@@ -14,7 +14,98 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      races: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          race_date: string | null
+          series: Database["public"]["Enums"]["race_series"]
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          race_date?: string | null
+          series: Database["public"]["Enums"]["race_series"]
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          race_date?: string | null
+          series?: Database["public"]["Enums"]["race_series"]
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      slider_images: {
+        Row: {
+          area: Database["public"]["Enums"]["slider_area"]
+          compressed_path: string | null
+          compressed_size_kb: number | null
+          compressed_url: string | null
+          created_at: string
+          format: string | null
+          id: string
+          original_path: string | null
+          original_size_kb: number | null
+          original_url: string | null
+          position: number
+          race_id: string
+          status: Database["public"]["Enums"]["image_status"]
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          area: Database["public"]["Enums"]["slider_area"]
+          compressed_path?: string | null
+          compressed_size_kb?: number | null
+          compressed_url?: string | null
+          created_at?: string
+          format?: string | null
+          id?: string
+          original_path?: string | null
+          original_size_kb?: number | null
+          original_url?: string | null
+          position?: number
+          race_id: string
+          status?: Database["public"]["Enums"]["image_status"]
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          area?: Database["public"]["Enums"]["slider_area"]
+          compressed_path?: string | null
+          compressed_size_kb?: number | null
+          compressed_url?: string | null
+          created_at?: string
+          format?: string | null
+          id?: string
+          original_path?: string | null
+          original_size_kb?: number | null
+          original_url?: string | null
+          position?: number
+          race_id?: string
+          status?: Database["public"]["Enums"]["image_status"]
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slider_images_race_id_fkey"
+            columns: ["race_id"]
+            isOneToOne: false
+            referencedRelation: "races"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +114,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      image_status: "live" | "image_done" | "todo" | "blank"
+      race_series: "f1" | "motogp"
+      slider_area: "plp" | "pdp"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +243,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      image_status: ["live", "image_done", "todo", "blank"],
+      race_series: ["f1", "motogp"],
+      slider_area: ["plp", "pdp"],
+    },
   },
 } as const
