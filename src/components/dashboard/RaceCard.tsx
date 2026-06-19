@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, ExternalLink, Pencil, Check, X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Plus, Trash2, ChevronDown, ChevronRight, ExternalLink, Pencil, Check, X, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ImageCell, type SliderImage } from "./ImageCell";
