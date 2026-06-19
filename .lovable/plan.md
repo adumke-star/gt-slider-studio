@@ -1,34 +1,52 @@
-## Problem
+# Plan: Dashboard-Erweiterungen
 
-Der Export funktioniert technisch — er komprimiert die Bilder per Canvas und legt sie im `compressed`-Bucket ab (deshalb erscheint im Bild auch der „komprimiert"-Status). Es fehlt aber das, was du erwartest: ein **Speicherort-Dialog / Download auf deinen Rechner**. Aktuell landen die Web-Ready-Dateien nur in der Cloud, nicht auf der Festplatte.
+## 1. Harte Größenobergrenze beim Export
+- `src/lib/imageProcess.ts`: Qualitätssuche so anpassen, dass das Ergebnis **immer ≤ targetKB** ist. Binäre Suche wird konservativ (zu groß → härter runter), Endkontrolle: falls noch zu groß, schrittweise weiter runter bis 0.2.
+- Wenn auch bei minimaler Qualität noch zu groß: Bildgröße iterativ um 10 % verkleinern (633×382 bleibt obere Grenze) bis Limit eingehalten oder Mindestgröße erreicht. Tritt das ein, Hinweis im Toast: „Limit eingehalten, Auflösung reduziert".
+- PNG: bleibt verlustfrei; wenn PNG > targetKB, automatisch Hinweis „PNG kann nicht garantiert werden".
 
-## Lösung
+## 2. Namensfeld pro Bild
+- `slider_images.title` existiert bereits — als Anzeigename verwenden.
+- `ImageCell.tsx`: kleines, inline editierbares Textfeld unterhalb der Buttons (Klick zum Bearbeiten, Speichern bei Blur/Enter).
+- Download-Dateinamen (Einzel-Download in `ImageCell` und Export in `ExportDialog`) nutzen `slugify(title)` falls gesetzt, sonst Fallback aus Race-Name + Section + Position.
 
-Den Export-Flow um lokale Downloads ergänzen, ohne die DB-/Bucket-Logik zu verändern.
+## 3. Drag & Drop Umsortieren
+- Aktuelles Verhalten tauscht nur zwei Bilder. Neu: **Einsortieren an Zielposition** (klassisches Reorder).
+- `ImageCell` bekommt zusätzlich linke/rechte Drop-Indikatoren; beim Drop wird das gezogene Bild vor/nach dem Ziel eingefügt, alle `position`-Werte der betroffenen Section neu gesetzt (Batch-Update).
+- Drag bleibt innerhalb derselben Section (Cross-Section später).
 
-### 1. `ExportDialog.tsx` erweitern
-- Neue Option **„Download nach Export"** (Toggle, default an) mit zwei Modi:
-  - **Einzeldateien** — je komprimiertes Bild wird per `a[download]` ausgelöst.
-  - **ZIP** — alle Bilder eines Exports werden in ein ZIP gepackt (`<RaceName>_<Area>.zip`) und einmal heruntergeladen. Default für >1 Bild.
-- Dateinamen-Schema: `{race-slug}_{area}_{position}.{ext}` (z. B. `monaco-gp_plp_1.webp`).
-- Nach dem Upload in Supabase wird das `blob` im RAM gehalten und am Ende für Download verwendet — keine zweite Komprimierung nötig.
+## 4. Mehrere benannte PLP/PDP-Sections
+Aktuell ist `area` ein Enum (`plp` | `pdp`) — fest verdrahtet. Wir führen eine richtige Section-Tabelle ein:
 
-### 2. Einzel-Download pro Zelle
-- In `ImageCell.tsx` einen kleinen Download-Button (Icon) einblenden, sobald `compressed_path` existiert — lädt die komprimierte Datei via signed URL und triggert `a[download]`.
+**Schema (Migration):**
+- Neue Tabelle `slider_sections`:
+  - `race_id` (FK races)
+  - `kind` ('plp' | 'pdp')
+  - `name` (text, editierbar, z. B. „PLP Hero", „PDP Sidebar")
+  - `sort_order` (int)
+  - `external_url` (text, nullable) — siehe Punkt 5
+- `slider_images`: neue Spalte `section_id uuid` (FK), bestehende Zeilen werden über `area` auf je eine automatisch erzeugte Default-Section pro Race + Kind gemappt. `area` bleibt vorerst bestehen (nullable) zur Sicherheit.
+- GRANTs + RLS analog zu bestehenden Tabellen.
 
-### 3. Mini-Bibliothek für ZIP
-- `jszip` hinzufügen (rein clientseitig, klein, keine Server-Abhängigkeit).
+**UI:**
+- `RaceCard.tsx`: rendert Liste der Sections statt fixen PLP/PDP-Block. Pro Section:
+  - Editierbarer Name (Inline)
+  - Kind-Badge (PLP/PDP)
+  - „+ Slot", Section löschen, Section umbenennen
+- Oben in der Race-Card: Button „+ PLP-Section" und „+ PDP-Section".
 
-### 4. Feedback
-- Toast nach Abschluss: „X Bilder exportiert · ZIP heruntergeladen" bzw. „… in Cloud gespeichert".
-- Progress-Anzeige bleibt wie sie ist.
+## 5. Externer Link pro Section (Original-Ordner)
+- Feld `external_url` in `slider_sections` (siehe 4).
+- Im Section-Header: kleines Stift-Icon zum Eintragen/Ändern der URL (Prompt oder Inline-Input).
+- Wenn URL gesetzt: Button **„Originale öffnen"** (Icon `ExternalLink`) im Header — öffnet die URL in neuem Tab (`target="_blank" rel="noopener"`). Kein roher Link sichtbar.
 
-## Was bleibt unverändert
-- Supabase-Schema, Buckets, RLS.
-- Canvas-Transformation (633×382, Format/KB-Slider).
-- Trennung Originals ↔ Compressed.
+## Technische Notizen
+- Migration in einem Schritt: Tabelle anlegen, GRANTs, RLS, Policies, dann Default-Sections für jedes bestehende Race per `INSERT … SELECT` aus `races` (eine „PLP" + eine „PDP" pro Race) und `UPDATE slider_images SET section_id = …` über das Mapping (race_id, area).
+- `ExportDialog` Dateinamen-Logik nutzt neuen Titel; Section-Name geht statt `area` in den Fallback-Namen ein.
+- `types.ts` regeneriert sich nach der Migration; danach folgen die Code-Anpassungen.
 
-## Technische Details
-- Neue Dependency: `jszip`.
-- Geänderte Dateien: `src/components/dashboard/ExportDialog.tsx`, `src/components/dashboard/ImageCell.tsx`.
-- Browser-`a[download]` reicht — kein File System Access API nötig (Chrome/Edge zeigen den Speicherort-Dialog ohnehin, wenn „Vor dem Download fragen" in den Browser-Einstellungen aktiv ist).
+## Reihenfolge der Umsetzung
+1. Migration (Sections-Tabelle, Backfill).
+2. Code-Refactor `RaceCard` + `ImageCell` (Sections, Namen, Reorder, Link-Button).
+3. `imageProcess.ts` harte Obergrenze.
+4. Export-/Download-Dateinamen anpassen.
