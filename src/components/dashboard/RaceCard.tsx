@@ -311,6 +311,7 @@ function SectionBlock({
   onSectionDragEnd,
   onSectionDropOn,
   onBatchUpload,
+  onExport,
 }: {
   section: SliderSection;
   images: SliderImage[];
@@ -328,6 +329,7 @@ function SectionBlock({
   onSectionDragEnd: () => void;
   onSectionDropOn: (side: "before" | "after") => void;
   onBatchUpload: (files: File[], onProgress?: (items: BatchItem[]) => void) => Promise<void> | void;
+  onExport: (images: SliderImage[]) => void;
 }) {
   const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const [editingName, setEditingName] = useState(false);
