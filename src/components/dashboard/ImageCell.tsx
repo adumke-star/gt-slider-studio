@@ -201,7 +201,7 @@ export function ImageCell({
       }}
       className={cn(
         "group relative flex w-[180px] shrink-0 flex-col overflow-hidden rounded-md border transition",
-        image.status === "changes" ? "bg-[#CB4F10]/20 border-[#CB4F10]/50" : "bg-surface-2 border-border hover:border-primary/40",
+        image.status === "changes" ? "bg-[#CB4F10]/20 border-[#CB4F10]/50" : image.status === "image_done" ? "bg-[#D4A843]/20 border-[#D4A843]/50" : "bg-surface-2 border-border hover:border-primary/40",
         selected ? "ring-2 ring-primary/40" : "",
       )}
     >
