@@ -108,14 +108,23 @@ export function RaceCard({
     onReload();
   }
 
-  async function batchUploadToSection(s: SliderSection, files: File[]) {
+  async function batchUploadToSection(
+    s: SliderSection,
+    files: File[],
+    onProgress?: (items: BatchItem[]) => void,
+  ) {
     const imageFiles = files.filter((f) => f.type.startsWith("image/"));
     if (imageFiles.length === 0) return;
     imageFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+    const items: BatchItem[] = imageFiles.map((f) => ({ name: f.name, status: "pending" }));
+    onProgress?.(items.slice());
     const list = imagesBySection.get(s.id) ?? [];
     let nextPos = (list[list.length - 1]?.position ?? -1) + 1;
     const { uploadFile } = await import("@/lib/storage");
-    for (const file of imageFiles) {
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i];
+      items[i].status = "uploading";
+      onProgress?.(items.slice());
       const ext = file.name.split(".").pop() || "bin";
       const baseName = file.name.replace(/\.[^.]+$/, "").trim();
       const { data: row, error } = await supabase.from("slider_images").insert({
@@ -126,7 +135,12 @@ export function RaceCard({
         status: "todo",
         title: baseName || null,
       }).select().single();
-      if (error || !row) continue;
+      if (error || !row) {
+        items[i].status = "error";
+        items[i].error = error?.message || "DB insert fehlgeschlagen";
+        onProgress?.(items.slice());
+        continue;
+      }
       const path = `${race.id}/${s.id}/${row.id}-${Date.now()}.${ext}`;
       try {
         await uploadFile("originals", path, file, file.type);
@@ -134,9 +148,13 @@ export function RaceCard({
           original_path: path,
           original_size_kb: Math.round(file.size / 1024),
         }).eq("id", row.id);
-      } catch (e) {
+        items[i].status = "done";
+      } catch (e: any) {
         console.error("batch upload failed", file.name, e);
+        items[i].status = "error";
+        items[i].error = e?.message || "Upload fehlgeschlagen";
       }
+      onProgress?.(items.slice());
     }
     onReload();
   }
