@@ -356,16 +356,18 @@ function SectionBlock({
     <div
       ref={rootRef}
       onDragEnter={(e) => {
-        if (e.dataTransfer.types.includes("Files")) {
+        if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
+          e.stopPropagation();
           dragCounterRef.current += 1;
           setFileHover(true);
         }
       }}
       onDragOver={(e) => {
         const types = e.dataTransfer.types;
-        if (types.includes("Files")) {
+        if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
+          e.stopPropagation();
           e.dataTransfer.dropEffect = "copy";
           if (!fileHover) setFileHover(true);
           return;
@@ -377,7 +379,7 @@ function SectionBlock({
         setSectionDropSide(e.clientY < r.top + r.height / 2 ? "before" : "after");
       }}
       onDragLeave={(e) => {
-        if (e.dataTransfer.types.includes("Files")) {
+        if (dataTransferHasFiles(e.dataTransfer)) {
           dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
           if (dragCounterRef.current === 0) setFileHover(false);
           return;
@@ -387,14 +389,13 @@ function SectionBlock({
         }
       }}
       onDrop={async (e) => {
-        if (e.dataTransfer.types.includes("Files") || (e.dataTransfer.files && e.dataTransfer.files.length > 0)) {
+        if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
           e.stopPropagation();
           dragCounterRef.current = 0;
           setFileHover(false);
-          const { collectFilesFromDataTransfer } = await import("@/lib/dropFiles");
           const files = await collectFilesFromDataTransfer(e.dataTransfer);
-          const images = files.filter((f) => f.type.startsWith("image/"));
+          const images = files.filter(isImageFile);
           if (images.length === 0) return;
           setUploading(true);
           setBatchItems(images.map((f) => ({ name: f.name, status: "pending" as const })));
