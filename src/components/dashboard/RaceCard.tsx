@@ -13,6 +13,8 @@ type Race = {
   sort_order: number;
 };
 
+export type SectionLink = { label: string; url: string };
+
 export type SliderSection = {
   id: string;
   race_id: string;
@@ -20,6 +22,7 @@ export type SliderSection = {
   name: string;
   sort_order: number;
   external_url: string | null;
+  external_links: SectionLink[] | null;
 };
 
 export function RaceCard({
