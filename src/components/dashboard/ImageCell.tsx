@@ -66,6 +66,8 @@ export function ImageCell({
 
   useEffect(() => { setName(image.title ?? ""); }, [image.title]);
 
+  useEffect(() => { setName(image.title ?? ""); }, [image.title]);
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -77,6 +79,27 @@ export function ImageCell({
     })();
     return () => { alive = false; };
   }, [image.compressed_path, image.original_path]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const { count } = await supabase.from("comments")
+        .select("id", { count: "exact", head: true }).eq("image_id", image.id);
+      if (alive) setCommentCount(count ?? 0);
+      if (u.user) {
+        const { data: cs } = await supabase.from("comments").select("id").eq("image_id", image.id);
+        const ids = (cs ?? []).map((c) => c.id);
+        if (ids.length > 0) {
+          const { count: unread } = await supabase.from("comment_mentions")
+            .select("id", { count: "exact", head: true })
+            .in("comment_id", ids).eq("mentioned_user_id", u.user.id).is("read_at", null);
+          if (alive) setUnreadMentions(unread ?? 0);
+        } else if (alive) setUnreadMentions(0);
+      }
+    })();
+    return () => { alive = false; };
+  }, [image.id, commentsOpen]);
 
   async function handleFile(file: File) {
     setBusy(true);
