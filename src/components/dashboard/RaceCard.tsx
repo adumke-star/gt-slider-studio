@@ -41,7 +41,6 @@ export function RaceCard({
   const [dragId, setDragId] = useState<string | null>(null);
   const [sectionDragId, setSectionDragId] = useState<string | null>(null);
 
-  const [sectionDragId, setSectionDragId] = useState<string | null>(null);
 
   // PLP always first, then PDP. Inside each kind: sort_order, then name.
   const sorted = useMemo(() => {
