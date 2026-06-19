@@ -49,9 +49,28 @@ export function RaceCard({
   const [open, setOpen] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
   const [sectionDragId, setSectionDragId] = useState<string | null>(null);
-
+  const [hasOpenComments, setHasOpenComments] = useState(false);
 
   const hasChanges = useMemo(() => images.some((i) => i.status === "changes"), [images]);
+
+  useEffect(() => {
+    if (images.length === 0) {
+      setHasOpenComments(false);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      const ids = images.map((i) => i.id);
+      const { count } = await supabase
+        .from("comments")
+        .select("id", { count: "exact", head: true })
+        .in("image_id", ids)
+        .is("resolved_at", null);
+      if (alive) setHasOpenComments((count ?? 0) > 0);
+    })();
+    return () => { alive = false; };
+  }, [images]);
+
 
   // PLP always first, then PDP. Inside each kind: sort_order, then name.
   const sorted = useMemo(() => {
