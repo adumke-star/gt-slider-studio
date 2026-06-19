@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Download, Plus, X, Flag } from "lucide-react";
+import { Download, Plus, X, Flag, Trash2 } from "lucide-react";
+import { removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { RaceCard, type SliderSection } from "@/components/dashboard/RaceCard";
@@ -112,6 +113,25 @@ function Dashboard() {
             </div>
             <Button onClick={() => setAddOpen(true)} variant="outline" className="gap-1.5">
               <Plus className="h-4 w-4" /> Race
+            </Button>
+            <Button
+              onClick={async () => {
+                if (selectedImgs.length === 0) return;
+                if (!confirm(`${selectedImgs.length} Slot(s) endgültig löschen? Die zugehörigen Bilder werden ebenfalls entfernt.`)) return;
+                await Promise.all(selectedImgs.flatMap((img) => [
+                  img.original_path ? removeFile("originals", img.original_path).catch(() => {}) : Promise.resolve(),
+                  img.compressed_path ? removeFile("compressed", img.compressed_path).catch(() => {}) : Promise.resolve(),
+                ]));
+                await supabase.from("slider_images").delete().in("id", selectedImgs.map((i) => i.id));
+                setSelected(new Set());
+                load();
+              }}
+              disabled={selected.size === 0}
+              variant="outline"
+              className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+            >
+              <Trash2 className="h-4 w-4" />
+              Löschen {selected.size > 0 && <span className="rounded bg-destructive/20 px-1.5 text-xs">{selected.size}</span>}
             </Button>
             <Button
               onClick={() => setExportOpen(true)}

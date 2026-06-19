@@ -42,6 +42,7 @@ export function ImageCell({
   onDragStart,
   onDropBefore,
   onDropAfter,
+  onMultiFileDrop,
 }: {
   image: SliderImage;
   selected: boolean;
@@ -50,6 +51,7 @@ export function ImageCell({
   onDragStart: () => void;
   onDropBefore: () => void;
   onDropAfter: () => void;
+  onMultiFileDrop?: (files: File[]) => void;
 }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -146,10 +148,17 @@ export function ImageCell({
       }}
       onDragLeave={() => setDropSide(null)}
       onDrop={(e) => {
-        if (e.dataTransfer.files?.[0]) {
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
           e.preventDefault();
+          e.stopPropagation();
           setDropSide(null);
-          handleFile(e.dataTransfer.files[0]);
+          const arr = Array.from(files).filter((f) => f.type.startsWith("image/"));
+          if (arr.length > 1 && onMultiFileDrop) {
+            onMultiFileDrop(arr);
+          } else if (arr.length >= 1) {
+            handleFile(arr[0]);
+          }
           return;
         }
         e.preventDefault();
