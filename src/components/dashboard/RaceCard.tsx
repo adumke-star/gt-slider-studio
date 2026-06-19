@@ -241,6 +241,10 @@ function SectionBlock({
   onAddSlot,
   onDragStart,
   onDropOn,
+  isSectionDragging,
+  onSectionDragStart,
+  onSectionDragEnd,
+  onSectionDropOn,
 }: {
   section: SliderSection;
   images: SliderImage[];
@@ -253,11 +257,17 @@ function SectionBlock({
   onAddSlot: () => void;
   onDragStart: (id: string) => void;
   onDropOn: (targetId: string, side: "before" | "after") => void;
+  isSectionDragging: boolean;
+  onSectionDragStart: () => void;
+  onSectionDragEnd: () => void;
+  onSectionDropOn: (side: "before" | "after") => void;
 }) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(section.name);
   const [editingUrl, setEditingUrl] = useState(false);
   const [urlDraft, setUrlDraft] = useState(section.external_url ?? "");
+  const [sectionDropSide, setSectionDropSide] = useState<"before" | "after" | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   function commitName() {
     setEditingName(false);
@@ -270,9 +280,54 @@ function SectionBlock({
   }
 
   return (
-    <div className="rounded border border-border/60 bg-background/30">
+    <div
+      ref={rootRef}
+      onDragOver={(e) => {
+        // Only react to section drags (text/plain payload "section:<id>")
+        const types = e.dataTransfer.types;
+        if (types.includes("Files") || types.includes("application/x-slider-image")) return;
+        e.preventDefault();
+        const r = rootRef.current?.getBoundingClientRect();
+        if (!r) return;
+        setSectionDropSide(e.clientY < r.top + r.height / 2 ? "before" : "after");
+      }}
+      onDragLeave={() => setSectionDropSide(null)}
+      onDrop={(e) => {
+        if (sectionDropSide) {
+          e.preventDefault();
+          const side = sectionDropSide;
+          setSectionDropSide(null);
+          onSectionDropOn(side);
+        }
+      }}
+      className={cn(
+        "relative rounded border border-border/60 bg-background/30 transition",
+        isSectionDragging && "opacity-50",
+      )}
+    >
+      {sectionDropSide && (
+        <div
+          className={cn(
+            "pointer-events-none absolute left-0 z-20 h-1 w-full bg-primary",
+            sectionDropSide === "before" ? "top-0" : "bottom-0",
+          )}
+        />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
+          <div
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", `section:${section.id}`);
+              onSectionDragStart();
+            }}
+            onDragEnd={onSectionDragEnd}
+            title="Sektion verschieben"
+            className="grid h-5 w-5 cursor-grab place-items-center rounded text-muted-foreground hover:text-primary active:cursor-grabbing"
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </div>
           <span className={cn(
             "shrink-0 rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest",
             section.kind === "plp" ? "bg-primary/15 text-primary" : "bg-foreground/10 text-foreground",
@@ -386,3 +441,4 @@ function SectionBlock({
     </div>
   );
 }
+
