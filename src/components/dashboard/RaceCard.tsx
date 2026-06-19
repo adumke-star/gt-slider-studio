@@ -109,7 +109,7 @@ export function RaceCard({
       area: s.kind,
       section_id: s.id,
       position: nextPos,
-      status: "blank",
+      status: "todo",
     });
     onReload();
   }
