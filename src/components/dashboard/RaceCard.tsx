@@ -224,15 +224,6 @@ export function RaceCard({
           <button onClick={() => setOpen((o) => !o)} className="text-muted-foreground hover:text-primary">
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
-          {hasChanges && (
-            <span
-              title="Changes pending"
-              className="relative flex h-2.5 w-2.5 shrink-0"
-            >
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#CB4F10]/60" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#CB4F10]" />
-            </span>
-          )}
           <span className={cn(
             "shrink-0 rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-widest",
             race.series === "f1" ? "bg-primary text-primary-foreground" :
@@ -550,6 +541,15 @@ function SectionBlock({
           )}>
             {section.kind}
           </span>
+          {images.some((i) => i.status === "changes") && (
+            <span
+              title="Changes pending"
+              className="relative flex h-2.5 w-2.5 shrink-0"
+            >
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#CB4F10]/60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#CB4F10]" />
+            </span>
+          )}
           {editingName ? (
             <div className="flex items-center gap-1">
               <input
