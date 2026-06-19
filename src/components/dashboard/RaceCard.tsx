@@ -237,31 +237,6 @@ export function RaceCard({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {(() => {
-            const sectionKindById = new Map(sections.map((s) => [s.id, s.kind] as const));
-            const plpImgs = images.filter((i) => i.original_path && (i.section_id ? sectionKindById.get(i.section_id) === "plp" : i.area === "plp"));
-            const pdpImgs = images.filter((i) => i.original_path && (i.section_id ? sectionKindById.get(i.section_id) === "pdp" : i.area === "pdp"));
-            const allImgs = images.filter((i) => i.original_path);
-            return (
-              <div className="mr-1 flex items-center gap-1 border-r border-border pr-2">
-                <Button size="sm" variant="ghost" disabled={plpImgs.length === 0}
-                  onClick={() => onExport(plpImgs)}
-                  className="h-7 gap-1 text-xs disabled:opacity-40" title="Alle PLP-Bilder exportieren">
-                  <Download className="h-3.5 w-3.5" /> PLP {plpImgs.length > 0 && <span className="text-muted-foreground">({plpImgs.length})</span>}
-                </Button>
-                <Button size="sm" variant="ghost" disabled={pdpImgs.length === 0}
-                  onClick={() => onExport(pdpImgs)}
-                  className="h-7 gap-1 text-xs disabled:opacity-40" title="Alle PDP-Bilder exportieren">
-                  <Download className="h-3.5 w-3.5" /> PDP {pdpImgs.length > 0 && <span className="text-muted-foreground">({pdpImgs.length})</span>}
-                </Button>
-                <Button size="sm" variant="ghost" disabled={allImgs.length === 0}
-                  onClick={() => onExport(allImgs)}
-                  className="h-7 gap-1 text-xs disabled:opacity-40" title="Kompletten Stack exportieren">
-                  <Download className="h-3.5 w-3.5" /> Stack {allImgs.length > 0 && <span className="text-muted-foreground">({allImgs.length})</span>}
-                </Button>
-              </div>
-            );
-          })()}
           <Button size="sm" variant="ghost" onClick={() => addSection("plp")} className="h-7 gap-1 text-xs">
             <Plus className="h-3.5 w-3.5" /> PLP
           </Button>
@@ -309,6 +284,7 @@ export function RaceCard({
                 onSectionDragEnd={() => setSectionDragId(null)}
                 onSectionDropOn={(side) => reorderSection(s.id, side)}
                 onBatchUpload={(files, onProgress) => batchUploadToSection(s, files, onProgress)}
+                onExport={onExport}
               />
             );
           })}
@@ -335,6 +311,7 @@ function SectionBlock({
   onSectionDragEnd,
   onSectionDropOn,
   onBatchUpload,
+  onExport,
 }: {
   section: SliderSection;
   images: SliderImage[];
@@ -352,6 +329,7 @@ function SectionBlock({
   onSectionDragEnd: () => void;
   onSectionDropOn: (side: "before" | "after") => void;
   onBatchUpload: (files: File[], onProgress?: (items: BatchItem[]) => void) => Promise<void> | void;
+  onExport: (images: SliderImage[]) => void;
 }) {
   const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const [editingName, setEditingName] = useState(false);
@@ -578,6 +556,13 @@ function SectionBlock({
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
+          <Button size="sm" variant="ghost"
+            disabled={images.filter((i) => i.original_path).length === 0}
+            onClick={() => onExport(images.filter((i) => i.original_path))}
+            className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-40"
+            title={`${section.kind.toUpperCase()}-Bilder exportieren`}>
+            <Download className="h-3.5 w-3.5" /> Export
+          </Button>
           <Button size="sm" variant="ghost" onClick={onAddSlot}
             className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary">
             <Plus className="h-3.5 w-3.5" /> Slot
