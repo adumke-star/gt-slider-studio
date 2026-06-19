@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, X } from "lucide-react";
+import { Send, Check, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl } from "@/lib/storage";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { SliderImage } from "./ImageCell";
 
 type Profile = { id: string; full_name: string | null; email: string; avatar_url: string | null };
-type Comment = { id: string; author_id: string; body: string; created_at: string };
+type Comment = { id: string; author_id: string; body: string; created_at: string; resolved_at: string | null; resolved_by: string | null };
 type Mention = { comment_id: string; mentioned_user_id: string };
 
 // Mentions are stored as @[Name](user_id) tokens in the comment body.
