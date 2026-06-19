@@ -325,6 +325,8 @@ export function ImageCell({
             : <>Orig: {image.original_size_kb} KB</>}
         </div>
       )}
+
+      <CommentsSheet image={image} open={commentsOpen} onOpenChange={setCommentsOpen} />
     </div>
   );
 }
