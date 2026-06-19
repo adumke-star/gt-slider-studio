@@ -40,10 +40,15 @@ export function RaceCard({
   const [open, setOpen] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
 
-  const sorted = useMemo(
-    () => [...sections].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
-    [sections],
-  );
+  const [sectionDragId, setSectionDragId] = useState<string | null>(null);
+
+  // PLP always first, then PDP. Inside each kind: sort_order, then name.
+  const sorted = useMemo(() => {
+    const byKind = (k: "plp" | "pdp") =>
+      sections.filter((s) => s.kind === k)
+        .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+    return [...byKind("plp"), ...byKind("pdp")];
+  }, [sections]);
 
   const imagesBySection = useMemo(() => {
     const m = new Map<string, SliderImage[]>();
