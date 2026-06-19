@@ -22,14 +22,14 @@ export type SliderImage = {
   format: string | null;
 };
 
-const STATUS_ORDER: SliderImage["status"][] = ["blank", "todo", "changes", "image_done", "live"];
+const STATUS_ORDER: SliderImage["status"][] = ["todo", "changes", "image_done", "live"];
 
 const STATUS_META: Record<SliderImage["status"], { label: string; cls: string }> = {
   live: { label: "Live", cls: "bg-[var(--status-live)]/15 text-[var(--status-live)] border-[var(--status-live)]/40" },
   image_done: { label: "Image done", cls: "bg-primary/15 text-primary border-primary/40" },
   changes: { label: "Changes", cls: "bg-[var(--status-changes)]/15 text-[var(--status-changes)] border-[var(--status-changes)]/40" },
   todo: { label: "To do", cls: "bg-[var(--status-todo)]/15 text-[var(--status-todo)] border-[var(--status-todo)]/40" },
-  blank: { label: "Blank", cls: "bg-muted text-muted-foreground border-border" },
+  blank: { label: "To do", cls: "bg-[var(--status-todo)]/15 text-[var(--status-todo)] border-[var(--status-todo)]/40" },
 };
 
 export function slugifyName(s: string) {
@@ -131,7 +131,7 @@ export function ImageCell({
       await supabase.from("slider_images").update({
         original_path: null, compressed_path: null, compressed_url: null,
         original_size_kb: null, compressed_size_kb: null, format: null,
-        status: "blank",
+        status: "todo",
       }).eq("id", image.id);
       onChanged();
     } finally {

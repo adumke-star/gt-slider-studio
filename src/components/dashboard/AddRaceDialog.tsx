@@ -35,7 +35,7 @@ export function AddRaceDialog({
               area: s.kind as "plp" | "pdp",
               section_id: s.id,
               position: 0,
-              status: "blank" as const,
+              status: "todo" as const,
             })),
           );
         }
