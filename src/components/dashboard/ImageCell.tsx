@@ -269,6 +269,19 @@ export function ImageCell({
           {meta.label}
         </button>
         <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => setCommentsOpen(true)}
+            title="Kommentare"
+            className="relative rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            {commentCount > 0 && (
+              <span className={cn(
+                "absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full px-1 text-[8px] font-bold",
+                unreadMentions > 0 ? "bg-destructive text-white" : "bg-primary text-primary-foreground",
+              )}>{unreadMentions > 0 ? unreadMentions : commentCount}</span>
+            )}
+          </button>
           {image.compressed_path && (
             <button
               onClick={async () => {
