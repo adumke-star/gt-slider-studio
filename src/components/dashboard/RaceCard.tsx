@@ -415,17 +415,28 @@ function SectionBlock({
       return;
     }
     let alive = true;
-    (async () => {
-      const ids = images.map((i) => i.id);
+    const ids = images.map((i) => i.id);
+    const refetch = async () => {
       const { count } = await supabase
         .from("comments")
         .select("id", { count: "exact", head: true })
         .in("image_id", ids)
         .is("resolved_at", null);
       if (alive) setHasOpenComments((count ?? 0) > 0);
-    })();
-    return () => { alive = false; };
-  }, [images]);
+    };
+    refetch();
+    const channel = supabase
+      .channel(`section-comments-${section.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, (payload) => {
+        const row = (payload.new ?? payload.old) as { image_id?: string } | null;
+        if (row?.image_id && ids.includes(row.image_id)) refetch();
+      })
+      .subscribe();
+    return () => {
+      alive = false;
+      supabase.removeChannel(channel);
+    };
+  }, [images, section.id]);
 
   const scrollBy = (dir: 1 | -1) => {
     const el = scrollRef.current;
