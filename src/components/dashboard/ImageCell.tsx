@@ -131,7 +131,7 @@ export function ImageCell({
       await supabase.from("slider_images").update({
         original_path: null, compressed_path: null, compressed_url: null,
         original_size_kb: null, compressed_size_kb: null, format: null,
-        status: "blank",
+        status: "todo",
       }).eq("id", image.id);
       onChanged();
     } finally {
