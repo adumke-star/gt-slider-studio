@@ -422,7 +422,94 @@ function SectionBlock({
           />
         ))}
       </div>
+
+      {editingLinks && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur"
+          onClick={() => setEditingLinks(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg rounded-lg border border-border bg-surface-2 p-4 shadow-xl"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-display text-sm font-black uppercase tracking-widest">
+                Externe Links — {section.name}
+              </h3>
+              <button
+                onClick={() => setEditingLinks(false)}
+                className="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {linksDraft.length === 0 && (
+                <div className="rounded border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+                  Noch keine Links — füge unten den ersten hinzu.
+                </div>
+              )}
+              {linksDraft.map((l, idx) => (
+                <div key={idx} className="grid grid-cols-[140px_minmax(0,1fr)_auto] gap-2">
+                  <input
+                    type="text"
+                    placeholder="Beschriftung"
+                    value={l.label}
+                    onChange={(e) => {
+                      const next = linksDraft.slice();
+                      next[idx] = { ...next[idx], label: e.target.value };
+                      setLinksDraft(next);
+                    }}
+                    className="rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
+                  />
+                  <input
+                    type="url"
+                    placeholder="https://…"
+                    value={l.url}
+                    onChange={(e) => {
+                      const next = linksDraft.slice();
+                      next[idx] = { ...next[idx], url: e.target.value };
+                      setLinksDraft(next);
+                    }}
+                    className="rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
+                  />
+                  <button
+                    onClick={() => setLinksDraft(linksDraft.filter((_, i) => i !== idx))}
+                    className="rounded p-1.5 text-muted-foreground hover:bg-background hover:text-destructive"
+                    title="Link entfernen"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setLinksDraft([...linksDraft, { label: "", url: "" }])}
+                className="gap-1 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" /> Link hinzufügen
+              </Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setEditingLinks(false)}>
+                  Abbrechen
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={commitLinks}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  Speichern
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
