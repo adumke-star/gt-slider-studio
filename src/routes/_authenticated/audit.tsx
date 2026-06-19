@@ -4,7 +4,7 @@ import { ArrowLeft, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/audit")({
-  head: () => ({ meta: [{ title: "Verlauf — Slider Studio" }] }),
+  head: () => ({ meta: [{ title: "History — Slider Studio" }] }),
   component: AuditPage,
 });
 
@@ -23,14 +23,14 @@ type Profile = { id: string; email: string; full_name: string | null; avatar_url
 type Race = { id: string; name: string };
 
 const ACTION_LABEL: Record<string, string> = {
-  created: "angelegt",
-  uploaded: "hochgeladen",
-  replaced: "ersetzt",
-  renamed: "umbenannt",
-  moved: "verschoben",
-  status_changed: "Status geändert",
-  updated: "geändert",
-  deleted: "gelöscht",
+  created: "created",
+  uploaded: "uploaded",
+  replaced: "replaced",
+  renamed: "renamed",
+  moved: "moved",
+  status_changed: "status changed",
+  updated: "updated",
+  deleted: "deleted",
 };
 
 const ACTION_COLOR: Record<string, string> = {
@@ -102,9 +102,9 @@ function AuditPage() {
     return (
       <div className="grid min-h-screen place-items-center bg-background px-6 text-center text-foreground">
         <div>
-          <h1 className="font-display text-2xl uppercase">Kein Zugriff</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Diese Seite ist nur für Admins.</p>
-          <Link to="/" className="mt-4 inline-block text-sm text-primary hover:underline">← Zurück zum Dashboard</Link>
+          <h1 className="font-display text-2xl uppercase">No access</h1>
+          <p className="mt-2 text-sm text-muted-foreground">This page is for admins only.</p>
+          <Link to="/" className="mt-4 inline-block text-sm text-primary hover:underline">← Back to dashboard</Link>
         </div>
       </div>
     );
@@ -117,7 +117,7 @@ function AuditPage() {
           <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" /> Dashboard
           </Link>
-          <h1 className="ml-auto font-display text-lg font-black uppercase">Änderungs-Verlauf</h1>
+          <h1 className="ml-auto font-display text-lg font-black uppercase">Change history</h1>
         </div>
       </header>
 
@@ -125,25 +125,25 @@ function AuditPage() {
         <section className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface-2 p-3">
           <Filter className="h-4 w-4 text-muted-foreground" />
           <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1.5 text-sm">
-            <option value="">Alle Nutzer</option>
+            <option value="">All users</option>
             {uniqueUsers.map((p) => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
           </select>
           <select value={raceFilter} onChange={(e) => setRaceFilter(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1.5 text-sm">
-            <option value="">Alle Rennen</option>
+            <option value="">All races</option>
             {uniqueRaces.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
           <select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1.5 text-sm">
-            <option value="">Alle Aktionen</option>
+            <option value="">All actions</option>
             {Object.entries(ACTION_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-          <span className="ml-auto text-xs text-muted-foreground">{filtered.length} Einträge</span>
+          <span className="ml-auto text-xs text-muted-foreground">{filtered.length} entries</span>
         </section>
 
         <section className="overflow-hidden rounded-lg border border-border bg-surface-2">
           {loading ? (
-            <div className="px-4 py-12 text-center text-sm text-muted-foreground">Lade…</div>
+            <div className="px-4 py-12 text-center text-sm text-muted-foreground">Loading…</div>
           ) : filtered.length === 0 ? (
-            <div className="px-4 py-12 text-center text-sm text-muted-foreground">Keine Einträge.</div>
+            <div className="px-4 py-12 text-center text-sm text-muted-foreground">No entries.</div>
           ) : (
             <ul className="divide-y divide-border/50">
               {filtered.map((r) => <LogEntry key={r.id} row={r} profile={r.user_id ? profiles[r.user_id] : undefined} race={r.race_id ? races[r.race_id] : undefined} />)}
@@ -156,12 +156,12 @@ function AuditPage() {
 }
 
 function LogEntry({ row, profile, race }: { row: LogRow; profile?: Profile; race?: Race }) {
-  const who = profile?.full_name || profile?.email || "Unbekannt";
+  const who = profile?.full_name || profile?.email || "Unknown";
   const what = ACTION_LABEL[row.action] ?? row.action;
   const color = ACTION_COLOR[row.action] ?? ACTION_COLOR.updated;
-  const title = (row.new_values?.title ?? row.old_values?.title) || "(ohne Titel)";
+  const title = (row.new_values?.title ?? row.old_values?.title) || "(untitled)";
   const detail = describeChange(row);
-  const when = new Date(row.created_at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+  const when = new Date(row.created_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 
   return (
     <li className="flex items-start gap-3 px-4 py-3">
@@ -191,15 +191,15 @@ function describeChange(row: LogRow): string | null {
   const n = row.new_values ?? {};
   switch (row.action) {
     case "renamed":
-      return `„${o.title ?? "—"}" → „${n.title ?? "—"}"`;
+      return `"${o.title ?? "—"}" → "${n.title ?? "—"}"`;
     case "status_changed":
       return `${o.status} → ${n.status}`;
     case "moved":
       if (o.position !== n.position) return `Position ${o.position} → ${n.position}`;
-      if (o.area !== n.area) return `Bereich ${o.area} → ${n.area}`;
-      return "Verschoben";
+      if (o.area !== n.area) return `Area ${o.area} → ${n.area}`;
+      return "Moved";
     case "replaced":
-      return n.format ? `Neues Bild (${n.format}, ${n.original_size_kb ?? "?"} KB)` : "Neues Bild hochgeladen";
+      return n.format ? `New image (${n.format}, ${n.original_size_kb ?? "?"} KB)` : "New image uploaded";
     case "uploaded":
       return n.format ? `${n.format}, ${n.original_size_kb ?? "?"} KB` : null;
     default:

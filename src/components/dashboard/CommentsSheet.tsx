@@ -171,7 +171,7 @@ export function CommentsSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-full max-w-md flex-col gap-0 p-0">
         <SheetHeader className="border-b border-border p-4">
-          <SheetTitle className="text-sm font-bold uppercase tracking-wider">Kommentare</SheetTitle>
+          <SheetTitle className="text-sm font-bold uppercase tracking-wider">Comments</SheetTitle>
         </SheetHeader>
 
         {image && (
@@ -181,7 +181,7 @@ export function CommentsSheet({
                 {preview ? <img src={preview} alt="" className="h-full w-full object-cover" /> : null}
               </div>
               <div className="min-w-0">
-                <div className="truncate text-sm font-semibold">{image.title || "Unbenannter Slot"}</div>
+                <div className="truncate text-sm font-semibold">{image.title || "Untitled slot"}</div>
                 <div className="text-xs text-muted-foreground">
                   {image.area.toUpperCase()} · Position {image.position}
                 </div>
@@ -192,7 +192,7 @@ export function CommentsSheet({
 
         <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
           {comments.length === 0 && (
-            <p className="text-center text-xs text-muted-foreground">Noch keine Kommentare. Schreib den ersten ↓</p>
+            <p className="text-center text-xs text-muted-foreground">No comments yet. Write the first one ↓</p>
           )}
           {comments.map((c) => {
             const author = profiles.get(c.author_id);
@@ -213,7 +213,7 @@ export function CommentsSheet({
                   <div className="mb-0.5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
                     <span className="truncate">{author?.full_name || author?.email || "—"}</span>
                     <span>·</span>
-                    <span>{new Date(c.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}</span>
+                    <span>{new Date(c.created_at).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}</span>
                     {isResolved && <span className="text-emerald-500">· solved</span>}
                   </div>
                   <div className={cn("whitespace-pre-wrap break-words", isResolved && "line-through")}>{renderBody(c.body, profiles)}</div>
@@ -226,7 +226,7 @@ export function CommentsSheet({
                         : "border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10",
                     )}
                   >
-                    {isResolved ? <><RotateCcw className="h-3 w-3" /> Wieder öffnen</> : <><Check className="h-3 w-3" /> Solved</>}
+                    {isResolved ? <><RotateCcw className="h-3 w-3" /> Reopen</> : <><Check className="h-3 w-3" /> Solved</>}
                   </button>
                 </div>
               </div>
