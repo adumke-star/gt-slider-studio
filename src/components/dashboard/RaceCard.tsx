@@ -556,6 +556,13 @@ function SectionBlock({
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
+          <Button size="sm" variant="ghost"
+            disabled={images.filter((i) => i.original_path).length === 0}
+            onClick={() => onExport(images.filter((i) => i.original_path))}
+            className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-40"
+            title={`${section.kind.toUpperCase()}-Bilder exportieren`}>
+            <Download className="h-3.5 w-3.5" /> Export
+          </Button>
           <Button size="sm" variant="ghost" onClick={onAddSlot}
             className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary">
             <Plus className="h-3.5 w-3.5" /> Slot
