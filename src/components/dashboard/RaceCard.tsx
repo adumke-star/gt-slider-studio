@@ -380,7 +380,13 @@ function SectionBlock({
           const files = await collectFilesFromDataTransfer(e.dataTransfer);
           if (files.length === 0) return;
           setUploading(true);
-          try { await onBatchUpload(files); } finally { setUploading(false); }
+          setBatchItems(files.filter((f) => f.type.startsWith("image/")).map((f) => ({ name: f.name, status: "pending" as const })));
+          try {
+            await onBatchUpload(files, (items) => setBatchItems(items));
+          } finally {
+            setUploading(false);
+            setTimeout(() => setBatchItems([]), 4000);
+          }
           return;
         }
         if (sectionDropSide) {
