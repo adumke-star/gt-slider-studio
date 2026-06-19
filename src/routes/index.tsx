@@ -152,6 +152,7 @@ function Dashboard() {
         open={exportOpen}
         onOpenChange={setExportOpen}
         images={selectedImgs}
+        races={races}
         onDone={() => { setSelected(new Set()); load(); }}
       />
     </div>

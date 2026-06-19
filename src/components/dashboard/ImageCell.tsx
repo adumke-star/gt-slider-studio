@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Trash2, Upload, Image as ImageIcon, Check } from "lucide-react";
+import { Trash2, Upload, Image as ImageIcon, Check, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -160,6 +160,25 @@ export function ImageCell({
           {meta.label}
         </button>
         <div className="flex items-center gap-0.5">
+          {image.compressed_path && (
+            <button
+              onClick={async () => {
+                const url = await signedUrl("compressed", image.compressed_path!);
+                if (!url) return;
+                const blob = await (await fetch(url)).blob();
+                const ext = image.format ? (image.format === "jpeg" ? "jpg" : image.format) : "webp";
+                const name = `${image.area}_${String(image.position).padStart(2, "0")}_${image.id.slice(0, 6)}.${ext}`;
+                const a = document.createElement("a");
+                const objUrl = URL.createObjectURL(blob);
+                a.href = objUrl; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(objUrl), 2000);
+              }}
+              title="Download compressed"
+              className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
+            >
+              <Download className="h-3.5 w-3.5" />
+            </button>
+          )}
           <label className="cursor-pointer rounded p-1 text-muted-foreground hover:bg-background hover:text-primary">
             <Upload className="h-3.5 w-3.5" />
             <input
