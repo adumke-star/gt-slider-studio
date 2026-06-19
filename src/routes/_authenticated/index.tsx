@@ -102,9 +102,7 @@ function Dashboard() {
       <header className="sticky top-0 z-30 border-b border-border bg-surface-2/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-4 px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded bg-primary text-primary-foreground">
-              <img src={logoAsset.url} alt="Global Tickets" className="h-6 w-6" />
-            </div>
+            <img src={logoAsset.url} alt="Global Tickets" className="h-9 w-auto" />
             <div className="min-w-0">
               <h1 className="font-display text-xl font-black uppercase leading-none tracking-tight">
                 Slider <span className="text-primary">Studio</span>

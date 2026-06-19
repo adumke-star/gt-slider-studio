@@ -54,9 +54,7 @@ function AuthPage() {
     <div className="grid min-h-screen place-items-center bg-background px-6 text-foreground">
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface-2 p-8 shadow-lg">
         <div className="mb-6 flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded bg-primary text-primary-foreground">
-            <img src={logoAsset.url} alt="Global Tickets" className="h-6 w-6" />
-          </div>
+          <img src={logoAsset.url} alt="Global Tickets" className="h-9 w-auto" />
           <div>
             <h1 className="font-display text-lg font-black uppercase leading-none">
               Slider <span className="text-primary">Studio</span>
