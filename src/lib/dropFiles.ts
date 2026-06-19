@@ -11,6 +11,17 @@ type FsEntry = {
   };
 };
 
+const IMAGE_FILE_RE = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|tiff?|webp)$/i;
+
+export function isImageFile(file: File) {
+  return file.type.startsWith("image/") || IMAGE_FILE_RE.test(file.name);
+}
+
+export function dataTransferHasFiles(dt: DataTransfer) {
+  const types = Array.from(dt.types ?? []);
+  return types.includes("Files") || (dt.files?.length ?? 0) > 0 || Array.from(dt.items ?? []).some((item) => item.kind === "file");
+}
+
 function readEntryFile(entry: FsEntry): Promise<File | null> {
   return new Promise((resolve) => {
     if (!entry.file) return resolve(null);
