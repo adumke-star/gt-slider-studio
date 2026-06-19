@@ -338,6 +338,33 @@ function SectionBlock({
   const [linksDraft, setLinksDraft] = useState<SectionLink[]>(links);
   const [sectionDropSide, setSectionDropSide] = useState<"before" | "after" | null>(null);
   const [fileHover, setFileHover] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const updateScrollState = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  };
+  useEffect(() => {
+    updateScrollState();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateScrollState, { passive: true });
+    const ro = new ResizeObserver(updateScrollState);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      ro.disconnect();
+    };
+  }, [images.length]);
+  const scrollBy = (dir: 1 | -1) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.max(240, el.clientWidth * 0.8), behavior: "smooth" });
+  };
+
   const [uploading, setUploading] = useState(false);
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
