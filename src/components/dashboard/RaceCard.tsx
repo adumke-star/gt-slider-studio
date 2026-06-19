@@ -131,6 +131,30 @@ export function RaceCard({
     onReload();
   }
 
+  async function reorderSection(targetId: string, side: "before" | "after") {
+    const draggedId = sectionDragId;
+    setSectionDragId(null);
+    if (!draggedId || draggedId === targetId) return;
+    const dragged = sections.find((s) => s.id === draggedId);
+    const target = sections.find((s) => s.id === targetId);
+    if (!dragged || !target) return;
+    if (dragged.kind !== target.kind) return; // PLP stays above PDP
+    const list = sorted.filter((s) => s.kind === dragged.kind);
+    const from = list.findIndex((s) => s.id === draggedId);
+    const [moved] = list.splice(from, 1);
+    let to = list.findIndex((s) => s.id === targetId);
+    if (side === "after") to += 1;
+    list.splice(to, 0, moved);
+    await Promise.all(
+      list.map((s, idx) =>
+        s.sort_order === idx
+          ? Promise.resolve()
+          : supabase.from("slider_sections").update({ sort_order: idx }).eq("id", s.id),
+      ),
+    );
+    onReload();
+  }
+
   return (
     <section className="overflow-hidden rounded-lg border border-border bg-surface-2">
       <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-background/40 px-4 py-3 sm:flex sm:justify-between">
