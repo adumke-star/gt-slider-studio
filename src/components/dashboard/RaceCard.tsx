@@ -108,6 +108,39 @@ export function RaceCard({
     onReload();
   }
 
+  async function batchUploadToSection(s: SliderSection, files: File[]) {
+    const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+    imageFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+    const list = imagesBySection.get(s.id) ?? [];
+    let nextPos = (list[list.length - 1]?.position ?? -1) + 1;
+    const { uploadFile } = await import("@/lib/storage");
+    for (const file of imageFiles) {
+      const ext = file.name.split(".").pop() || "bin";
+      const baseName = file.name.replace(/\.[^.]+$/, "").trim();
+      const { data: row, error } = await supabase.from("slider_images").insert({
+        race_id: race.id,
+        area: s.kind,
+        section_id: s.id,
+        position: nextPos++,
+        status: "todo",
+        title: baseName || null,
+      }).select().single();
+      if (error || !row) continue;
+      const path = `${race.id}/${s.id}/${row.id}-${Date.now()}.${ext}`;
+      try {
+        await uploadFile("originals", path, file, file.type);
+        await supabase.from("slider_images").update({
+          original_path: path,
+          original_size_kb: Math.round(file.size / 1024),
+        }).eq("id", row.id);
+      } catch (e) {
+        console.error("batch upload failed", file.name, e);
+      }
+    }
+    onReload();
+  }
+
   async function deleteRace() {
     if (!confirm(`Rennen „${race.name}" und alle Bilder löschen?`)) return;
     await supabase.from("races").delete().eq("id", race.id);
