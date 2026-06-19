@@ -284,6 +284,7 @@ export function RaceCard({
                 onSectionDragEnd={() => setSectionDragId(null)}
                 onSectionDropOn={(side) => reorderSection(s.id, side)}
                 onBatchUpload={(files, onProgress) => batchUploadToSection(s, files, onProgress)}
+                onExport={onExport}
               />
             );
           })}
