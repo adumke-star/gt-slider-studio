@@ -115,6 +115,25 @@ function Dashboard() {
               <Plus className="h-4 w-4" /> Race
             </Button>
             <Button
+              onClick={async () => {
+                if (selectedImgs.length === 0) return;
+                if (!confirm(`${selectedImgs.length} Slot(s) endgültig löschen? Die zugehörigen Bilder werden ebenfalls entfernt.`)) return;
+                await Promise.all(selectedImgs.flatMap((img) => [
+                  img.original_path ? removeFile("originals", img.original_path).catch(() => {}) : Promise.resolve(),
+                  img.compressed_path ? removeFile("compressed", img.compressed_path).catch(() => {}) : Promise.resolve(),
+                ]));
+                await supabase.from("slider_images").delete().in("id", selectedImgs.map((i) => i.id));
+                setSelected(new Set());
+                load();
+              }}
+              disabled={selected.size === 0}
+              variant="outline"
+              className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+            >
+              <Trash2 className="h-4 w-4" />
+              Löschen {selected.size > 0 && <span className="rounded bg-destructive/20 px-1.5 text-xs">{selected.size}</span>}
+            </Button>
+            <Button
               onClick={() => setExportOpen(true)}
               disabled={selected.size === 0}
               className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
