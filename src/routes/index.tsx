@@ -151,6 +151,7 @@ function Dashboard() {
             <RaceCard
               key={race.id}
               race={race}
+              sections={sectionsByRace.get(race.id) ?? []}
               images={imagesByRace.get(race.id) ?? []}
               selected={selected}
               onToggleSelect={toggle}
