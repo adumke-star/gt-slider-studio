@@ -108,6 +108,39 @@ export type Database = {
           },
         ]
       }
+      image_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          image_id: string | null
+          new_values: Json | null
+          old_values: Json | null
+          race_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          image_id?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          race_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          image_id?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          race_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
