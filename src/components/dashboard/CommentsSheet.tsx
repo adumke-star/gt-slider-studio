@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, X } from "lucide-react";
+import { Send, Check, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl } from "@/lib/storage";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { SliderImage } from "./ImageCell";
 
 type Profile = { id: string; full_name: string | null; email: string; avatar_url: string | null };
-type Comment = { id: string; author_id: string; body: string; created_at: string };
+type Comment = { id: string; author_id: string; body: string; created_at: string; resolved_at: string | null; resolved_by: string | null };
 type Mention = { comment_id: string; mentioned_user_id: string };
 
 // Mentions are stored as @[Name](user_id) tokens in the comment body.
@@ -149,6 +149,14 @@ export function CommentsSheet({
     setComments((c) => [...c, ins as Comment]);
   }
 
+  async function toggleResolved(c: Comment) {
+    if (!meId) return;
+    const nextResolved = c.resolved_at ? null : new Date().toISOString();
+    const nextBy = c.resolved_at ? null : meId;
+    setComments((list) => list.map((x) => x.id === c.id ? { ...x, resolved_at: nextResolved, resolved_by: nextBy } : x));
+    await supabase.from("comments").update({ resolved_at: nextResolved, resolved_by: nextBy }).eq("id", c.id);
+  }
+
   const filteredSuggest = suggest.open
     ? allProfiles.filter((p) => {
         const q = suggest.query;
@@ -189,6 +197,7 @@ export function CommentsSheet({
           {comments.map((c) => {
             const author = profiles.get(c.author_id);
             const isMe = c.author_id === meId;
+            const isResolved = !!c.resolved_at;
             return (
               <div key={c.id} className={cn("flex gap-2", isMe && "flex-row-reverse")}>
                 <div className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full border border-border bg-surface-2 text-[10px] font-bold uppercase">
@@ -196,13 +205,29 @@ export function CommentsSheet({
                     ? <img src={author.avatar_url} alt="" className="h-full w-full object-cover" />
                     : (author?.full_name ?? author?.email ?? "?").slice(0, 2).toUpperCase()}
                 </div>
-                <div className={cn("max-w-[80%] rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm", isMe && "bg-primary/10 border-primary/30")}>
+                <div className={cn(
+                  "group max-w-[80%] rounded-lg border px-3 py-2 text-sm",
+                  isResolved ? "border-emerald-500/40 bg-emerald-500/10 opacity-70" :
+                    isMe ? "bg-primary/10 border-primary/30" : "bg-surface-2 border-border",
+                )}>
                   <div className="mb-0.5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
                     <span className="truncate">{author?.full_name || author?.email || "—"}</span>
                     <span>·</span>
                     <span>{new Date(c.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}</span>
+                    {isResolved && <span className="text-emerald-500">· solved</span>}
                   </div>
-                  <div className="whitespace-pre-wrap break-words">{renderBody(c.body, profiles)}</div>
+                  <div className={cn("whitespace-pre-wrap break-words", isResolved && "line-through")}>{renderBody(c.body, profiles)}</div>
+                  <button
+                    onClick={() => toggleResolved(c)}
+                    className={cn(
+                      "mt-1.5 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wider transition-colors",
+                      isResolved
+                        ? "border-border text-muted-foreground hover:bg-surface-2"
+                        : "border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10",
+                    )}
+                  >
+                    {isResolved ? <><RotateCcw className="h-3 w-3" /> Wieder öffnen</> : <><Check className="h-3 w-3" /> Solved</>}
+                  </button>
                 </div>
               </div>
             );

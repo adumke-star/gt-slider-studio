@@ -86,10 +86,10 @@ export function ImageCell({
     (async () => {
       const { data: u } = await supabase.auth.getUser();
       const { count } = await supabase.from("comments")
-        .select("id", { count: "exact", head: true }).eq("image_id", image.id);
+        .select("id", { count: "exact", head: true }).eq("image_id", image.id).is("resolved_at", null);
       if (alive) setCommentCount(count ?? 0);
       if (u.user) {
-        const { data: cs } = await supabase.from("comments").select("id").eq("image_id", image.id);
+        const { data: cs } = await supabase.from("comments").select("id").eq("image_id", image.id).is("resolved_at", null);
         const ids = (cs ?? []).map((c) => c.id);
         if (ids.length > 0) {
           const { count: unread } = await supabase.from("comment_mentions")
