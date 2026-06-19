@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, ExternalLink, Pencil, Check, X, GripVertical, Download } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, ExternalLink, Pencil, Check, X, GripVertical, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ImageCell, type SliderImage } from "./ImageCell";
@@ -338,6 +338,33 @@ function SectionBlock({
   const [linksDraft, setLinksDraft] = useState<SectionLink[]>(links);
   const [sectionDropSide, setSectionDropSide] = useState<"before" | "after" | null>(null);
   const [fileHover, setFileHover] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const updateScrollState = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  };
+  useEffect(() => {
+    updateScrollState();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateScrollState, { passive: true });
+    const ro = new ResizeObserver(updateScrollState);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      ro.disconnect();
+    };
+  }, [images.length]);
+  const scrollBy = (dir: 1 | -1) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.max(240, el.clientWidth * 0.8), behavior: "smooth" });
+  };
+
   const [uploading, setUploading] = useState(false);
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -576,35 +603,64 @@ function SectionBlock({
           </button>
         </div>
       </div>
-      <div className="flex gap-3 overflow-x-auto p-3">
-        {images.length === 0 && (
-          <div className="grid h-[120px] w-full place-items-center text-xs text-muted-foreground">
-            Noch keine Slots — füge oben einen Slot hinzu.
-          </div>
+      <div className="relative">
+        <div ref={scrollRef} className="flex gap-3 overflow-x-auto scroll-smooth p-3">
+          {images.length === 0 && (
+            <div className="grid h-[120px] w-full place-items-center text-xs text-muted-foreground">
+              Noch keine Slots — füge oben einen Slot hinzu.
+            </div>
+          )}
+          {images.map((img) => (
+            <ImageCell
+              key={img.id}
+              image={img}
+              selected={selected.has(img.id)}
+              onToggleSelect={() => onToggleSelect(img.id)}
+              onChanged={onReload}
+              onDragStart={() => onDragStart(img.id)}
+              onDropBefore={() => onDropOn(img.id, "before")}
+              onDropAfter={() => onDropOn(img.id, "after")}
+              onMultiFileDrop={async (files) => {
+                setUploading(true);
+                setBatchItems(files.map((f) => ({ name: f.name, status: "pending" as const })));
+                try {
+                  await onBatchUpload(files, (items) => setBatchItems(items));
+                } finally {
+                  setUploading(false);
+                  setTimeout(() => setBatchItems([]), 4000);
+                }
+              }}
+            />
+          ))}
+        </div>
+        {canScrollLeft && (
+          <>
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-surface-2 to-transparent" />
+            <button
+              type="button"
+              onClick={() => scrollBy(-1)}
+              aria-label="Nach links scrollen"
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full border border-border bg-background/90 text-foreground shadow-md backdrop-blur transition hover:bg-background hover:text-primary"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          </>
         )}
-        {images.map((img) => (
-          <ImageCell
-            key={img.id}
-            image={img}
-            selected={selected.has(img.id)}
-            onToggleSelect={() => onToggleSelect(img.id)}
-            onChanged={onReload}
-            onDragStart={() => onDragStart(img.id)}
-            onDropBefore={() => onDropOn(img.id, "before")}
-            onDropAfter={() => onDropOn(img.id, "after")}
-            onMultiFileDrop={async (files) => {
-              setUploading(true);
-              setBatchItems(files.map((f) => ({ name: f.name, status: "pending" as const })));
-              try {
-                await onBatchUpload(files, (items) => setBatchItems(items));
-              } finally {
-                setUploading(false);
-                setTimeout(() => setBatchItems([]), 4000);
-              }
-            }}
-          />
-        ))}
+        {canScrollRight && (
+          <>
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-surface-2 to-transparent" />
+            <button
+              type="button"
+              onClick={() => scrollBy(1)}
+              aria-label="Nach rechts scrollen"
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full border border-border bg-background/90 text-foreground shadow-md backdrop-blur transition hover:bg-background hover:text-primary"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </>
+        )}
       </div>
+
 
       {editingLinks && (
         <div
