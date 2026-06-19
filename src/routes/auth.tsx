@@ -1,9 +1,9 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
+import logoAsset from "@/assets/global-tickets-logo.svg.asset.json";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -55,7 +55,7 @@ function AuthPage() {
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface-2 p-8 shadow-lg">
         <div className="mb-6 flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded bg-primary text-primary-foreground">
-            <Flag className="h-5 w-5" strokeWidth={2.5} />
+            <img src={logoAsset.url} alt="Global Tickets" className="h-6 w-6" />
           </div>
           <div>
             <h1 className="font-display text-lg font-black uppercase leading-none">
