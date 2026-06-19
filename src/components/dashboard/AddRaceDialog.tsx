@@ -23,11 +23,22 @@ export function AddRaceDialog({
         name: name.trim(), series, race_date: date || null,
       }).select().single();
       if (race) {
-        // seed 1 blank slot per area
-        await supabase.from("slider_images").insert([
-          { race_id: race.id, area: "plp", position: 0, status: "blank" },
-          { race_id: race.id, area: "pdp", position: 0, status: "blank" },
-        ]);
+        // seed one PLP + one PDP section, each with a blank slot
+        const { data: secs } = await supabase.from("slider_sections").insert([
+          { race_id: race.id, kind: "plp", name: "PLP Slider", sort_order: 0 },
+          { race_id: race.id, kind: "pdp", name: "PDP Slider", sort_order: 1 },
+        ]).select();
+        if (secs) {
+          await supabase.from("slider_images").insert(
+            secs.map((s) => ({
+              race_id: race.id,
+              area: s.kind as "plp" | "pdp",
+              section_id: s.id,
+              position: 0,
+              status: "blank" as const,
+            })),
+          );
+        }
       }
       onCreated();
       onOpenChange(false);
