@@ -38,8 +38,10 @@ function Dashboard() {
   const [addOpen, setAddOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportImages, setExportImages] = useState<SliderImage[] | null>(null);
+  const [exportMode, setExportMode] = useState<"export" | "compress">("export");
   const [filter, setFilter] = useState<"all" | "f1" | "motogp" | "dtm" | "wsbk">("all");
   const [loading, setLoading] = useState(true);
+
 
   async function load() {
     const [{ data: r }, { data: s }, { data: i }] = await Promise.all([
@@ -131,7 +133,7 @@ function Dashboard() {
             <Button
               onClick={async () => {
                 if (selectedImgs.length === 0) return;
-                if (!confirm(`${selectedImgs.length} Slot(s) endgültig löschen? Die zugehörigen Bilder werden ebenfalls entfernt.`)) return;
+                if (!confirm(`Permanently delete ${selectedImgs.length} slot(s)? Their images will also be removed.`)) return;
                 await Promise.all(selectedImgs.flatMap((img) => [
                   img.original_path ? removeFile("originals", img.original_path).catch(() => {}) : Promise.resolve(),
                   img.compressed_path ? removeFile("compressed", img.compressed_path).catch(() => {}) : Promise.resolve(),
@@ -145,8 +147,9 @@ function Dashboard() {
               className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
             >
               <Trash2 className="h-4 w-4" />
-              Löschen {selected.size > 0 && <span className="rounded bg-destructive/20 px-1.5 text-xs">{selected.size}</span>}
+              Delete {selected.size > 0 && <span className="rounded bg-destructive/20 px-1.5 text-xs">{selected.size}</span>}
             </Button>
+
             <Button
               onClick={() => setExportOpen(true)}
               disabled={selected.size === 0}
@@ -191,7 +194,8 @@ function Dashboard() {
               selected={selected}
               onToggleSelect={toggle}
               onReload={load}
-              onExport={(imgs) => { setExportImages(imgs); setExportOpen(true); }}
+              onExport={(imgs) => { setExportMode("export"); setExportImages(imgs); setExportOpen(true); }}
+              onCompress={(imgs) => { setExportMode("compress"); setExportImages(imgs); setExportOpen(true); }}
             />
           ))
         )}
@@ -200,11 +204,13 @@ function Dashboard() {
       <AddRaceDialog open={addOpen} onOpenChange={setAddOpen} onCreated={load} />
       <ExportDialog
         open={exportOpen}
-        onOpenChange={(v) => { setExportOpen(v); if (!v) setExportImages(null); }}
+        onOpenChange={(v) => { setExportOpen(v); if (!v) { setExportImages(null); setExportMode("export"); } }}
         images={exportImages ?? selectedImgs}
         races={races}
-        onDone={() => { if (!exportImages) setSelected(new Set()); setExportImages(null); load(); }}
+        mode={exportMode}
+        onDone={() => { if (!exportImages && exportMode === "export") setSelected(new Set()); setExportImages(null); setExportMode("export"); load(); }}
       />
+
     </div>
   );
 }
