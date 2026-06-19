@@ -1,0 +1,1 @@
+UPDATE public.slider_images SET status = 'todo' WHERE status = 'blank';
