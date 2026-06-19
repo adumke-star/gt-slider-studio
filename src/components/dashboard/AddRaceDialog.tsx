@@ -8,7 +8,7 @@ export function AddRaceDialog({
   open, onOpenChange, onCreated,
 }: { open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void }) {
   const [name, setName] = useState("");
-  const [series, setSeries] = useState<"f1" | "motogp">("f1");
+  const [series, setSeries] = useState<"f1" | "motogp" | "dtm" | "wsbk">("f1");
   const [date, setDate] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -54,11 +54,13 @@ export function AddRaceDialog({
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Series</label>
-            <Select value={series} onValueChange={(v) => setSeries(v as "f1" | "motogp")}>
+            <Select value={series} onValueChange={(v) => setSeries(v as "f1" | "motogp" | "dtm" | "wsbk")}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="f1">Formula 1</SelectItem>
                 <SelectItem value="motogp">MotoGP</SelectItem>
+                <SelectItem value="dtm">DTM</SelectItem>
+                <SelectItem value="wsbk">WSBK</SelectItem>
               </SelectContent>
             </Select>
           </div>

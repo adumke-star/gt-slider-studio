@@ -25,7 +25,7 @@ export const Route = createFileRoute("/_authenticated/")({
 type Race = {
   id: string;
   name: string;
-  series: "f1" | "motogp";
+  series: "f1" | "motogp" | "dtm" | "wsbk";
   race_date: string | null;
   sort_order: number;
 };
@@ -37,7 +37,7 @@ function Dashboard() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [filter, setFilter] = useState<"all" | "f1" | "motogp">("all");
+  const [filter, setFilter] = useState<"all" | "f1" | "motogp" | "dtm" | "wsbk">("all");
   const [loading, setLoading] = useState(true);
 
   async function load() {
@@ -108,19 +108,19 @@ function Dashboard() {
                 Slider <span className="text-primary">Studio</span>
               </h1>
               <p className="mt-0.5 text-[11px] uppercase tracking-widest text-muted-foreground">
-                F1 · MotoGP · Web-Ready Assets
+                WEB-READY ASSETS
               </p>
             </div>
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <div className="flex rounded-md border border-border bg-background p-0.5">
-              {(["all", "f1", "motogp"] as const).map((k) => (
+              {(["all", "f1", "motogp", "dtm", "wsbk"] as const).map((k) => (
                 <button key={k} onClick={() => setFilter(k)}
                   className={`rounded px-3 py-1 text-xs font-bold uppercase tracking-wider transition ${
                     filter === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                   }`}>
-                  {k === "all" ? "All" : k === "f1" ? "F1" : "MotoGP"}
+                  {k === "all" ? "All" : k === "motogp" ? "MotoGP" : k.toUpperCase()}
                 </button>
               ))}
             </div>
