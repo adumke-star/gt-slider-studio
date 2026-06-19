@@ -241,7 +241,7 @@ function SectionBlock({
   onToggleSelect,
   onReload,
   onRename,
-  onSetUrl,
+  onSetLinks,
   onDelete,
   onAddSlot,
   onDragStart,
@@ -257,7 +257,7 @@ function SectionBlock({
   onToggleSelect: (id: string) => void;
   onReload: () => void;
   onRename: (name: string) => void;
-  onSetUrl: (url: string | null) => void;
+  onSetLinks: (links: SectionLink[]) => void;
   onDelete: () => void;
   onAddSlot: () => void;
   onDragStart: (id: string) => void;
@@ -267,10 +267,11 @@ function SectionBlock({
   onSectionDragEnd: () => void;
   onSectionDropOn: (side: "before" | "after") => void;
 }) {
+  const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(section.name);
-  const [editingUrl, setEditingUrl] = useState(false);
-  const [urlDraft, setUrlDraft] = useState(section.external_url ?? "");
+  const [editingLinks, setEditingLinks] = useState(false);
+  const [linksDraft, setLinksDraft] = useState<SectionLink[]>(links);
   const [sectionDropSide, setSectionDropSide] = useState<"before" | "after" | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -278,10 +279,16 @@ function SectionBlock({
     setEditingName(false);
     onRename(nameDraft);
   }
-  function commitUrl() {
-    setEditingUrl(false);
-    const v = urlDraft.trim();
-    onSetUrl(v || null);
+  function openLinksEditor() {
+    setLinksDraft(links.length ? links : [{ label: "Originale", url: "" }]);
+    setEditingLinks(true);
+  }
+  function commitLinks() {
+    const cleaned = linksDraft
+      .map((l) => ({ label: l.label.trim() || "Link", url: l.url.trim() }))
+      .filter((l) => l.url);
+    setEditingLinks(false);
+    onSetLinks(cleaned);
   }
 
   return (
