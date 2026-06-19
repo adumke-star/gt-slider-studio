@@ -42,6 +42,7 @@ export function ImageCell({
   onDragStart,
   onDropBefore,
   onDropAfter,
+  onMultiFileDrop,
 }: {
   image: SliderImage;
   selected: boolean;
@@ -50,6 +51,7 @@ export function ImageCell({
   onDragStart: () => void;
   onDropBefore: () => void;
   onDropAfter: () => void;
+  onMultiFileDrop?: (files: File[]) => void;
 }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
