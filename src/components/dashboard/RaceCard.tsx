@@ -50,6 +50,9 @@ export function RaceCard({
 
 
   const hasChanges = useMemo(() => images.some((i) => i.status === "changes"), [images]);
+
+  // PLP always first, then PDP. Inside each kind: sort_order, then name.
+  const sorted = useMemo(() => {
     const byKind = (k: "plp" | "pdp") =>
       sections.filter((s) => s.kind === k)
         .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
