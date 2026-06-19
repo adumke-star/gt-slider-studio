@@ -366,6 +366,25 @@ function SectionBlock({
       ro.disconnect();
     };
   }, [images.length]);
+
+  useEffect(() => {
+    if (images.length === 0) {
+      setHasOpenComments(false);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      const ids = images.map((i) => i.id);
+      const { count } = await supabase
+        .from("comments")
+        .select("id", { count: "exact", head: true })
+        .in("image_id", ids)
+        .is("resolved_at", null);
+      if (alive) setHasOpenComments((count ?? 0) > 0);
+    })();
+    return () => { alive = false; };
+  }, [images]);
+
   const scrollBy = (dir: 1 | -1) => {
     const el = scrollRef.current;
     if (!el) return;
@@ -374,6 +393,7 @@ function SectionBlock({
 
   const [uploading, setUploading] = useState(false);
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
+  const [hasOpenComments, setHasOpenComments] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   function commitName() {
@@ -553,6 +573,15 @@ function SectionBlock({
             >
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#CB4F10]/60" />
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#CB4F10]" />
+            </span>
+          )}
+          {hasOpenComments && (
+            <span
+              title="Open comments"
+              className="relative flex h-2.5 w-2.5 shrink-0"
+            >
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FACC15]/60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FACC15]" />
             </span>
           )}
           {editingName ? (

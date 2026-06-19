@@ -248,12 +248,6 @@ export function ImageCell({
             Working…
           </div>
         )}
-        {commentCount > 0 && (
-          <div
-            className="absolute right-2 bottom-2 z-10 h-3 w-3 rounded-full bg-[#FACC15] ring-2 ring-background"
-            title={`${commentCount} open comment${commentCount > 1 ? 's' : ''}`}
-          />
-        )}
       </div>
 
       <div className="px-2 pt-1.5">
