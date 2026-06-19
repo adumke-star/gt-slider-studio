@@ -415,11 +415,48 @@ function SectionBlock({
           Ordner/Bilder hier ablegen
         </div>
       )}
-      {uploading && (
-        <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center rounded bg-background/80 text-xs font-bold uppercase tracking-wider text-primary">
-          Lädt hoch…
-        </div>
-      )}
+      {(uploading || batchItems.length > 0) && (() => {
+        const total = batchItems.length;
+        const done = batchItems.filter((i) => i.status === "done").length;
+        const errored = batchItems.filter((i) => i.status === "error").length;
+        const pct = total === 0 ? 0 : Math.round(((done + errored) / total) * 100);
+        return (
+          <div className="absolute inset-x-2 top-2 z-30 max-h-[80%] overflow-hidden rounded-md border border-border bg-background/95 p-3 shadow-lg backdrop-blur">
+            <div className="mb-2 flex items-center justify-between text-xs font-semibold">
+              <span>{uploading ? "Lädt hoch…" : "Upload abgeschlossen"}</span>
+              <span className="text-muted-foreground">{done + errored}/{total} ({pct}%)</span>
+            </div>
+            <div className="mb-2 h-2 w-full overflow-hidden rounded bg-muted">
+              <div
+                className={cn("h-full transition-all", errored > 0 ? "bg-destructive" : "bg-primary")}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <ul className="max-h-40 space-y-0.5 overflow-auto text-[11px]">
+              {batchItems.map((it, idx) => (
+                <li key={idx} className="flex items-center justify-between gap-2 truncate">
+                  <span className="truncate" title={it.name}>{it.name}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                      it.status === "done" && "bg-emerald-500/15 text-emerald-600",
+                      it.status === "uploading" && "bg-primary/15 text-primary",
+                      it.status === "pending" && "bg-muted text-muted-foreground",
+                      it.status === "error" && "bg-destructive/15 text-destructive",
+                    )}
+                    title={it.error}
+                  >
+                    {it.status === "done" && "Fertig"}
+                    {it.status === "uploading" && "Lädt…"}
+                    {it.status === "pending" && "Wartet"}
+                    {it.status === "error" && "Fehler"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })()}
       {sectionDropSide && (
         <div
           className={cn(
