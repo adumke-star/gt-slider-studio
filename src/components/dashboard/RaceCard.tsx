@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, ExternalLink, Pencil, Check, X, GripVertical } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, ExternalLink, Pencil, Check, X, GripVertical, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ImageCell, type SliderImage } from "./ImageCell";
@@ -34,6 +34,7 @@ export function RaceCard({
   selected,
   onToggleSelect,
   onReload,
+  onExport,
 }: {
   race: Race;
   sections: SliderSection[];
@@ -41,6 +42,7 @@ export function RaceCard({
   selected: Set<string>;
   onToggleSelect: (id: string) => void;
   onReload: () => void;
+  onExport: (images: SliderImage[]) => void;
 }) {
   const [open, setOpen] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -235,6 +237,31 @@ export function RaceCard({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {(() => {
+            const sectionKindById = new Map(sections.map((s) => [s.id, s.kind] as const));
+            const plpImgs = images.filter((i) => i.original_path && (i.section_id ? sectionKindById.get(i.section_id) === "plp" : i.area === "plp"));
+            const pdpImgs = images.filter((i) => i.original_path && (i.section_id ? sectionKindById.get(i.section_id) === "pdp" : i.area === "pdp"));
+            const allImgs = images.filter((i) => i.original_path);
+            return (
+              <div className="mr-1 flex items-center gap-1 border-r border-border pr-2">
+                <Button size="sm" variant="ghost" disabled={plpImgs.length === 0}
+                  onClick={() => onExport(plpImgs)}
+                  className="h-7 gap-1 text-xs disabled:opacity-40" title="Alle PLP-Bilder exportieren">
+                  <Download className="h-3.5 w-3.5" /> PLP {plpImgs.length > 0 && <span className="text-muted-foreground">({plpImgs.length})</span>}
+                </Button>
+                <Button size="sm" variant="ghost" disabled={pdpImgs.length === 0}
+                  onClick={() => onExport(pdpImgs)}
+                  className="h-7 gap-1 text-xs disabled:opacity-40" title="Alle PDP-Bilder exportieren">
+                  <Download className="h-3.5 w-3.5" /> PDP {pdpImgs.length > 0 && <span className="text-muted-foreground">({pdpImgs.length})</span>}
+                </Button>
+                <Button size="sm" variant="ghost" disabled={allImgs.length === 0}
+                  onClick={() => onExport(allImgs)}
+                  className="h-7 gap-1 text-xs disabled:opacity-40" title="Kompletten Stack exportieren">
+                  <Download className="h-3.5 w-3.5" /> Stack {allImgs.length > 0 && <span className="text-muted-foreground">({allImgs.length})</span>}
+                </Button>
+              </div>
+            );
+          })()}
           <Button size="sm" variant="ghost" onClick={() => addSection("plp")} className="h-7 gap-1 text-xs">
             <Plus className="h-3.5 w-3.5" /> PLP
           </Button>

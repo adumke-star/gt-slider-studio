@@ -37,6 +37,7 @@ function Dashboard() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [exportImages, setExportImages] = useState<SliderImage[] | null>(null);
   const [filter, setFilter] = useState<"all" | "f1" | "motogp" | "dtm" | "wsbk">("all");
   const [loading, setLoading] = useState(true);
 
@@ -190,6 +191,7 @@ function Dashboard() {
               selected={selected}
               onToggleSelect={toggle}
               onReload={load}
+              onExport={(imgs) => { setExportImages(imgs); setExportOpen(true); }}
             />
           ))
         )}
@@ -198,10 +200,10 @@ function Dashboard() {
       <AddRaceDialog open={addOpen} onOpenChange={setAddOpen} onCreated={load} />
       <ExportDialog
         open={exportOpen}
-        onOpenChange={setExportOpen}
-        images={selectedImgs}
+        onOpenChange={(v) => { setExportOpen(v); if (!v) setExportImages(null); }}
+        images={exportImages ?? selectedImgs}
         races={races}
-        onDone={() => { setSelected(new Set()); load(); }}
+        onDone={() => { if (!exportImages) setSelected(new Set()); setExportImages(null); load(); }}
       />
     </div>
   );
