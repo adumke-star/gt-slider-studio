@@ -66,7 +66,7 @@ export function ImageCell({
 
   useEffect(() => { setName(image.title ?? ""); }, [image.title]);
 
-  useEffect(() => { setName(image.title ?? ""); }, [image.title]);
+
 
   useEffect(() => {
     let alive = true;
