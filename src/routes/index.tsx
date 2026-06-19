@@ -51,6 +51,19 @@ function Dashboard() {
 
   useEffect(() => { load(); }, []);
 
+  // Prevent the browser from opening files dropped outside a drop zone.
+  useEffect(() => {
+    const prevent = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+    };
+    window.addEventListener("dragover", prevent);
+    window.addEventListener("drop", prevent);
+    return () => {
+      window.removeEventListener("dragover", prevent);
+      window.removeEventListener("drop", prevent);
+    };
+  }, []);
+
   const sectionsByRace = useMemo(() => {
     const m = new Map<string, SliderSection[]>();
     for (const s of sections) {
