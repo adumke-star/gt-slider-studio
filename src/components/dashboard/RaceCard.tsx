@@ -541,6 +541,15 @@ function SectionBlock({
           )}>
             {section.kind}
           </span>
+          {images.some((i) => i.status === "changes") && (
+            <span
+              title="Changes pending"
+              className="relative flex h-2.5 w-2.5 shrink-0"
+            >
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#CB4F10]/60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#CB4F10]" />
+            </span>
+          )}
           {editingName ? (
             <div className="flex items-center gap-1">
               <input
