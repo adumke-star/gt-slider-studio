@@ -81,6 +81,7 @@ function AdminPage() {
             <ArrowLeft className="h-4 w-4" /> Dashboard
           </Link>
           <h1 className="ml-auto font-display text-lg font-black uppercase">Allowlist</h1>
+          <Link to="/audit" className="text-sm text-muted-foreground hover:text-foreground">Verlauf →</Link>
         </div>
       </header>
 
