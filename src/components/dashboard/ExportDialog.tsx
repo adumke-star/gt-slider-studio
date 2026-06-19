@@ -63,10 +63,14 @@ export function ExportDialog({
         const origUrl = await signedUrl("originals", img.original_path!);
         if (!origUrl) continue;
         const blob = await (await fetch(origUrl)).blob();
-        const { blob: out, mime, sizeKB } = await transformImage(blob, {
+        const result = await transformImage(blob, {
           format, targetKB, width: 633, height: 382,
         });
-        const outPath = `${img.race_id}/${img.area}/${img.id}.${ext}`;
+        const { blob: out, mime, sizeKB, overTarget, downscaled } = result;
+        if (overTarget) toast.warning(`Bild ${img.id.slice(0, 6)} konnte das Limit von ${targetKB} KB nicht einhalten (${sizeKB} KB).`);
+        else if (downscaled) toast.info(`Bild ${img.id.slice(0, 6)}: Auflösung reduziert, um ${targetKB} KB einzuhalten.`);
+        const folder = img.section_id ?? img.area;
+        const outPath = `${img.race_id}/${folder}/${img.id}.${ext}`;
         await uploadFile("compressed", outPath, out, mime);
         await supabase.from("slider_images").update({
           compressed_path: outPath,
@@ -76,8 +80,10 @@ export function ExportDialog({
         }).eq("id", img.id);
 
         const race = raceMap.get(img.race_id);
-        const base = race ? slugify(race.name) : img.race_id.slice(0, 8);
-        const name = `${base}_${img.area}_${String(img.position).padStart(2, "0")}.${ext}`;
+        const slugTitle = img.title ? slugify(img.title) : "";
+        const base = slugTitle
+          || `${race ? slugify(race.name) : img.race_id.slice(0, 8)}_${img.area}_${String(img.position).padStart(2, "0")}`;
+        const name = `${base}.${ext}`;
         results.push({ name, blob: out });
       } catch (e) {
         console.error("export failed for", img.id, e);

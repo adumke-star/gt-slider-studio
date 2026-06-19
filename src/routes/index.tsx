@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, Plus, X, Flag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { RaceCard } from "@/components/dashboard/RaceCard";
+import { RaceCard, type SliderSection } from "@/components/dashboard/RaceCard";
 import { AddRaceDialog } from "@/components/dashboard/AddRaceDialog";
 import { ExportDialog } from "@/components/dashboard/ExportDialog";
 import type { SliderImage } from "@/components/dashboard/ImageCell";
@@ -28,6 +28,7 @@ type Race = {
 
 function Dashboard() {
   const [races, setRaces] = useState<Race[]>([]);
+  const [sections, setSections] = useState<SliderSection[]>([]);
   const [images, setImages] = useState<SliderImage[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
@@ -36,16 +37,27 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   async function load() {
-    const [{ data: r }, { data: i }] = await Promise.all([
+    const [{ data: r }, { data: s }, { data: i }] = await Promise.all([
       supabase.from("races").select("*").order("sort_order").order("created_at"),
+      supabase.from("slider_sections").select("*").order("sort_order"),
       supabase.from("slider_images").select("*"),
     ]);
     setRaces((r ?? []) as Race[]);
+    setSections((s ?? []) as SliderSection[]);
     setImages((i ?? []) as SliderImage[]);
     setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
+
+  const sectionsByRace = useMemo(() => {
+    const m = new Map<string, SliderSection[]>();
+    for (const s of sections) {
+      if (!m.has(s.race_id)) m.set(s.race_id, []);
+      m.get(s.race_id)!.push(s);
+    }
+    return m;
+  }, [sections]);
 
   const imagesByRace = useMemo(() => {
     const m = new Map<string, SliderImage[]>();
@@ -55,6 +67,7 @@ function Dashboard() {
     }
     return m;
   }, [images]);
+
 
   const visibleRaces = filter === "all" ? races : races.filter((r) => r.series === filter);
 
@@ -138,6 +151,7 @@ function Dashboard() {
             <RaceCard
               key={race.id}
               race={race}
+              sections={sectionsByRace.get(race.id) ?? []}
               images={imagesByRace.get(race.id) ?? []}
               selected={selected}
               onToggleSelect={toggle}

@@ -1,10 +1,7 @@
 /**
  * Client-side image transformation using Canvas.
  * Target: 633 x 382, cover fill, center crop.
- * Iterative quality tuning to hit target size (KB).
- *
- * NOTE: This module is intentionally self-contained so it can be swapped
- * for a Node/Sharp implementation later without touching UI code.
+ * Iterative quality + resolution tuning to STAY UNDER target size (KB).
  */
 
 export type ExportFormat = "jpeg" | "png" | "webp" | "avif";
@@ -14,6 +11,18 @@ export interface TransformOptions {
   height?: number;
   targetKB?: number;
   format: ExportFormat;
+}
+
+export interface TransformResult {
+  blob: Blob;
+  mime: string;
+  sizeKB: number;
+  width: number;
+  height: number;
+  /** True if output exceeds the requested target (only possible for PNG). */
+  overTarget: boolean;
+  /** True if the canvas resolution had to be reduced to honour the limit. */
+  downscaled: boolean;
 }
 
 const DEFAULT_W = 633;
@@ -29,7 +38,6 @@ export async function fileToImage(file: Blob): Promise<HTMLImageElement> {
       img.src = url;
     });
   } finally {
-    // keep URL until image consumed by drawImage caller; revoke later
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 }
@@ -79,36 +87,80 @@ const MIME: Record<ExportFormat, string> = {
 export async function transformImage(
   file: Blob,
   opts: TransformOptions,
-): Promise<{ blob: Blob; mime: string; sizeKB: number }> {
+): Promise<TransformResult> {
   const img = await fileToImage(file);
-  const canvas = drawCover(img, opts.width ?? DEFAULT_W, opts.height ?? DEFAULT_H);
+  const baseW = opts.width ?? DEFAULT_W;
+  const baseH = opts.height ?? DEFAULT_H;
   const mime = MIME[opts.format];
+  const target = opts.targetKB ?? 0;
 
-  // PNG is lossless: one pass
+  // PNG is lossless: try downscaling only when target is set.
   if (opts.format === "png") {
-    const blob = await canvasToBlob(canvas, mime);
-    return { blob, mime, sizeKB: Math.round(blob.size / 1024) };
+    let scale = 1;
+    let canvas = drawCover(img, baseW, baseH);
+    let blob = await canvasToBlob(canvas, mime);
+    if (target > 0) {
+      while (blob.size / 1024 > target && scale > 0.35) {
+        scale *= 0.85;
+        canvas = drawCover(img, Math.round(baseW * scale), Math.round(baseH * scale));
+        blob = await canvasToBlob(canvas, mime);
+      }
+    }
+    return {
+      blob, mime,
+      sizeKB: Math.round(blob.size / 1024),
+      width: canvas.width, height: canvas.height,
+      overTarget: target > 0 && blob.size / 1024 > target,
+      downscaled: scale < 1,
+    };
   }
 
-  // Iterative quality search to hit targetKB (or use 0.82 default)
-  const target = opts.targetKB ?? 0;
+  // Lossy formats: search quality first, then downscale if still too big.
+  let scale = 1;
+  let canvas = drawCover(img, baseW, baseH);
   let q = 0.85;
   let blob = await canvasToBlob(canvas, mime, q);
+  let downscaled = false;
 
-  if (target > 0) {
-    let lo = 0.3;
+  async function fitQualityUnderTarget() {
+    if (target <= 0) return;
+    let lo = 0.2;
     let hi = 0.95;
-    for (let i = 0; i < 8; i++) {
+    q = 0.85;
+    blob = await canvasToBlob(canvas, mime, q);
+    // 10 iterations binary search → ~0.001 precision
+    for (let i = 0; i < 10; i++) {
       const kb = blob.size / 1024;
-      if (Math.abs(kb - target) < target * 0.08) break;
+      if (kb <= target && target - kb < target * 0.05) break; // close enough under
       if (kb > target) hi = q;
       else lo = q;
       q = (lo + hi) / 2;
       blob = await canvasToBlob(canvas, mime, q);
     }
+    // Final pass: if still above, push quality to lo bound.
+    if (blob.size / 1024 > target) {
+      q = lo;
+      blob = await canvasToBlob(canvas, mime, q);
+    }
   }
 
-  return { blob, mime, sizeKB: Math.round(blob.size / 1024) };
+  await fitQualityUnderTarget();
+
+  // Still too big at minimum quality → reduce resolution iteratively.
+  while (target > 0 && blob.size / 1024 > target && scale > 0.35) {
+    scale *= 0.85;
+    downscaled = true;
+    canvas = drawCover(img, Math.round(baseW * scale), Math.round(baseH * scale));
+    await fitQualityUnderTarget();
+  }
+
+  return {
+    blob, mime,
+    sizeKB: Math.round(blob.size / 1024),
+    width: canvas.width, height: canvas.height,
+    overTarget: target > 0 && blob.size / 1024 > target,
+    downscaled,
+  };
 }
 
 export function extForFormat(f: ExportFormat): string {
