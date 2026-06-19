@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Download, Plus, X, Flag } from "lucide-react";
+import { Download, Plus, X, Flag, Trash2 } from "lucide-react";
+import { removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { RaceCard, type SliderSection } from "@/components/dashboard/RaceCard";
