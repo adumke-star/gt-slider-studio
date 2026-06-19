@@ -255,6 +255,18 @@ export function RaceCard({
             {race.series === "f1" ? "F1" : race.series === "motogp" ? "MotoGP" : race.series.toUpperCase()}
           </span>
           <h2 className="truncate font-display text-lg font-black uppercase tracking-tight">{race.name}</h2>
+          {!open && hasChanges && (
+            <span title="Changes pending" className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#CB4F10]/60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#CB4F10]" />
+            </span>
+          )}
+          {!open && hasOpenComments && (
+            <span title="Open comments" className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FACC15]/60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FACC15]" />
+            </span>
+          )}
           {race.race_date && (
             <span className="hidden text-xs text-muted-foreground sm:inline">{race.race_date}</span>
           )}
