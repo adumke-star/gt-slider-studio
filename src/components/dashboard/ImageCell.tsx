@@ -198,8 +198,9 @@ export function ImageCell({
         else onDropAfter();
       }}
       className={cn(
-        "group relative flex w-[180px] shrink-0 flex-col overflow-hidden rounded-md border bg-surface-2 transition",
-        selected ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/40",
+        "group relative flex w-[180px] shrink-0 flex-col overflow-hidden rounded-md border transition",
+        image.status === "changes" ? "bg-[#CB4F10]/20 border-[#CB4F10]/50" : "bg-surface-2 border-border hover:border-primary/40",
+        selected ? "ring-2 ring-primary/40" : "",
       )}
     >
       {dropSide && (
