@@ -177,7 +177,7 @@ export function ImageCell({
 
       <div
         draggable
-        onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", image.id); onDragStart(); }}
+        onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", image.id); e.dataTransfer.setData("application/x-slider-image", image.id); onDragStart(); }}
         title="Drag to reorder"
         className="absolute right-1.5 top-1.5 z-10 grid h-5 w-5 cursor-grab place-items-center rounded border border-border bg-background/80 text-muted-foreground backdrop-blur active:cursor-grabbing"
       >
