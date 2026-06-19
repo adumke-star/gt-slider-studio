@@ -371,53 +371,25 @@ function SectionBlock({
           )}
         </div>
         <div className="flex items-center gap-1">
-          {editingUrl ? (
-            <div className="flex items-center gap-1">
-              <input
-                autoFocus
-                type="url"
-                placeholder="https://drive…/originale"
-                value={urlDraft}
-                onChange={(e) => setUrlDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitUrl();
-                  if (e.key === "Escape") { setEditingUrl(false); setUrlDraft(section.external_url ?? ""); }
-                }}
-                className="w-56 rounded border border-border bg-background px-1.5 py-1 text-xs text-foreground focus:border-primary focus:outline-none"
-              />
-              <button onClick={commitUrl} className="rounded p-1 text-primary hover:bg-background" title="Speichern">
-                <Check className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => { setEditingUrl(false); setUrlDraft(section.external_url ?? ""); }}
-                className="rounded p-1 text-muted-foreground hover:bg-background"
-                title="Abbrechen"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : (
-            <>
-              {section.external_url ? (
-                <a
-                  href={section.external_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-primary hover:border-primary"
-                  title={section.external_url}
-                >
-                  <ExternalLink className="h-3 w-3" /> Originale
-                </a>
-              ) : null}
-              <button
-                onClick={() => setEditingUrl(true)}
-                className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
-                title={section.external_url ? "Link bearbeiten" : "Externen Link hinzufügen"}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-            </>
-          )}
+          {links.map((l, idx) => (
+            <a
+              key={idx}
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex max-w-[160px] items-center gap-1 truncate rounded border border-border bg-background px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-primary hover:border-primary"
+              title={l.url}
+            >
+              <ExternalLink className="h-3 w-3 shrink-0" /> <span className="truncate">{l.label}</span>
+            </a>
+          ))}
+          <button
+            onClick={openLinksEditor}
+            className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
+            title={links.length ? "Links bearbeiten" : "Externe Links hinzufügen"}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
           <Button size="sm" variant="ghost" onClick={onAddSlot}
             className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary">
             <Plus className="h-3.5 w-3.5" /> Slot
