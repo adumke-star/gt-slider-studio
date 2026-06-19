@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Download, Plus, X, Flag, Trash2 } from "lucide-react";
+import { Download, Plus, X, Flag, Trash2, LogOut } from "lucide-react";
 import { removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,9 @@ import { AddRaceDialog } from "@/components/dashboard/AddRaceDialog";
 import { ExportDialog } from "@/components/dashboard/ExportDialog";
 import type { SliderImage } from "@/components/dashboard/ImageCell";
 import { dataTransferHasFiles } from "@/lib/dropFiles";
+import { UserMenu } from "@/components/dashboard/UserMenu";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "Slider Studio — F1 & MotoGP Image Manager" },
@@ -52,7 +53,6 @@ function Dashboard() {
 
   useEffect(() => { load(); }, []);
 
-  // Prevent the browser from opening files dropped outside a drop zone.
   useEffect(() => {
     const prevent = (e: DragEvent) => {
       if (e.dataTransfer && dataTransferHasFiles(e.dataTransfer)) e.preventDefault();
@@ -155,6 +155,7 @@ function Dashboard() {
               <Download className="h-4 w-4" />
               Export {selected.size > 0 && <span className="rounded bg-primary-foreground/20 px-1.5 text-xs">{selected.size}</span>}
             </Button>
+            <UserMenu />
           </div>
         </div>
 

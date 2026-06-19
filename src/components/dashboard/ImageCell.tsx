@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical } from "lucide-react";
+import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
+import { CommentsSheet } from "./CommentsSheet";
 
 export type SliderImage = {
   id: string;
@@ -58,9 +59,14 @@ export function ImageCell({
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState(image.title ?? "");
   const [dropSide, setDropSide] = useState<"left" | "right" | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentCount, setCommentCount] = useState(0);
+  const [unreadMentions, setUnreadMentions] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setName(image.title ?? ""); }, [image.title]);
+
+
 
   useEffect(() => {
     let alive = true;
@@ -73,6 +79,27 @@ export function ImageCell({
     })();
     return () => { alive = false; };
   }, [image.compressed_path, image.original_path]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const { count } = await supabase.from("comments")
+        .select("id", { count: "exact", head: true }).eq("image_id", image.id);
+      if (alive) setCommentCount(count ?? 0);
+      if (u.user) {
+        const { data: cs } = await supabase.from("comments").select("id").eq("image_id", image.id);
+        const ids = (cs ?? []).map((c) => c.id);
+        if (ids.length > 0) {
+          const { count: unread } = await supabase.from("comment_mentions")
+            .select("id", { count: "exact", head: true })
+            .in("comment_id", ids).eq("mentioned_user_id", u.user.id).is("read_at", null);
+          if (alive) setUnreadMentions(unread ?? 0);
+        } else if (alive) setUnreadMentions(0);
+      }
+    })();
+    return () => { alive = false; };
+  }, [image.id, commentsOpen]);
 
   async function handleFile(file: File) {
     setBusy(true);
@@ -242,6 +269,19 @@ export function ImageCell({
           {meta.label}
         </button>
         <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => setCommentsOpen(true)}
+            title="Kommentare"
+            className="relative rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            {commentCount > 0 && (
+              <span className={cn(
+                "absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full px-1 text-[8px] font-bold",
+                unreadMentions > 0 ? "bg-destructive text-white" : "bg-primary text-primary-foreground",
+              )}>{unreadMentions > 0 ? unreadMentions : commentCount}</span>
+            )}
+          </button>
           {image.compressed_path && (
             <button
               onClick={async () => {
@@ -285,6 +325,8 @@ export function ImageCell({
             : <>Orig: {image.original_size_kb} KB</>}
         </div>
       )}
+
+      <CommentsSheet image={image} open={commentsOpen} onOpenChange={setCommentsOpen} />
     </div>
   );
 }
