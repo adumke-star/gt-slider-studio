@@ -35,6 +35,7 @@ export function RaceCard({
   onToggleSelect,
   onReload,
   onExport,
+  onCompress,
 }: {
   race: Race;
   sections: SliderSection[];
@@ -43,6 +44,7 @@ export function RaceCard({
   onToggleSelect: (id: string) => void;
   onReload: () => void;
   onExport: (images: SliderImage[]) => void;
+  onCompress: (images: SliderImage[]) => void;
 }) {
   const [open, setOpen] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -82,7 +84,7 @@ export function RaceCard({
   }
 
   async function deleteSection(s: SliderSection) {
-    if (!confirm(`Sektion „${s.name}" wirklich löschen? Alle Bilder darin werden entfernt.`)) return;
+    if (!confirm(`Delete section "${s.name}"? All images inside will be removed.`)) return;
     await supabase.from("slider_sections").delete().eq("id", s.id);
     onReload();
   }
@@ -143,7 +145,7 @@ export function RaceCard({
       }).select().single();
       if (error || !row) {
         items[i].status = "error";
-        items[i].error = error?.message || "DB insert fehlgeschlagen";
+        items[i].error = error?.message || "DB insert failed";
         onProgress?.(items.slice());
         continue;
       }
@@ -158,7 +160,7 @@ export function RaceCard({
       } catch (e: any) {
         console.error("batch upload failed", file.name, e);
         items[i].status = "error";
-        items[i].error = e?.message || "Upload fehlgeschlagen";
+        items[i].error = e?.message || "Upload failed";
       }
       onProgress?.(items.slice());
     }
@@ -166,7 +168,7 @@ export function RaceCard({
   }
 
   async function deleteRace() {
-    if (!confirm(`Rennen „${race.name}" und alle Bilder löschen?`)) return;
+    if (!confirm(`Delete race "${race.name}" and all its images?`)) return;
     await supabase.from("races").delete().eq("id", race.id);
     onReload();
   }
@@ -259,7 +261,7 @@ export function RaceCard({
         <div className="space-y-3 p-4">
           {sorted.length === 0 && (
             <div className="grid h-[80px] place-items-center rounded border border-dashed border-border text-xs text-muted-foreground">
-              Noch keine Sektion — füge oben eine PLP- oder PDP-Sektion hinzu.
+              No sections yet — add a PLP or PDP section above.
             </div>
           )}
           {sorted.map((s) => {
@@ -287,6 +289,7 @@ export function RaceCard({
                 onSectionDropOn={(side) => reorderSection(s.id, side)}
                 onBatchUpload={(files, onProgress) => batchUploadToSection(s, files, onProgress)}
                 onExport={onExport}
+                onCompress={onCompress}
               />
             );
           })}
@@ -314,6 +317,7 @@ function SectionBlock({
   onSectionDropOn,
   onBatchUpload,
   onExport,
+  onCompress,
 }: {
   section: SliderSection;
   images: SliderImage[];
@@ -332,6 +336,7 @@ function SectionBlock({
   onSectionDropOn: (side: "before" | "after") => void;
   onBatchUpload: (files: File[], onProgress?: (items: BatchItem[]) => void) => Promise<void> | void;
   onExport: (images: SliderImage[]) => void;
+  onCompress: (images: SliderImage[]) => void;
 }) {
   const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const [editingName, setEditingName] = useState(false);
@@ -376,7 +381,7 @@ function SectionBlock({
     onRename(nameDraft);
   }
   function openLinksEditor() {
-    setLinksDraft(links.length ? links : [{ label: "Originale", url: "" }]);
+    setLinksDraft(links.length ? links : [{ label: "Originals", url: "" }]);
     setEditingLinks(true);
   }
   function commitLinks() {
@@ -467,7 +472,7 @@ function SectionBlock({
       )}
       {fileHover && (
         <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded bg-primary/10 text-xs font-bold uppercase tracking-wider text-primary">
-          Ordner/Bilder hier ablegen
+          Drop folder/images here
         </div>
       )}
       {(uploading || batchItems.length > 0) && (() => {
@@ -478,7 +483,7 @@ function SectionBlock({
         return (
           <div className="absolute inset-x-2 top-2 z-30 max-h-[80%] overflow-hidden rounded-md border border-border bg-background/95 p-3 shadow-lg backdrop-blur">
             <div className="mb-2 flex items-center justify-between text-xs font-semibold">
-              <span>{uploading ? "Lädt hoch…" : "Upload abgeschlossen"}</span>
+              <span>{uploading ? "Uploading…" : "Upload complete"}</span>
               <span className="text-muted-foreground">{done + errored}/{total} ({pct}%)</span>
             </div>
             <div className="mb-2 h-2 w-full overflow-hidden rounded bg-muted">
@@ -501,10 +506,10 @@ function SectionBlock({
                     )}
                     title={it.error}
                   >
-                    {it.status === "done" && "Fertig"}
-                    {it.status === "uploading" && "Lädt…"}
-                    {it.status === "pending" && "Wartet"}
-                    {it.status === "error" && "Fehler"}
+                    {it.status === "done" && "Done"}
+                    {it.status === "uploading" && "Uploading…"}
+                    {it.status === "pending" && "Pending"}
+                    {it.status === "error" && "Error"}
                   </span>
                 </li>
               ))}
@@ -530,7 +535,7 @@ function SectionBlock({
               onSectionDragStart();
             }}
             onDragEnd={onSectionDragEnd}
-            title="Sektion verschieben"
+            title="Move section"
             className="grid h-5 w-5 cursor-grab place-items-center rounded text-muted-foreground hover:text-primary active:cursor-grabbing"
           >
             <GripVertical className="h-3.5 w-3.5" />
@@ -568,7 +573,7 @@ function SectionBlock({
             <button
               onClick={() => { setNameDraft(section.name); setEditingName(true); }}
               className="font-display text-xs font-black uppercase tracking-widest text-foreground hover:text-primary"
-              title="Sektion umbenennen"
+              title="Rename section"
             >
               {section.name}
             </button>
@@ -590,15 +595,22 @@ function SectionBlock({
           <button
             onClick={openLinksEditor}
             className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
-            title={links.length ? "Links bearbeiten" : "Externe Links hinzufügen"}
+            title={links.length ? "Edit links" : "Add external links"}
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <Button size="sm" variant="ghost"
             disabled={images.filter((i) => i.original_path).length === 0}
+            onClick={() => onCompress(images.filter((i) => i.original_path))}
+            className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-40"
+            title={`Compress ${section.kind.toUpperCase()} images`}>
+            <Wand2 className="h-3.5 w-3.5" /> Compress
+          </Button>
+          <Button size="sm" variant="ghost"
+            disabled={images.filter((i) => i.original_path).length === 0}
             onClick={() => onExport(images.filter((i) => i.original_path))}
             className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-40"
-            title={`${section.kind.toUpperCase()}-Bilder exportieren`}>
+            title={`Export ${section.kind.toUpperCase()} images`}>
             <Download className="h-3.5 w-3.5" /> Export
           </Button>
           <Button size="sm" variant="ghost" onClick={onAddSlot}
@@ -608,7 +620,7 @@ function SectionBlock({
           <button
             onClick={onDelete}
             className="rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive"
-            title="Sektion löschen"
+            title="Delete section"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -618,7 +630,7 @@ function SectionBlock({
         <div ref={scrollRef} className="flex gap-3 overflow-x-auto scroll-smooth p-3">
           {images.length === 0 && (
             <div className="grid h-[120px] w-full place-items-center text-xs text-muted-foreground">
-              Noch keine Slots — füge oben einen Slot hinzu.
+              No slots yet — add a slot above.
             </div>
           )}
           {images.map((img) => (
@@ -631,6 +643,7 @@ function SectionBlock({
               onDragStart={() => onDragStart(img.id)}
               onDropBefore={() => onDropOn(img.id, "before")}
               onDropAfter={() => onDropOn(img.id, "after")}
+              onCompress={() => onCompress([img])}
               onMultiFileDrop={async (files) => {
                 setUploading(true);
                 setBatchItems(files.map((f) => ({ name: f.name, status: "pending" as const })));
@@ -650,7 +663,7 @@ function SectionBlock({
             <button
               type="button"
               onClick={() => scrollBy(-1)}
-              aria-label="Nach links scrollen"
+              aria-label="Scroll left"
               className="absolute left-2 top-1/2 z-10 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full border border-border bg-background/90 text-foreground shadow-md backdrop-blur transition hover:bg-background hover:text-primary"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -663,7 +676,7 @@ function SectionBlock({
             <button
               type="button"
               onClick={() => scrollBy(1)}
-              aria-label="Nach rechts scrollen"
+              aria-label="Scroll right"
               className="absolute right-2 top-1/2 z-10 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full border border-border bg-background/90 text-foreground shadow-md backdrop-blur transition hover:bg-background hover:text-primary"
             >
               <ChevronRight className="h-5 w-5" />
@@ -684,7 +697,7 @@ function SectionBlock({
           >
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-display text-sm font-black uppercase tracking-widest">
-                Externe Links — {section.name}
+                External links — {section.name}
               </h3>
               <button
                 onClick={() => setEditingLinks(false)}
@@ -696,14 +709,14 @@ function SectionBlock({
             <div className="space-y-2">
               {linksDraft.length === 0 && (
                 <div className="rounded border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
-                  Noch keine Links — füge unten den ersten hinzu.
+                  No links yet — add the first one below.
                 </div>
               )}
               {linksDraft.map((l, idx) => (
                 <div key={idx} className="grid grid-cols-[140px_minmax(0,1fr)_auto] gap-2">
                   <input
                     type="text"
-                    placeholder="Beschriftung"
+                    placeholder="Label"
                     value={l.label}
                     onChange={(e) => {
                       const next = linksDraft.slice();
@@ -726,7 +739,7 @@ function SectionBlock({
                   <button
                     onClick={() => setLinksDraft(linksDraft.filter((_, i) => i !== idx))}
                     className="rounded p-1.5 text-muted-foreground hover:bg-background hover:text-destructive"
-                    title="Link entfernen"
+                    title="Remove link"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -740,18 +753,18 @@ function SectionBlock({
                 onClick={() => setLinksDraft([...linksDraft, { label: "", url: "" }])}
                 className="gap-1 text-xs"
               >
-                <Plus className="h-3.5 w-3.5" /> Link hinzufügen
+                <Plus className="h-3.5 w-3.5" /> Add link
               </Button>
               <div className="flex gap-2">
                 <Button size="sm" variant="ghost" onClick={() => setEditingLinks(false)}>
-                  Abbrechen
+                  Cancel
                 </Button>
                 <Button
                   size="sm"
                   onClick={commitLinks}
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
-                  Speichern
+                  Save
                 </Button>
               </div>
             </div>
