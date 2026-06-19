@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare, ChevronDown } from "lucide-react";
+import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare, ChevronDown, Wand2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,7 @@ export function ImageCell({
   onDropBefore,
   onDropAfter,
   onMultiFileDrop,
+  onCompress,
 }: {
   image: SliderImage;
   selected: boolean;
@@ -56,6 +57,7 @@ export function ImageCell({
   onDropBefore: () => void;
   onDropAfter: () => void;
   onMultiFileDrop?: (files: File[]) => void;
+  onCompress?: () => void;
 }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -255,7 +257,7 @@ export function ImageCell({
           onChange={(e) => setName(e.target.value)}
           onBlur={saveName}
           onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-          placeholder="Bildname…"
+          placeholder="Image name…"
           className="w-full rounded border border-border bg-background/50 px-1.5 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
         />
       </div>
@@ -295,7 +297,7 @@ export function ImageCell({
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setCommentsOpen(true)}
-            title="Kommentare"
+            title="Comments"
             className="relative rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
           >
             <MessageSquare className="h-3.5 w-3.5" />
@@ -306,6 +308,15 @@ export function ImageCell({
               )}>{unreadMentions > 0 ? unreadMentions : commentCount}</span>
             )}
           </button>
+          {image.original_path && onCompress && (
+            <button
+              onClick={onCompress}
+              title="Compress image"
+              className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
+            >
+              <Wand2 className="h-3.5 w-3.5" />
+            </button>
+          )}
           {image.compressed_path && (
             <button
               onClick={async () => {
