@@ -1,0 +1,1 @@
+ALTER TABLE public.comments ADD COLUMN resolved_at timestamptz, ADD COLUMN resolved_by uuid REFERENCES auth.users(id) ON DELETE SET NULL;
