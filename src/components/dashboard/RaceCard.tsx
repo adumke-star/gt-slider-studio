@@ -349,14 +349,24 @@ function SectionBlock({
     onSetLinks(cleaned);
   }
 
+  const dragCounterRef = useRef(0);
+
   return (
     <div
       ref={rootRef}
+      onDragEnter={(e) => {
+        if (e.dataTransfer.types.includes("Files")) {
+          e.preventDefault();
+          dragCounterRef.current += 1;
+          setFileHover(true);
+        }
+      }}
       onDragOver={(e) => {
         const types = e.dataTransfer.types;
         if (types.includes("Files")) {
           e.preventDefault();
-          setFileHover(true);
+          e.dataTransfer.dropEffect = "copy";
+          if (!fileHover) setFileHover(true);
           return;
         }
         if (types.includes("application/x-slider-image")) return;
@@ -366,23 +376,29 @@ function SectionBlock({
         setSectionDropSide(e.clientY < r.top + r.height / 2 ? "before" : "after");
       }}
       onDragLeave={(e) => {
-        // Only clear if leaving the root, not when moving over children
+        if (e.dataTransfer.types.includes("Files")) {
+          dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+          if (dragCounterRef.current === 0) setFileHover(false);
+          return;
+        }
         if (e.currentTarget === e.target) {
           setSectionDropSide(null);
-          setFileHover(false);
         }
       }}
       onDrop={async (e) => {
-        if (e.dataTransfer.types.includes("Files")) {
+        if (e.dataTransfer.types.includes("Files") || (e.dataTransfer.files && e.dataTransfer.files.length > 0)) {
           e.preventDefault();
+          e.stopPropagation();
+          dragCounterRef.current = 0;
           setFileHover(false);
           const { collectFilesFromDataTransfer } = await import("@/lib/dropFiles");
           const files = await collectFilesFromDataTransfer(e.dataTransfer);
-          if (files.length === 0) return;
+          const images = files.filter((f) => f.type.startsWith("image/"));
+          if (images.length === 0) return;
           setUploading(true);
-          setBatchItems(files.filter((f) => f.type.startsWith("image/")).map((f) => ({ name: f.name, status: "pending" as const })));
+          setBatchItems(images.map((f) => ({ name: f.name, status: "pending" as const })));
           try {
-            await onBatchUpload(files, (items) => setBatchItems(items));
+            await onBatchUpload(images, (items) => setBatchItems(items));
           } finally {
             setUploading(false);
             setTimeout(() => setBatchItems([]), 4000);
