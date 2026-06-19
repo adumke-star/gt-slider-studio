@@ -14,6 +14,7 @@ type Race = {
 };
 
 export type SectionLink = { label: string; url: string };
+export type BatchItem = { name: string; status: "pending" | "uploading" | "done" | "error"; error?: string };
 
 export type SliderSection = {
   id: string;
