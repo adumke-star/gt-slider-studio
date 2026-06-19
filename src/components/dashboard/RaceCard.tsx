@@ -14,6 +14,7 @@ type Race = {
 };
 
 export type SectionLink = { label: string; url: string };
+export type BatchItem = { name: string; status: "pending" | "uploading" | "done" | "error"; error?: string };
 
 export type SliderSection = {
   id: string;
@@ -108,14 +109,23 @@ export function RaceCard({
     onReload();
   }
 
-  async function batchUploadToSection(s: SliderSection, files: File[]) {
+  async function batchUploadToSection(
+    s: SliderSection,
+    files: File[],
+    onProgress?: (items: BatchItem[]) => void,
+  ) {
     const imageFiles = files.filter((f) => f.type.startsWith("image/"));
     if (imageFiles.length === 0) return;
     imageFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+    const items: BatchItem[] = imageFiles.map((f) => ({ name: f.name, status: "pending" }));
+    onProgress?.(items.slice());
     const list = imagesBySection.get(s.id) ?? [];
     let nextPos = (list[list.length - 1]?.position ?? -1) + 1;
     const { uploadFile } = await import("@/lib/storage");
-    for (const file of imageFiles) {
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i];
+      items[i].status = "uploading";
+      onProgress?.(items.slice());
       const ext = file.name.split(".").pop() || "bin";
       const baseName = file.name.replace(/\.[^.]+$/, "").trim();
       const { data: row, error } = await supabase.from("slider_images").insert({
@@ -126,7 +136,12 @@ export function RaceCard({
         status: "todo",
         title: baseName || null,
       }).select().single();
-      if (error || !row) continue;
+      if (error || !row) {
+        items[i].status = "error";
+        items[i].error = error?.message || "DB insert fehlgeschlagen";
+        onProgress?.(items.slice());
+        continue;
+      }
       const path = `${race.id}/${s.id}/${row.id}-${Date.now()}.${ext}`;
       try {
         await uploadFile("originals", path, file, file.type);
@@ -134,9 +149,13 @@ export function RaceCard({
           original_path: path,
           original_size_kb: Math.round(file.size / 1024),
         }).eq("id", row.id);
-      } catch (e) {
+        items[i].status = "done";
+      } catch (e: any) {
         console.error("batch upload failed", file.name, e);
+        items[i].status = "error";
+        items[i].error = e?.message || "Upload fehlgeschlagen";
       }
+      onProgress?.(items.slice());
     }
     onReload();
   }
@@ -301,7 +320,7 @@ function SectionBlock({
   onSectionDragStart: () => void;
   onSectionDragEnd: () => void;
   onSectionDropOn: (side: "before" | "after") => void;
-  onBatchUpload: (files: File[]) => Promise<void> | void;
+  onBatchUpload: (files: File[], onProgress?: (items: BatchItem[]) => void) => Promise<void> | void;
 }) {
   const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const [editingName, setEditingName] = useState(false);
@@ -311,6 +330,7 @@ function SectionBlock({
   const [sectionDropSide, setSectionDropSide] = useState<"before" | "after" | null>(null);
   const [fileHover, setFileHover] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
 
   function commitName() {
@@ -360,7 +380,13 @@ function SectionBlock({
           const files = await collectFilesFromDataTransfer(e.dataTransfer);
           if (files.length === 0) return;
           setUploading(true);
-          try { await onBatchUpload(files); } finally { setUploading(false); }
+          setBatchItems(files.filter((f) => f.type.startsWith("image/")).map((f) => ({ name: f.name, status: "pending" as const })));
+          try {
+            await onBatchUpload(files, (items) => setBatchItems(items));
+          } finally {
+            setUploading(false);
+            setTimeout(() => setBatchItems([]), 4000);
+          }
           return;
         }
         if (sectionDropSide) {
@@ -389,11 +415,48 @@ function SectionBlock({
           Ordner/Bilder hier ablegen
         </div>
       )}
-      {uploading && (
-        <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center rounded bg-background/80 text-xs font-bold uppercase tracking-wider text-primary">
-          Lädt hoch…
-        </div>
-      )}
+      {(uploading || batchItems.length > 0) && (() => {
+        const total = batchItems.length;
+        const done = batchItems.filter((i) => i.status === "done").length;
+        const errored = batchItems.filter((i) => i.status === "error").length;
+        const pct = total === 0 ? 0 : Math.round(((done + errored) / total) * 100);
+        return (
+          <div className="absolute inset-x-2 top-2 z-30 max-h-[80%] overflow-hidden rounded-md border border-border bg-background/95 p-3 shadow-lg backdrop-blur">
+            <div className="mb-2 flex items-center justify-between text-xs font-semibold">
+              <span>{uploading ? "Lädt hoch…" : "Upload abgeschlossen"}</span>
+              <span className="text-muted-foreground">{done + errored}/{total} ({pct}%)</span>
+            </div>
+            <div className="mb-2 h-2 w-full overflow-hidden rounded bg-muted">
+              <div
+                className={cn("h-full transition-all", errored > 0 ? "bg-destructive" : "bg-primary")}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <ul className="max-h-40 space-y-0.5 overflow-auto text-[11px]">
+              {batchItems.map((it, idx) => (
+                <li key={idx} className="flex items-center justify-between gap-2 truncate">
+                  <span className="truncate" title={it.name}>{it.name}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                      it.status === "done" && "bg-emerald-500/15 text-emerald-600",
+                      it.status === "uploading" && "bg-primary/15 text-primary",
+                      it.status === "pending" && "bg-muted text-muted-foreground",
+                      it.status === "error" && "bg-destructive/15 text-destructive",
+                    )}
+                    title={it.error}
+                  >
+                    {it.status === "done" && "Fertig"}
+                    {it.status === "uploading" && "Lädt…"}
+                    {it.status === "pending" && "Wartet"}
+                    {it.status === "error" && "Fehler"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })()}
       {sectionDropSide && (
         <div
           className={cn(
