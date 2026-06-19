@@ -9,7 +9,7 @@ import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from 
 type Race = {
   id: string;
   name: string;
-  series: "f1" | "motogp";
+  series: "f1" | "motogp" | "dtm" | "wsbk";
   race_date: string | null;
   sort_order: number;
 };
@@ -222,9 +222,12 @@ export function RaceCard({
           </button>
           <span className={cn(
             "shrink-0 rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-widest",
-            race.series === "f1" ? "bg-primary text-primary-foreground" : "bg-foreground/90 text-background",
+            race.series === "f1" ? "bg-primary text-primary-foreground" :
+            race.series === "motogp" ? "bg-foreground/90 text-background" :
+            race.series === "dtm" ? "bg-amber-500 text-black" :
+            "bg-red-600 text-white",
           )}>
-            {race.series === "f1" ? "F1" : "MotoGP"}
+            {race.series === "f1" ? "F1" : race.series === "motogp" ? "MotoGP" : race.series.toUpperCase()}
           </span>
           <h2 className="truncate font-display text-lg font-black uppercase tracking-tight">{race.name}</h2>
           {race.race_date && (
