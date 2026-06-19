@@ -8,6 +8,7 @@ import { RaceCard, type SliderSection } from "@/components/dashboard/RaceCard";
 import { AddRaceDialog } from "@/components/dashboard/AddRaceDialog";
 import { ExportDialog } from "@/components/dashboard/ExportDialog";
 import type { SliderImage } from "@/components/dashboard/ImageCell";
+import { dataTransferHasFiles } from "@/lib/dropFiles";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -54,7 +55,7 @@ function Dashboard() {
   // Prevent the browser from opening files dropped outside a drop zone.
   useEffect(() => {
     const prevent = (e: DragEvent) => {
-      if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+      if (e.dataTransfer && dataTransferHasFiles(e.dataTransfer)) e.preventDefault();
     };
     window.addEventListener("dragover", prevent);
     window.addEventListener("drop", prevent);

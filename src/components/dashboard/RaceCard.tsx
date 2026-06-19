@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ImageCell, type SliderImage } from "./ImageCell";
 import { cn } from "@/lib/utils";
+import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 
 type Race = {
   id: string;
@@ -114,7 +115,7 @@ export function RaceCard({
     files: File[],
     onProgress?: (items: BatchItem[]) => void,
   ) {
-    const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+    const imageFiles = files.filter(isImageFile);
     if (imageFiles.length === 0) return;
     imageFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
     const items: BatchItem[] = imageFiles.map((f) => ({ name: f.name, status: "pending" }));
@@ -277,7 +278,7 @@ export function RaceCard({
                 onSectionDragStart={() => setSectionDragId(s.id)}
                 onSectionDragEnd={() => setSectionDragId(null)}
                 onSectionDropOn={(side) => reorderSection(s.id, side)}
-                onBatchUpload={(files) => batchUploadToSection(s, files)}
+                onBatchUpload={(files, onProgress) => batchUploadToSection(s, files, onProgress)}
               />
             );
           })}
@@ -355,16 +356,18 @@ function SectionBlock({
     <div
       ref={rootRef}
       onDragEnter={(e) => {
-        if (e.dataTransfer.types.includes("Files")) {
+        if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
+          e.stopPropagation();
           dragCounterRef.current += 1;
           setFileHover(true);
         }
       }}
       onDragOver={(e) => {
         const types = e.dataTransfer.types;
-        if (types.includes("Files")) {
+        if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
+          e.stopPropagation();
           e.dataTransfer.dropEffect = "copy";
           if (!fileHover) setFileHover(true);
           return;
@@ -376,7 +379,7 @@ function SectionBlock({
         setSectionDropSide(e.clientY < r.top + r.height / 2 ? "before" : "after");
       }}
       onDragLeave={(e) => {
-        if (e.dataTransfer.types.includes("Files")) {
+        if (dataTransferHasFiles(e.dataTransfer)) {
           dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
           if (dragCounterRef.current === 0) setFileHover(false);
           return;
@@ -386,14 +389,13 @@ function SectionBlock({
         }
       }}
       onDrop={async (e) => {
-        if (e.dataTransfer.types.includes("Files") || (e.dataTransfer.files && e.dataTransfer.files.length > 0)) {
+        if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
           e.stopPropagation();
           dragCounterRef.current = 0;
           setFileHover(false);
-          const { collectFilesFromDataTransfer } = await import("@/lib/dropFiles");
           const files = await collectFilesFromDataTransfer(e.dataTransfer);
-          const images = files.filter((f) => f.type.startsWith("image/"));
+          const images = files.filter(isImageFile);
           if (images.length === 0) return;
           setUploading(true);
           setBatchItems(images.map((f) => ({ name: f.name, status: "pending" as const })));
