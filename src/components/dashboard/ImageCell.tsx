@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare } from "lucide-react";
+import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 import { CommentsSheet } from "./CommentsSheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export type SliderImage = {
   id: string;
@@ -139,10 +140,9 @@ export function ImageCell({
     }
   }
 
-  async function cycleStatus() {
-    const idx = STATUS_ORDER.indexOf(image.status);
-    const next = STATUS_ORDER[(idx + 1) % STATUS_ORDER.length];
-    await supabase.from("slider_images").update({ status: next }).eq("id", image.id);
+  async function setStatus(status: SliderImage["status"]) {
+    if (status === image.status) return;
+    await supabase.from("slider_images").update({ status }).eq("id", image.id);
     onChanged();
   }
 
@@ -261,15 +261,37 @@ export function ImageCell({
       </div>
 
       <div className="flex items-center justify-between gap-1 px-2 py-1.5">
-        <button
-          onClick={cycleStatus}
-          className={cn(
-            "rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition hover:scale-105",
-            meta.cls,
-          )}
-        >
-          {meta.label}
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className={cn(
+                "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition hover:scale-105",
+                meta.cls,
+              )}
+            >
+              {meta.label}
+              <ChevronDown className="h-3 w-3 opacity-60" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-[8rem]">
+            {STATUS_ORDER.map((s) => {
+              const m = STATUS_META[s];
+              return (
+                <DropdownMenuItem
+                  key={s}
+                  onClick={() => setStatus(s)}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 text-xs",
+                    s === image.status && "font-semibold",
+                  )}
+                >
+                  <span className={cn("h-2 w-2 rounded-full", m.cls.replace(/border-\S+/g, "").replace(/text-\S+/g, "").replace(/bg-\[/g, "bg-[").replace(/\/15/g, ""))} />
+                  {m.label}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setCommentsOpen(true)}
