@@ -39,13 +39,13 @@ function AuthPage() {
         const msg = result.error instanceof Error ? result.error.message : String(result.error);
         setError(
           msg.toLowerCase().includes("nicht freigeschaltet") || msg.includes("42501")
-            ? "Diese E-Mail-Adresse ist nicht freigeschaltet. Bitte beim Admin melden."
+            ? "This email address is not allow-listed. Please contact an admin."
             : msg,
         );
         setLoading(false);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Login fehlgeschlagen.");
+      setError(e instanceof Error ? e.message : "Login failed.");
       setLoading(false);
     }
   }
