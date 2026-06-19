@@ -49,6 +49,8 @@ export function RaceCard({
   const [sectionDragId, setSectionDragId] = useState<string | null>(null);
 
 
+  const hasChanges = useMemo(() => images.some((i) => i.status === "changes"), [images]);
+
   // PLP always first, then PDP. Inside each kind: sort_order, then name.
   const sorted = useMemo(() => {
     const byKind = (k: "plp" | "pdp") =>
