@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical } from "lucide-react";
+import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
+import { CommentsSheet } from "./CommentsSheet";
 
 export type SliderImage = {
   id: string;
