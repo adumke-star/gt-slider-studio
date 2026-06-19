@@ -1,12 +1,9 @@
 import { useState } from "react";
-import JSZip from "jszip";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { transformImage, extForFormat, type ExportFormat } from "@/lib/imageProcess";
 import { signedUrl, uploadFile } from "@/lib/storage";
@@ -94,6 +91,7 @@ export function ExportDialog({
     if (download && results.length > 0) {
       try {
         if (asZip && results.length > 1) {
+          const { default: JSZip } = await import("jszip");
           const zip = new JSZip();
           // de-dupe filenames if necessary
           const used = new Map<string, number>();
@@ -160,17 +158,31 @@ export function ExportDialog({
 
           <div className="space-y-3 rounded border border-border bg-background/50 p-3">
             <div className="flex items-center justify-between">
-              <Label htmlFor="dl" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              <label htmlFor="dl" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Download to computer
-              </Label>
-              <Switch id="dl" checked={download} onCheckedChange={setDownload} disabled={running} />
+              </label>
+              <input
+                id="dl"
+                type="checkbox"
+                checked={download}
+                onChange={(e) => setDownload(e.target.checked)}
+                disabled={running}
+                className="h-4 w-4 accent-primary"
+              />
             </div>
             {download && eligible.length > 1 && (
               <div className="flex items-center justify-between">
-                <Label htmlFor="zip" className="text-xs text-muted-foreground">
+                <label htmlFor="zip" className="text-xs text-muted-foreground">
                   Bundle as ZIP
-                </Label>
-                <Switch id="zip" checked={asZip} onCheckedChange={setAsZip} disabled={running} />
+                </label>
+                <input
+                  id="zip"
+                  type="checkbox"
+                  checked={asZip}
+                  onChange={(e) => setAsZip(e.target.checked)}
+                  disabled={running}
+                  className="h-4 w-4 accent-primary"
+                />
               </div>
             )}
           </div>
