@@ -140,10 +140,9 @@ export function ImageCell({
     }
   }
 
-  async function cycleStatus() {
-    const idx = STATUS_ORDER.indexOf(image.status);
-    const next = STATUS_ORDER[(idx + 1) % STATUS_ORDER.length];
-    await supabase.from("slider_images").update({ status: next }).eq("id", image.id);
+  async function setStatus(status: SliderImage["status"]) {
+    if (status === image.status) return;
+    await supabase.from("slider_images").update({ status }).eq("id", image.id);
     onChanged();
   }
 
