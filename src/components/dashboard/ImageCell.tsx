@@ -75,6 +75,7 @@ export function ImageCell({
     setBusy(true);
     try {
       const ext = file.name.split(".").pop() || "bin";
+      const baseName = file.name.replace(/\.[^.]+$/, "").trim();
       const folder = image.section_id ?? image.area;
       const path = `${image.race_id}/${folder}/${image.id}-${Date.now()}.${ext}`;
       await uploadFile("originals", path, file, file.type);
@@ -82,6 +83,7 @@ export function ImageCell({
       await supabase.from("slider_images").update({
         original_path: path,
         original_size_kb: Math.round(file.size / 1024),
+        title: baseName || image.title,
         status: image.status === "blank" ? "todo" : image.status,
       }).eq("id", image.id);
       onChanged();
