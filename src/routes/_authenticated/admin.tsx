@@ -38,7 +38,7 @@ function AdminPage() {
     setError(null);
     const e = email.trim().toLowerCase();
     if (!e || !e.includes("@")) {
-      setError("Bitte gültige E-Mail eingeben.");
+      setError("Please enter a valid email address.");
       return;
     }
     const { error: err } = await supabase.from("allowed_emails").insert({ email: e, role });
@@ -50,7 +50,7 @@ function AdminPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Diesen Eintrag wirklich löschen? Der Nutzer kann sich danach nicht mehr neu einloggen (bestehende Sessions bleiben aktiv).")) return;
+    if (!confirm("Really delete this entry? The user won't be able to sign in again (existing sessions stay active).")) return;
     await supabase.from("allowed_emails").delete().eq("id", id);
     load();
   }
@@ -65,9 +65,9 @@ function AdminPage() {
     return (
       <div className="grid min-h-screen place-items-center bg-background px-6 text-center text-foreground">
         <div>
-          <h1 className="font-display text-2xl uppercase">Kein Zugriff</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Diese Seite ist nur für Admins.</p>
-          <Link to="/" className="mt-4 inline-block text-sm text-primary hover:underline">← Zurück zum Dashboard</Link>
+          <h1 className="font-display text-2xl uppercase">No access</h1>
+          <p className="mt-2 text-sm text-muted-foreground">This page is for admins only.</p>
+          <Link to="/" className="mt-4 inline-block text-sm text-primary hover:underline">← Back to dashboard</Link>
         </div>
       </div>
     );
@@ -81,13 +81,13 @@ function AdminPage() {
             <ArrowLeft className="h-4 w-4" /> Dashboard
           </Link>
           <h1 className="ml-auto font-display text-lg font-black uppercase">Allowlist</h1>
-          <Link to="/audit" className="text-sm text-muted-foreground hover:text-foreground">Verlauf →</Link>
+          <Link to="/audit" className="text-sm text-muted-foreground hover:text-foreground">History →</Link>
         </div>
       </header>
 
       <main className="mx-auto max-w-4xl space-y-6 px-6 py-6">
         <section className="rounded-lg border border-border bg-surface-2 p-4">
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted-foreground">Mitarbeiter freischalten</h2>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted-foreground">Invite team member</h2>
           <div className="flex flex-wrap items-center gap-2">
             <Input
               type="email"
@@ -102,11 +102,11 @@ function AdminPage() {
               onChange={(e) => setRole(e.target.value as "admin" | "member")}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm"
             >
-              <option value="member">Mitglied</option>
+              <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
             <Button onClick={add} className="gap-1.5">
-              <UserPlus className="h-4 w-4" /> Hinzufügen
+              <UserPlus className="h-4 w-4" /> Add
             </Button>
           </div>
           {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
@@ -115,10 +115,10 @@ function AdminPage() {
         <section className="rounded-lg border border-border bg-surface-2">
           <table className="w-full text-sm">
             <thead className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr><th className="px-4 py-2">E-Mail</th><th className="px-4 py-2">Rolle</th><th className="px-4 py-2 text-right">Aktionen</th></tr>
+              <tr><th className="px-4 py-2">Email</th><th className="px-4 py-2">Role</th><th className="px-4 py-2 text-right">Actions</th></tr>
             </thead>
             <tbody>
-              {rows.length === 0 && <tr><td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">Noch keine Einträge.</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">No entries yet.</td></tr>}
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-border/50 last:border-b-0">
                   <td className="px-4 py-2">{r.email}</td>
@@ -128,10 +128,10 @@ function AdminPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <button onClick={() => toggleRole(r)} title="Rolle wechseln" className="mr-1 inline-flex items-center rounded p-1.5 text-muted-foreground hover:bg-background hover:text-primary">
+                    <button onClick={() => toggleRole(r)} title="Toggle role" className="mr-1 inline-flex items-center rounded p-1.5 text-muted-foreground hover:bg-background hover:text-primary">
                       {r.role === "admin" ? <ShieldOff className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
                     </button>
-                    <button onClick={() => remove(r.id)} title="Löschen" className="inline-flex items-center rounded p-1.5 text-muted-foreground hover:bg-background hover:text-destructive">
+                    <button onClick={() => remove(r.id)} title="Delete" className="inline-flex items-center rounded p-1.5 text-muted-foreground hover:bg-background hover:text-destructive">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </td>

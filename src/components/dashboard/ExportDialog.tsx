@@ -34,16 +34,19 @@ export function ExportDialog({
   images,
   races = [],
   onDone,
+  mode = "export",
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   images: SliderImage[];
   races?: RaceLite[];
   onDone: () => void;
+  mode?: "export" | "compress";
 }) {
+  const isCompress = mode === "compress";
   const [targetKB, setTargetKB] = useState(120);
   const [format, setFormat] = useState<ExportFormat>("webp");
-  const [download, setDownload] = useState(true);
+  const [download, setDownload] = useState(!isCompress);
   const [asZip, setAsZip] = useState(true);
   const [progress, setProgress] = useState(0);
   const [running, setRunning] = useState(false);
@@ -67,8 +70,8 @@ export function ExportDialog({
           format, targetKB, width: 633, height: 382,
         });
         const { blob: out, mime, sizeKB, overTarget, downscaled } = result;
-        if (overTarget) toast.warning(`Bild ${img.id.slice(0, 6)} konnte das Limit von ${targetKB} KB nicht einhalten (${sizeKB} KB).`);
-        else if (downscaled) toast.info(`Bild ${img.id.slice(0, 6)}: Auflösung reduziert, um ${targetKB} KB einzuhalten.`);
+        if (overTarget) toast.warning(`Image ${img.id.slice(0, 6)} could not stay under ${targetKB} KB (${sizeKB} KB).`);
+        else if (downscaled) toast.info(`Image ${img.id.slice(0, 6)}: resolution reduced to fit ${targetKB} KB.`);
         const folder = img.section_id ?? img.area;
         const outPath = `${img.race_id}/${folder}/${img.id}.${ext}`;
         await uploadFile("compressed", outPath, out, mime);
@@ -99,7 +102,6 @@ export function ExportDialog({
         if (asZip && results.length > 1) {
           const { default: JSZip } = await import("jszip");
           const zip = new JSZip();
-          // de-dupe filenames if necessary
           const used = new Map<string, number>();
           for (const r of results) {
             let n = r.name;
@@ -116,13 +118,13 @@ export function ExportDialog({
         } else {
           for (const r of results) triggerDownload(r.blob, r.name);
         }
-        toast.success(`${results.length} image${results.length === 1 ? "" : "s"} exported & downloaded`);
+        toast.success(`${results.length} image${results.length === 1 ? "" : "s"} ${isCompress ? "compressed" : "exported"} & downloaded`);
       } catch (e) {
         console.error(e);
         toast.error("Download failed");
       }
     } else if (results.length > 0) {
-      toast.success(`${results.length} image${results.length === 1 ? "" : "s"} exported to cloud`);
+      toast.success(`${results.length} image${results.length === 1 ? "" : "s"} ${isCompress ? "compressed" : "exported"}`);
     }
 
     setRunning(false);
@@ -134,8 +136,14 @@ export function ExportDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-surface-2 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Export {eligible.length} image{eligible.length === 1 ? "" : "s"}</DialogTitle>
-          <DialogDescription>Resize to 633×382, compress and optionally download to your computer.</DialogDescription>
+          <DialogTitle className="font-display text-xl">
+            {isCompress ? "Compress" : "Export"} {eligible.length} image{eligible.length === 1 ? "" : "s"}
+          </DialogTitle>
+          <DialogDescription>
+            {isCompress
+              ? "Resize to 633×382 and compress in place. The compressed copy is stored alongside the original."
+              : "Resize to 633×382, compress and optionally download to your computer."}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-2">
           <div className="space-y-2">
@@ -162,36 +170,38 @@ export function ExportDialog({
             </Select>
           </div>
 
-          <div className="space-y-3 rounded border border-border bg-background/50 p-3">
-            <div className="flex items-center justify-between">
-              <label htmlFor="dl" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Download to computer
-              </label>
-              <input
-                id="dl"
-                type="checkbox"
-                checked={download}
-                onChange={(e) => setDownload(e.target.checked)}
-                disabled={running}
-                className="h-4 w-4 accent-primary"
-              />
-            </div>
-            {download && eligible.length > 1 && (
+          {!isCompress && (
+            <div className="space-y-3 rounded border border-border bg-background/50 p-3">
               <div className="flex items-center justify-between">
-                <label htmlFor="zip" className="text-xs text-muted-foreground">
-                  Bundle as ZIP
+                <label htmlFor="dl" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Download to computer
                 </label>
                 <input
-                  id="zip"
+                  id="dl"
                   type="checkbox"
-                  checked={asZip}
-                  onChange={(e) => setAsZip(e.target.checked)}
+                  checked={download}
+                  onChange={(e) => setDownload(e.target.checked)}
                   disabled={running}
                   className="h-4 w-4 accent-primary"
                 />
               </div>
-            )}
-          </div>
+              {download && eligible.length > 1 && (
+                <div className="flex items-center justify-between">
+                  <label htmlFor="zip" className="text-xs text-muted-foreground">
+                    Bundle as ZIP
+                  </label>
+                  <input
+                    id="zip"
+                    type="checkbox"
+                    checked={asZip}
+                    onChange={(e) => setAsZip(e.target.checked)}
+                    disabled={running}
+                    className="h-4 w-4 accent-primary"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
             Output: <span className="text-foreground">633 × 382 px</span> · cover fill, center-cropped.
@@ -207,7 +217,9 @@ export function ExportDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={running}>Cancel</Button>
           <Button onClick={run} disabled={running || eligible.length === 0}
             className="bg-primary text-primary-foreground hover:bg-primary/90">
-            {running ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Exporting</> : "Export now"}
+            {running
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isCompress ? "Compressing" : "Exporting"}</>
+              : (isCompress ? "Compress now" : "Export now")}
           </Button>
         </DialogFooter>
       </DialogContent>
