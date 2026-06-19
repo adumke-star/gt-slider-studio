@@ -58,6 +58,7 @@ export type Database = {
           original_url: string | null
           position: number
           race_id: string
+          section_id: string | null
           status: Database["public"]["Enums"]["image_status"]
           title: string | null
           updated_at: string
@@ -75,6 +76,7 @@ export type Database = {
           original_url?: string | null
           position?: number
           race_id: string
+          section_id?: string | null
           status?: Database["public"]["Enums"]["image_status"]
           title?: string | null
           updated_at?: string
@@ -92,6 +94,7 @@ export type Database = {
           original_url?: string | null
           position?: number
           race_id?: string
+          section_id?: string | null
           status?: Database["public"]["Enums"]["image_status"]
           title?: string | null
           updated_at?: string
@@ -99,6 +102,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "slider_images_race_id_fkey"
+            columns: ["race_id"]
+            isOneToOne: false
+            referencedRelation: "races"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slider_images_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "slider_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      slider_sections: {
+        Row: {
+          created_at: string
+          external_url: string | null
+          id: string
+          kind: string
+          name: string
+          race_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          external_url?: string | null
+          id?: string
+          kind: string
+          name?: string
+          race_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          external_url?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          race_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slider_sections_race_id_fkey"
             columns: ["race_id"]
             isOneToOne: false
             referencedRelation: "races"
