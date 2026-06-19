@@ -39,6 +39,7 @@ export function RaceCard({
 }) {
   const [open, setOpen] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [sectionDragId, setSectionDragId] = useState<string | null>(null);
 
   const [sectionDragId, setSectionDragId] = useState<string | null>(null);
 
