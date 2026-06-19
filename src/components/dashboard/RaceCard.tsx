@@ -300,6 +300,7 @@ function SectionBlock({
   onSectionDragStart: () => void;
   onSectionDragEnd: () => void;
   onSectionDropOn: (side: "before" | "after") => void;
+  onBatchUpload: (files: File[]) => Promise<void> | void;
 }) {
   const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const [editingName, setEditingName] = useState(false);
@@ -307,6 +308,8 @@ function SectionBlock({
   const [editingLinks, setEditingLinks] = useState(false);
   const [linksDraft, setLinksDraft] = useState<SectionLink[]>(links);
   const [sectionDropSide, setSectionDropSide] = useState<"before" | "after" | null>(null);
+  const [fileHover, setFileHover] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   function commitName() {
@@ -329,16 +332,36 @@ function SectionBlock({
     <div
       ref={rootRef}
       onDragOver={(e) => {
-        // Only react to section drags (text/plain payload "section:<id>")
         const types = e.dataTransfer.types;
-        if (types.includes("Files") || types.includes("application/x-slider-image")) return;
+        if (types.includes("Files")) {
+          e.preventDefault();
+          setFileHover(true);
+          return;
+        }
+        if (types.includes("application/x-slider-image")) return;
         e.preventDefault();
         const r = rootRef.current?.getBoundingClientRect();
         if (!r) return;
         setSectionDropSide(e.clientY < r.top + r.height / 2 ? "before" : "after");
       }}
-      onDragLeave={() => setSectionDropSide(null)}
-      onDrop={(e) => {
+      onDragLeave={(e) => {
+        // Only clear if leaving the root, not when moving over children
+        if (e.currentTarget === e.target) {
+          setSectionDropSide(null);
+          setFileHover(false);
+        }
+      }}
+      onDrop={async (e) => {
+        if (e.dataTransfer.types.includes("Files")) {
+          e.preventDefault();
+          setFileHover(false);
+          const { collectFilesFromDataTransfer } = await import("@/lib/dropFiles");
+          const files = await collectFilesFromDataTransfer(e.dataTransfer);
+          if (files.length === 0) return;
+          setUploading(true);
+          try { await onBatchUpload(files); } finally { setUploading(false); }
+          return;
+        }
         if (sectionDropSide) {
           e.preventDefault();
           const side = sectionDropSide;
@@ -347,10 +370,29 @@ function SectionBlock({
         }
       }}
       className={cn(
-        "relative rounded border border-border/60 bg-background/30 transition",
+        "relative rounded border bg-background/30 transition",
+        fileHover ? "border-primary ring-2 ring-primary/40" : "border-border/60",
         isSectionDragging && "opacity-50",
       )}
     >
+      {sectionDropSide && (
+        <div
+          className={cn(
+            "pointer-events-none absolute left-0 z-20 h-1 w-full bg-primary",
+            sectionDropSide === "before" ? "top-0" : "bottom-0",
+          )}
+        />
+      )}
+      {fileHover && (
+        <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded bg-primary/10 text-xs font-bold uppercase tracking-wider text-primary">
+          Ordner/Bilder hier ablegen
+        </div>
+      )}
+      {uploading && (
+        <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center rounded bg-background/80 text-xs font-bold uppercase tracking-wider text-primary">
+          Lädt hoch…
+        </div>
+      )}
       {sectionDropSide && (
         <div
           className={cn(
