@@ -320,8 +320,18 @@ function SectionBlock({
   onSectionDragStart: () => void;
   onSectionDragEnd: () => void;
   onSectionDropOn: (side: "before" | "after") => void;
-  onBatchUpload: (files: File[]) => Promise<void> | void;
+  onBatchUpload: (files: File[], onProgress?: (items: BatchItem[]) => void) => Promise<void> | void;
 }) {
+  const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(section.name);
+  const [editingLinks, setEditingLinks] = useState(false);
+  const [linksDraft, setLinksDraft] = useState<SectionLink[]>(links);
+  const [sectionDropSide, setSectionDropSide] = useState<"before" | "after" | null>(null);
+  const [fileHover, setFileHover] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
+  const rootRef = useRef<HTMLDivElement>(null);
   const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(section.name);
