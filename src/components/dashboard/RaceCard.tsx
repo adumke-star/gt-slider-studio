@@ -34,6 +34,7 @@ export function RaceCard({
   selected,
   onToggleSelect,
   onReload,
+  onExport,
 }: {
   race: Race;
   sections: SliderSection[];
@@ -41,6 +42,7 @@ export function RaceCard({
   selected: Set<string>;
   onToggleSelect: (id: string) => void;
   onReload: () => void;
+  onExport: (images: SliderImage[]) => void;
 }) {
   const [open, setOpen] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
