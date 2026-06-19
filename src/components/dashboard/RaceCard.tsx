@@ -284,6 +284,7 @@ function SectionBlock({
   onSectionDragStart,
   onSectionDragEnd,
   onSectionDropOn,
+  onBatchUpload,
 }: {
   section: SliderSection;
   images: SliderImage[];
