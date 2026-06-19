@@ -1,52 +1,73 @@
-# Plan: Dashboard-Erweiterungen
+# Plan: Kommentar- & Feedback-Funktion pro Bild
 
-## 1. Harte Größenobergrenze beim Export
-- `src/lib/imageProcess.ts`: Qualitätssuche so anpassen, dass das Ergebnis **immer ≤ targetKB** ist. Binäre Suche wird konservativ (zu groß → härter runter), Endkontrolle: falls noch zu groß, schrittweise weiter runter bis 0.2.
-- Wenn auch bei minimaler Qualität noch zu groß: Bildgröße iterativ um 10 % verkleinern (633×382 bleibt obere Grenze) bis Limit eingehalten oder Mindestgröße erreicht. Tritt das ein, Hinweis im Toast: „Limit eingehalten, Auflösung reduziert".
-- PNG: bleibt verlustfrei; wenn PNG > targetKB, automatisch Hinweis „PNG kann nicht garantiert werden".
+## Ziel
+Mitarbeiter können pro Bild-Slot einen Kommentar-Thread führen, andere Mitarbeiter mit `@name` markieren, und die markierte Person bekommt automatisch eine Benachrichtigung per **Google Chat** (Space-Webhook) und **E-Mail**.
 
-## 2. Namensfeld pro Bild
-- `slider_images.title` existiert bereits — als Anzeigename verwenden.
-- `ImageCell.tsx`: kleines, inline editierbares Textfeld unterhalb der Buttons (Klick zum Bearbeiten, Speichern bei Blur/Enter).
-- Download-Dateinamen (Einzel-Download in `ImageCell` und Export in `ExportDialog`) nutzen `slugify(title)` falls gesetzt, sonst Fallback aus Race-Name + Section + Position.
+Umsetzbar — kein Hexenwerk. Aufwand ist überschaubar, weil wir Lovable Cloud (Auth, DB, RLS) + zwei einfache externe Integrationen nutzen.
 
-## 3. Drag & Drop Umsortieren
-- Aktuelles Verhalten tauscht nur zwei Bilder. Neu: **Einsortieren an Zielposition** (klassisches Reorder).
-- `ImageCell` bekommt zusätzlich linke/rechte Drop-Indikatoren; beim Drop wird das gezogene Bild vor/nach dem Ziel eingefügt, alle `position`-Werte der betroffenen Section neu gesetzt (Batch-Update).
-- Drag bleibt innerhalb derselben Section (Cross-Section später).
+---
 
-## 4. Mehrere benannte PLP/PDP-Sections
-Aktuell ist `area` ein Enum (`plp` | `pdp`) — fest verdrahtet. Wir führen eine richtige Section-Tabelle ein:
+## 1. Login & Nutzerverwaltung (Voraussetzung)
 
-**Schema (Migration):**
-- Neue Tabelle `slider_sections`:
-  - `race_id` (FK races)
-  - `kind` ('plp' | 'pdp')
-  - `name` (text, editierbar, z. B. „PLP Hero", „PDP Sidebar")
-  - `sort_order` (int)
-  - `external_url` (text, nullable) — siehe Punkt 5
-- `slider_images`: neue Spalte `section_id uuid` (FK), bestehende Zeilen werden über `area` auf je eine automatisch erzeugte Default-Section pro Race + Kind gemappt. `area` bleibt vorerst bestehen (nullable) zur Sicherheit.
-- GRANTs + RLS analog zu bestehenden Tabellen.
+- **Google Sign-In** als einziger Login-Weg (passt zu eurem Workspace, liefert Name + E-Mail automatisch für Mentions).
+- **Allowlist**: nur freigegebene User dürfen rein. Umsetzung:
+  - Tabelle `allowed_emails` (vom Admin gepflegt) ODER Domain-Check (`@eurefirma.com`).
+  - Trigger beim Signup: ist die E-Mail nicht erlaubt → Account wird sofort gelöscht / blockiert.
+- `profiles`-Tabelle mit `id, email, full_name, avatar_url` (auto-befüllt beim ersten Login).
+- `user_roles`-Tabelle (`admin` / `member`) — nur Admins können die Allowlist pflegen.
+- Auth-Routen: `/auth` (Login), alles bisherige wandert unter `_authenticated`.
 
-**UI:**
-- `RaceCard.tsx`: rendert Liste der Sections statt fixen PLP/PDP-Block. Pro Section:
-  - Editierbarer Name (Inline)
-  - Kind-Badge (PLP/PDP)
-  - „+ Slot", Section löschen, Section umbenennen
-- Oben in der Race-Card: Button „+ PLP-Section" und „+ PDP-Section".
+## 2. Datenmodell (neu)
 
-## 5. Externer Link pro Section (Original-Ordner)
-- Feld `external_url` in `slider_sections` (siehe 4).
-- Im Section-Header: kleines Stift-Icon zum Eintragen/Ändern der URL (Prompt oder Inline-Input).
-- Wenn URL gesetzt: Button **„Originale öffnen"** (Icon `ExternalLink`) im Header — öffnet die URL in neuem Tab (`target="_blank" rel="noopener"`). Kein roher Link sichtbar.
+- `comments`
+  - `id, image_id (→ slider_images), author_id (→ profiles), body (text), created_at, updated_at`
+- `comment_mentions`
+  - `id, comment_id, mentioned_user_id, notified_at, read_at`
+- RLS: nur eingeloggte User dürfen lesen/schreiben; nur Autor darf editieren/löschen.
 
-## Technische Notizen
-- Migration in einem Schritt: Tabelle anlegen, GRANTs, RLS, Policies, dann Default-Sections für jedes bestehende Race per `INSERT … SELECT` aus `races` (eine „PLP" + eine „PDP" pro Race) und `UPDATE slider_images SET section_id = …` über das Mapping (race_id, area).
-- `ExportDialog` Dateinamen-Logik nutzt neuen Titel; Section-Name geht statt `area` in den Fallback-Namen ein.
-- `types.ts` regeneriert sich nach der Migration; danach folgen die Code-Anpassungen.
+## 3. UI
 
-## Reihenfolge der Umsetzung
-1. Migration (Sections-Tabelle, Backfill).
-2. Code-Refactor `RaceCard` + `ImageCell` (Sections, Namen, Reorder, Link-Button).
-3. `imageProcess.ts` harte Obergrenze.
-4. Export-/Download-Dateinamen anpassen.
+- **Kommentar-Button** in jedem `ImageCell` (kleines Sprechblasen-Icon mit Badge = Anzahl ungelesener Kommentare/Mentions).
+- Klick öffnet **Sheet/Drawer rechts** mit:
+  - Bild-Preview oben (damit klar ist worum es geht)
+  - Chronologischer Thread (Avatar, Name, Zeit, Text)
+  - Eingabefeld unten mit `@`-Autocomplete (Liste aller `profiles`)
+  - Mentions werden im Text als Chip `@Max Mustermann` gerendert
+- **Globale Glocke** oben rechts: zeigt alle Threads in denen ich erwähnt wurde, mit Link zum Bild.
+
+## 4. Benachrichtigungen
+
+Beim Speichern eines Kommentars → Server Function `postComment`:
+1. Kommentar + Mentions in DB schreiben
+2. Für jede gementionte Person parallel:
+   - **Google Chat**: POST an Webhook-URL eines gemeinsamen Spaces. Karte mit „<Autor> hat dich zu <Race> / <Section> / Slot #<n> markiert" + Kommentartext + Link zur App.
+   - **E-Mail** (über Lovable Emails / euer Email-Domain-Setup): gleicher Inhalt, „Antworten" führt zurück in die App.
+3. `notified_at` setzen.
+
+Beides ist **Best-Effort** — wenn Chat oder Mail fehlschlägt, wird der Kommentar trotzdem gespeichert und der Fehler geloggt.
+
+## 5. Was wir vom dir brauchen
+1. **Erlaubte Domain oder Liste der E-Mails** für die Allowlist.
+2. **Google-Chat-Webhook-URL** des Spaces, in den die Benachrichtigungen sollen. (In Google Chat: Space → „Apps & Integrationen" → „Webhooks verwalten" → URL kopieren). Wir speichern sie als Secret `GOOGLE_CHAT_WEBHOOK_URL`.
+3. **Sender-Domain für E-Mails** (z. B. `notify.eurefirma.com`) — wird einmalig per Lovable-Setup verifiziert.
+
+## 6. Reihenfolge der Umsetzung
+
+```text
+Schritt 1  Google-Login + profiles + Allowlist + _authenticated-Layout
+Schritt 2  user_roles + Admin-Seite für Allowlist
+Schritt 3  comments + comment_mentions Tabellen mit RLS
+Schritt 4  Kommentar-Sheet im ImageCell + @mention-Autocomplete
+Schritt 5  Glocke / In-App-Benachrichtigungen
+Schritt 6  Google-Chat-Webhook-Integration (Server Function)
+Schritt 7  E-Mail-Benachrichtigung (Lovable Emails)
+```
+
+Wir können nach Schritt 4 schon live testen — Benachrichtigungen kommen on top.
+
+## Technische Hinweise
+- Auth: Supabase Google OAuth via Lovable Cloud, gated über das `_authenticated`-Layout der Integration.
+- Mention-Parsing: Markdown-ähnliches Format `@[Name](user_id)` im DB-Text, beim Rendern in Chips umgewandelt — robuster als reines `@name`.
+- Server Function `postComment` mit `requireSupabaseAuth` — verhindert anonymes Spamming des Chat-Webhooks.
+- Google-Chat-Webhooks brauchen **kein** OAuth, nur die URL → einfach.
+- Realtime (Supabase Channels) optional in Phase 2, damit Kommentare live auftauchen ohne Reload.
