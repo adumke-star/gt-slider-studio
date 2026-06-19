@@ -216,6 +216,10 @@ export function RaceCard({
                   if (!dragId) return;
                   reorder(s, dragId, targetId, side);
                 }}
+                isSectionDragging={sectionDragId === s.id}
+                onSectionDragStart={() => setSectionDragId(s.id)}
+                onSectionDragEnd={() => setSectionDragId(null)}
+                onSectionDropOn={(side) => reorderSection(s.id, side)}
               />
             );
           })}
