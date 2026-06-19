@@ -119,6 +119,7 @@ export type Database = {
       slider_sections: {
         Row: {
           created_at: string
+          external_links: Json
           external_url: string | null
           id: string
           kind: string
@@ -129,6 +130,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          external_links?: Json
           external_url?: string | null
           id?: string
           kind: string
@@ -139,6 +141,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          external_links?: Json
           external_url?: string | null
           id?: string
           kind?: string

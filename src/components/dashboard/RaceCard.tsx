@@ -13,6 +13,8 @@ type Race = {
   sort_order: number;
 };
 
+export type SectionLink = { label: string; url: string };
+
 export type SliderSection = {
   id: string;
   race_id: string;
@@ -20,6 +22,7 @@ export type SliderSection = {
   name: string;
   sort_order: number;
   external_url: string | null;
+  external_links: SectionLink[] | null;
 };
 
 export function RaceCard({
@@ -85,8 +88,10 @@ export function RaceCard({
     onReload();
   }
 
-  async function setSectionUrl(s: SliderSection, url: string | null) {
-    await supabase.from("slider_sections").update({ external_url: url }).eq("id", s.id);
+  async function setSectionLinks(s: SliderSection, links: SectionLink[]) {
+    await supabase.from("slider_sections").update({
+      external_links: links as unknown as never,
+    }).eq("id", s.id);
     onReload();
   }
 
@@ -208,7 +213,7 @@ export function RaceCard({
                 onToggleSelect={onToggleSelect}
                 onReload={onReload}
                 onRename={(n) => renameSection(s, n)}
-                onSetUrl={(u) => setSectionUrl(s, u)}
+                onSetLinks={(links) => setSectionLinks(s, links)}
                 onDelete={() => deleteSection(s)}
                 onAddSlot={() => addSlot(s)}
                 onDragStart={(id) => setDragId(id)}
@@ -236,7 +241,7 @@ function SectionBlock({
   onToggleSelect,
   onReload,
   onRename,
-  onSetUrl,
+  onSetLinks,
   onDelete,
   onAddSlot,
   onDragStart,
@@ -252,7 +257,7 @@ function SectionBlock({
   onToggleSelect: (id: string) => void;
   onReload: () => void;
   onRename: (name: string) => void;
-  onSetUrl: (url: string | null) => void;
+  onSetLinks: (links: SectionLink[]) => void;
   onDelete: () => void;
   onAddSlot: () => void;
   onDragStart: (id: string) => void;
@@ -262,10 +267,11 @@ function SectionBlock({
   onSectionDragEnd: () => void;
   onSectionDropOn: (side: "before" | "after") => void;
 }) {
+  const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(section.name);
-  const [editingUrl, setEditingUrl] = useState(false);
-  const [urlDraft, setUrlDraft] = useState(section.external_url ?? "");
+  const [editingLinks, setEditingLinks] = useState(false);
+  const [linksDraft, setLinksDraft] = useState<SectionLink[]>(links);
   const [sectionDropSide, setSectionDropSide] = useState<"before" | "after" | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -273,10 +279,16 @@ function SectionBlock({
     setEditingName(false);
     onRename(nameDraft);
   }
-  function commitUrl() {
-    setEditingUrl(false);
-    const v = urlDraft.trim();
-    onSetUrl(v || null);
+  function openLinksEditor() {
+    setLinksDraft(links.length ? links : [{ label: "Originale", url: "" }]);
+    setEditingLinks(true);
+  }
+  function commitLinks() {
+    const cleaned = linksDraft
+      .map((l) => ({ label: l.label.trim() || "Link", url: l.url.trim() }))
+      .filter((l) => l.url);
+    setEditingLinks(false);
+    onSetLinks(cleaned);
   }
 
   return (
@@ -359,53 +371,25 @@ function SectionBlock({
           )}
         </div>
         <div className="flex items-center gap-1">
-          {editingUrl ? (
-            <div className="flex items-center gap-1">
-              <input
-                autoFocus
-                type="url"
-                placeholder="https://drive…/originale"
-                value={urlDraft}
-                onChange={(e) => setUrlDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitUrl();
-                  if (e.key === "Escape") { setEditingUrl(false); setUrlDraft(section.external_url ?? ""); }
-                }}
-                className="w-56 rounded border border-border bg-background px-1.5 py-1 text-xs text-foreground focus:border-primary focus:outline-none"
-              />
-              <button onClick={commitUrl} className="rounded p-1 text-primary hover:bg-background" title="Speichern">
-                <Check className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => { setEditingUrl(false); setUrlDraft(section.external_url ?? ""); }}
-                className="rounded p-1 text-muted-foreground hover:bg-background"
-                title="Abbrechen"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : (
-            <>
-              {section.external_url ? (
-                <a
-                  href={section.external_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-primary hover:border-primary"
-                  title={section.external_url}
-                >
-                  <ExternalLink className="h-3 w-3" /> Originale
-                </a>
-              ) : null}
-              <button
-                onClick={() => setEditingUrl(true)}
-                className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
-                title={section.external_url ? "Link bearbeiten" : "Externen Link hinzufügen"}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-            </>
-          )}
+          {links.map((l, idx) => (
+            <a
+              key={idx}
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex max-w-[160px] items-center gap-1 truncate rounded border border-border bg-background px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-primary hover:border-primary"
+              title={l.url}
+            >
+              <ExternalLink className="h-3 w-3 shrink-0" /> <span className="truncate">{l.label}</span>
+            </a>
+          ))}
+          <button
+            onClick={openLinksEditor}
+            className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
+            title={links.length ? "Links bearbeiten" : "Externe Links hinzufügen"}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
           <Button size="sm" variant="ghost" onClick={onAddSlot}
             className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary">
             <Plus className="h-3.5 w-3.5" /> Slot
@@ -438,7 +422,94 @@ function SectionBlock({
           />
         ))}
       </div>
+
+      {editingLinks && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur"
+          onClick={() => setEditingLinks(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg rounded-lg border border-border bg-surface-2 p-4 shadow-xl"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-display text-sm font-black uppercase tracking-widest">
+                Externe Links — {section.name}
+              </h3>
+              <button
+                onClick={() => setEditingLinks(false)}
+                className="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {linksDraft.length === 0 && (
+                <div className="rounded border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+                  Noch keine Links — füge unten den ersten hinzu.
+                </div>
+              )}
+              {linksDraft.map((l, idx) => (
+                <div key={idx} className="grid grid-cols-[140px_minmax(0,1fr)_auto] gap-2">
+                  <input
+                    type="text"
+                    placeholder="Beschriftung"
+                    value={l.label}
+                    onChange={(e) => {
+                      const next = linksDraft.slice();
+                      next[idx] = { ...next[idx], label: e.target.value };
+                      setLinksDraft(next);
+                    }}
+                    className="rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
+                  />
+                  <input
+                    type="url"
+                    placeholder="https://…"
+                    value={l.url}
+                    onChange={(e) => {
+                      const next = linksDraft.slice();
+                      next[idx] = { ...next[idx], url: e.target.value };
+                      setLinksDraft(next);
+                    }}
+                    className="rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
+                  />
+                  <button
+                    onClick={() => setLinksDraft(linksDraft.filter((_, i) => i !== idx))}
+                    className="rounded p-1.5 text-muted-foreground hover:bg-background hover:text-destructive"
+                    title="Link entfernen"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setLinksDraft([...linksDraft, { label: "", url: "" }])}
+                className="gap-1 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" /> Link hinzufügen
+              </Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setEditingLinks(false)}>
+                  Abbrechen
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={commitLinks}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  Speichern
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
