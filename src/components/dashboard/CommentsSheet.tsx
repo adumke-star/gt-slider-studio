@@ -226,7 +226,7 @@ export function CommentsSheet({
                         : "border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10",
                     )}
                   >
-                    {isResolved ? <><RotateCcw className="h-3 w-3" /> Reopen</> : <><Check className="h-3 w-3" /> Solved</>}
+                    {isResolved ? <><RotateCcw className="h-3 w-3" /> Reopen</> : <><Check className="h-3 w-3" /> Solve</>}
                   </button>
                 </div>
               </div>
