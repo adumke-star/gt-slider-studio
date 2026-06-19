@@ -237,7 +237,6 @@ export function RaceCard({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
-        <div className="flex shrink-0 items-center gap-1">
           {(() => {
             const sectionKindById = new Map(sections.map((s) => [s.id, s.kind] as const));
             const plpImgs = images.filter((i) => i.original_path && (i.section_id ? sectionKindById.get(i.section_id) === "plp" : i.area === "plp"));
