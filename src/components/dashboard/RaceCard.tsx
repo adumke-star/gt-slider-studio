@@ -213,7 +213,7 @@ export function RaceCard({
                 onToggleSelect={onToggleSelect}
                 onReload={onReload}
                 onRename={(n) => renameSection(s, n)}
-                onSetUrl={(u) => setSectionUrl(s, u)}
+                onSetLinks={(links) => setSectionLinks(s, links)}
                 onDelete={() => deleteSection(s)}
                 onAddSlot={() => addSlot(s)}
                 onDragStart={(id) => setDragId(id)}
