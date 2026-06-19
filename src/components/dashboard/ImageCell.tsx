@@ -3,6 +3,7 @@ import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical } fro
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
 import { cn } from "@/lib/utils";
+import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 
 export type SliderImage = {
   id: string;
@@ -138,7 +139,9 @@ export function ImageCell({
       onDragOver={(e) => {
         e.preventDefault();
         // Side detection only when moving an image, not a file
-        if (e.dataTransfer.types.includes("Files")) {
+        if (dataTransferHasFiles(e.dataTransfer)) {
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = "copy";
           setDropSide(null);
           return;
         }
@@ -147,13 +150,12 @@ export function ImageCell({
         setDropSide(e.clientX < r.left + r.width / 2 ? "left" : "right");
       }}
       onDragLeave={() => setDropSide(null)}
-      onDrop={(e) => {
-        const files = e.dataTransfer.files;
-        if (files && files.length > 0) {
+      onDrop={async (e) => {
+        if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
           e.stopPropagation();
           setDropSide(null);
-          const arr = Array.from(files).filter((f) => f.type.startsWith("image/"));
+          const arr = (await collectFilesFromDataTransfer(e.dataTransfer)).filter(isImageFile);
           if (arr.length > 1 && onMultiFileDrop) {
             onMultiFileDrop(arr);
           } else if (arr.length >= 1) {
