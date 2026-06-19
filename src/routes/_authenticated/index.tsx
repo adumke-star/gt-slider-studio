@@ -37,6 +37,7 @@ function Dashboard() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [exportImages, setExportImages] = useState<SliderImage[] | null>(null);
   const [filter, setFilter] = useState<"all" | "f1" | "motogp" | "dtm" | "wsbk">("all");
   const [loading, setLoading] = useState(true);
 
