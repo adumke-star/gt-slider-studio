@@ -59,6 +59,9 @@ export function ImageCell({
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState(image.title ?? "");
   const [dropSide, setDropSide] = useState<"left" | "right" | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentCount, setCommentCount] = useState(0);
+  const [unreadMentions, setUnreadMentions] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setName(image.title ?? ""); }, [image.title]);
