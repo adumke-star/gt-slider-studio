@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Download, Plus, X, Flag, Trash2, LogOut } from "lucide-react";
+import { Download, Plus, X, Trash2, LogOut } from "lucide-react";
 import { removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { ExportDialog } from "@/components/dashboard/ExportDialog";
 import type { SliderImage } from "@/components/dashboard/ImageCell";
 import { dataTransferHasFiles } from "@/lib/dropFiles";
 import { UserMenu } from "@/components/dashboard/UserMenu";
+import logoAsset from "@/assets/global-tickets-logo.svg.asset.json";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -102,7 +103,7 @@ function Dashboard() {
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-4 px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded bg-primary text-primary-foreground">
-              <Flag className="h-5 w-5" strokeWidth={2.5} />
+              <img src={logoAsset.url} alt="Global Tickets" className="h-6 w-6" />
             </div>
             <div className="min-w-0">
               <h1 className="font-display text-xl font-black uppercase leading-none tracking-tight">
