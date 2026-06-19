@@ -49,9 +49,28 @@ export function RaceCard({
   const [open, setOpen] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
   const [sectionDragId, setSectionDragId] = useState<string | null>(null);
-
+  const [hasOpenComments, setHasOpenComments] = useState(false);
 
   const hasChanges = useMemo(() => images.some((i) => i.status === "changes"), [images]);
+
+  useEffect(() => {
+    if (images.length === 0) {
+      setHasOpenComments(false);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      const ids = images.map((i) => i.id);
+      const { count } = await supabase
+        .from("comments")
+        .select("id", { count: "exact", head: true })
+        .in("image_id", ids)
+        .is("resolved_at", null);
+      if (alive) setHasOpenComments((count ?? 0) > 0);
+    })();
+    return () => { alive = false; };
+  }, [images]);
+
 
   // PLP always first, then PDP. Inside each kind: sort_order, then name.
   const sorted = useMemo(() => {
@@ -236,6 +255,18 @@ export function RaceCard({
             {race.series === "f1" ? "F1" : race.series === "motogp" ? "MotoGP" : race.series.toUpperCase()}
           </span>
           <h2 className="truncate font-display text-lg font-black uppercase tracking-tight">{race.name}</h2>
+          {!open && hasChanges && (
+            <span title="Changes pending" className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#CB4F10]/60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#CB4F10]" />
+            </span>
+          )}
+          {!open && hasOpenComments && (
+            <span title="Open comments" className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FACC15]/60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FACC15]" />
+            </span>
+          )}
           {race.race_date && (
             <span className="hidden text-xs text-muted-foreground sm:inline">{race.race_date}</span>
           )}
