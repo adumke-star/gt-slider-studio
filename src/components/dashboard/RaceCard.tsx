@@ -88,8 +88,10 @@ export function RaceCard({
     onReload();
   }
 
-  async function setSectionUrl(s: SliderSection, url: string | null) {
-    await supabase.from("slider_sections").update({ external_url: url }).eq("id", s.id);
+  async function setSectionLinks(s: SliderSection, links: SectionLink[]) {
+    await supabase.from("slider_sections").update({
+      external_links: links as unknown as never,
+    }).eq("id", s.id);
     onReload();
   }
 
