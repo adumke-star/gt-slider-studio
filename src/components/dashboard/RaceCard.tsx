@@ -559,6 +559,16 @@ function SectionBlock({
             onDragStart={() => onDragStart(img.id)}
             onDropBefore={() => onDropOn(img.id, "before")}
             onDropAfter={() => onDropOn(img.id, "after")}
+            onMultiFileDrop={async (files) => {
+              setUploading(true);
+              setBatchItems(files.map((f) => ({ name: f.name, status: "pending" as const })));
+              try {
+                await onBatchUpload(files, (items) => setBatchItems(items));
+              } finally {
+                setUploading(false);
+                setTimeout(() => setBatchItems([]), 4000);
+              }
+            }}
           />
         ))}
       </div>
