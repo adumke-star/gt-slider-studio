@@ -149,6 +149,14 @@ export function CommentsSheet({
     setComments((c) => [...c, ins as Comment]);
   }
 
+  async function toggleResolved(c: Comment) {
+    if (!meId) return;
+    const nextResolved = c.resolved_at ? null : new Date().toISOString();
+    const nextBy = c.resolved_at ? null : meId;
+    setComments((list) => list.map((x) => x.id === c.id ? { ...x, resolved_at: nextResolved, resolved_by: nextBy } : x));
+    await supabase.from("comments").update({ resolved_at: nextResolved, resolved_by: nextBy }).eq("id", c.id);
+  }
+
   const filteredSuggest = suggest.open
     ? allProfiles.filter((p) => {
         const q = suggest.query;
