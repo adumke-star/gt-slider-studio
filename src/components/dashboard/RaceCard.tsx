@@ -603,35 +603,64 @@ function SectionBlock({
           </button>
         </div>
       </div>
-      <div className="flex gap-3 overflow-x-auto p-3">
-        {images.length === 0 && (
-          <div className="grid h-[120px] w-full place-items-center text-xs text-muted-foreground">
-            Noch keine Slots — füge oben einen Slot hinzu.
-          </div>
+      <div className="relative">
+        <div ref={scrollRef} className="flex gap-3 overflow-x-auto scroll-smooth p-3">
+          {images.length === 0 && (
+            <div className="grid h-[120px] w-full place-items-center text-xs text-muted-foreground">
+              Noch keine Slots — füge oben einen Slot hinzu.
+            </div>
+          )}
+          {images.map((img) => (
+            <ImageCell
+              key={img.id}
+              image={img}
+              selected={selected.has(img.id)}
+              onToggleSelect={() => onToggleSelect(img.id)}
+              onChanged={onReload}
+              onDragStart={() => onDragStart(img.id)}
+              onDropBefore={() => onDropOn(img.id, "before")}
+              onDropAfter={() => onDropOn(img.id, "after")}
+              onMultiFileDrop={async (files) => {
+                setUploading(true);
+                setBatchItems(files.map((f) => ({ name: f.name, status: "pending" as const })));
+                try {
+                  await onBatchUpload(files, (items) => setBatchItems(items));
+                } finally {
+                  setUploading(false);
+                  setTimeout(() => setBatchItems([]), 4000);
+                }
+              }}
+            />
+          ))}
+        </div>
+        {canScrollLeft && (
+          <>
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-surface-2 to-transparent" />
+            <button
+              type="button"
+              onClick={() => scrollBy(-1)}
+              aria-label="Nach links scrollen"
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full border border-border bg-background/90 text-foreground shadow-md backdrop-blur transition hover:bg-background hover:text-primary"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          </>
         )}
-        {images.map((img) => (
-          <ImageCell
-            key={img.id}
-            image={img}
-            selected={selected.has(img.id)}
-            onToggleSelect={() => onToggleSelect(img.id)}
-            onChanged={onReload}
-            onDragStart={() => onDragStart(img.id)}
-            onDropBefore={() => onDropOn(img.id, "before")}
-            onDropAfter={() => onDropOn(img.id, "after")}
-            onMultiFileDrop={async (files) => {
-              setUploading(true);
-              setBatchItems(files.map((f) => ({ name: f.name, status: "pending" as const })));
-              try {
-                await onBatchUpload(files, (items) => setBatchItems(items));
-              } finally {
-                setUploading(false);
-                setTimeout(() => setBatchItems([]), 4000);
-              }
-            }}
-          />
-        ))}
+        {canScrollRight && (
+          <>
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-surface-2 to-transparent" />
+            <button
+              type="button"
+              onClick={() => scrollBy(1)}
+              aria-label="Nach rechts scrollen"
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full border border-border bg-background/90 text-foreground shadow-md backdrop-blur transition hover:bg-background hover:text-primary"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </>
+        )}
       </div>
+
 
       {editingLinks && (
         <div
