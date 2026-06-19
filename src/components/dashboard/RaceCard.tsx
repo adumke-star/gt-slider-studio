@@ -267,16 +267,10 @@ export function RaceCard({
           </span>
           <h2 className="truncate font-display text-lg font-black uppercase tracking-tight">{race.name}</h2>
           {!open && hasChanges && (
-            <span title="Changes pending" className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#CB4F10]/60" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#CB4F10]" />
-            </span>
+            <span title="Changes pending" className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#CB4F10]" />
           )}
           {!open && hasOpenComments && (
-            <span title="Open comments" className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FACC15]/60" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FACC15]" />
-            </span>
+            <span title="Open comments" className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#FACC15]" />
           )}
           {race.race_date && (
             <span className="hidden text-xs text-muted-foreground sm:inline">{race.race_date}</span>
@@ -622,20 +616,14 @@ function SectionBlock({
           {images.some((i) => i.status === "changes") && (
             <span
               title="Changes pending"
-              className="relative flex h-2.5 w-2.5 shrink-0"
-            >
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#CB4F10]/60" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#CB4F10]" />
-            </span>
+              className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#CB4F10]"
+            />
           )}
           {hasOpenComments && (
             <span
               title="Open comments"
-              className="relative flex h-2.5 w-2.5 shrink-0"
-            >
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FACC15]/60" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FACC15]" />
-            </span>
+              className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#FACC15]"
+            />
           )}
           {editingName ? (
             <div className="flex items-center gap-1">
