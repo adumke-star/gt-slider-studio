@@ -353,6 +353,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      race_status_flags: {
+        Args: never
+        Returns: {
+          has_changes: boolean
+          has_open_comments: boolean
+          race_id: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "member"

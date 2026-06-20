@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Download, Plus, X, Trash2, LogOut } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Download, Plus, X, Trash2 } from "lucide-react";
 import { removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ import { ExportDialog } from "@/components/dashboard/ExportDialog";
 import type { SliderImage } from "@/components/dashboard/ImageCell";
 import { dataTransferHasFiles } from "@/lib/dropFiles";
 import { UserMenu } from "@/components/dashboard/UserMenu";
-import { RaceNav, type NavSelection } from "@/components/dashboard/RaceNav";
+import { RaceNav, type NavSelection, type RaceFlags } from "@/components/dashboard/RaceNav";
+import { RaceListView } from "@/components/dashboard/RaceListView";
 import logoAsset from "@/assets/global-tickets-logo.svg.asset.json";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -31,10 +32,14 @@ type Race = {
   sort_order: number;
 };
 
+type RaceBundle = { sections: SliderSection[]; images: SliderImage[] };
+
 function Dashboard() {
   const [races, setRaces] = useState<Race[]>([]);
-  const [sections, setSections] = useState<SliderSection[]>([]);
-  const [images, setImages] = useState<SliderImage[]>([]);
+  const [flagsByRace, setFlagsByRace] = useState<Map<string, RaceFlags>>(new Map());
+  const [bundleByRace, setBundleByRace] = useState<Map<string, RaceBundle>>(new Map());
+  const [loadingRaceIds, setLoadingRaceIds] = useState<Set<string>>(new Set());
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -43,20 +48,57 @@ function Dashboard() {
   const [selection, setSelection] = useState<NavSelection>({ kind: "series", series: "f1" });
   const [loading, setLoading] = useState(true);
 
+  const bundleRef = useRef(bundleByRace);
+  bundleRef.current = bundleByRace;
 
-  async function load() {
-    const [{ data: r }, { data: s }, { data: i }] = await Promise.all([
-      supabase.from("races").select("*").order("sort_order").order("created_at"),
-      supabase.from("slider_sections").select("*").order("sort_order"),
-      supabase.from("slider_images").select("*"),
+  const loadRaces = useCallback(async () => {
+    const { data } = await supabase.from("races").select("*").order("sort_order").order("created_at");
+    setRaces((data ?? []) as Race[]);
+  }, []);
+
+  const loadFlags = useCallback(async () => {
+    const { data } = await supabase.rpc("race_status_flags");
+    const m = new Map<string, RaceFlags>();
+    for (const r of data ?? []) {
+      m.set(r.race_id as string, {
+        hasChanges: !!r.has_changes,
+        hasOpenComments: !!r.has_open_comments,
+      });
+    }
+    setFlagsByRace(m);
+  }, []);
+
+  const loadRace = useCallback(async (raceId: string) => {
+    setLoadingRaceIds((s) => {
+      const n = new Set(s);
+      n.add(raceId);
+      return n;
+    });
+    const [{ data: s }, { data: i }] = await Promise.all([
+      supabase.from("slider_sections").select("*").eq("race_id", raceId).order("sort_order"),
+      supabase.from("slider_images").select("*").eq("race_id", raceId),
     ]);
-    setRaces((r ?? []) as Race[]);
-    setSections((s ?? []) as SliderSection[]);
-    setImages((i ?? []) as SliderImage[]);
-    setLoading(false);
-  }
+    setBundleByRace((prev) => {
+      const n = new Map(prev);
+      n.set(raceId, {
+        sections: (s ?? []) as SliderSection[],
+        images: (i ?? []) as SliderImage[],
+      });
+      return n;
+    });
+    setLoadingRaceIds((s) => {
+      const n = new Set(s);
+      n.delete(raceId);
+      return n;
+    });
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    (async () => {
+      await Promise.all([loadRaces(), loadFlags()]);
+      setLoading(false);
+    })();
+  }, [loadRaces, loadFlags]);
 
   useEffect(() => {
     const prevent = (e: DragEvent) => {
@@ -70,29 +112,49 @@ function Dashboard() {
     };
   }, []);
 
-  const sectionsByRace = useMemo(() => {
-    const m = new Map<string, SliderSection[]>();
-    for (const s of sections) {
-      if (!m.has(s.race_id)) m.set(s.race_id, []);
-      m.get(s.race_id)!.push(s);
-    }
-    return m;
-  }, [sections]);
+  // Visible races based on selection
+  const visibleRaces = useMemo(
+    () =>
+      selection.kind === "series"
+        ? races.filter((r) => r.series === selection.series)
+        : races.filter((r) => r.id === selection.raceId),
+    [races, selection],
+  );
 
-  const imagesByRace = useMemo(() => {
-    const m = new Map<string, SliderImage[]>();
-    for (const im of images) {
-      if (!m.has(im.race_id)) m.set(im.race_id, []);
-      m.get(im.race_id)!.push(im);
-    }
-    return m;
-  }, [images]);
+  // For race selection: load that one race's bundle if not cached
+  useEffect(() => {
+    if (selection.kind !== "race") return;
+    if (bundleRef.current.has(selection.raceId)) return;
+    loadRace(selection.raceId);
+  }, [selection, loadRace]);
 
-
-  const visibleRaces =
-    selection.kind === "series"
-      ? races.filter((r) => r.series === selection.series)
-      : races.filter((r) => r.id === selection.raceId);
+  // Realtime: keep flags + any currently loaded race in sync
+  useEffect(() => {
+    if (loading) return;
+    const refetchRace = (raceId: string) => {
+      if (bundleRef.current.has(raceId)) loadRace(raceId);
+    };
+    const channel = supabase
+      .channel("dashboard-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "slider_images" }, (payload) => {
+        loadFlags();
+        const row = (payload.new ?? payload.old) as { race_id?: string } | null;
+        if (row?.race_id) refetchRace(row.race_id);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "slider_sections" }, (payload) => {
+        const row = (payload.new ?? payload.old) as { race_id?: string } | null;
+        if (row?.race_id) refetchRace(row.race_id);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, () => {
+        loadFlags();
+        // also refresh active race so comment threads update
+        for (const id of bundleRef.current.keys()) refetchRace(id);
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loading, loadFlags, loadRace]);
 
   function toggle(id: string) {
     setSelected((s) => {
@@ -102,7 +164,19 @@ function Dashboard() {
     });
   }
 
-  const selectedImgs = images.filter((i) => selected.has(i.id));
+  // All loaded images (across cached races) — needed for selection-based actions
+  const loadedImages = useMemo(() => {
+    const arr: SliderImage[] = [];
+    for (const b of bundleByRace.values()) arr.push(...b.images);
+    return arr;
+  }, [bundleByRace]);
+
+  const selectedImgs = loadedImages.filter((i) => selected.has(i.id));
+
+  const onSelectNav = (sel: NavSelection) => {
+    setSelected(new Set());
+    setSelection(sel);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -121,7 +195,7 @@ function Dashboard() {
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <RaceNav races={races} images={images} selection={selection} onSelect={setSelection} />
+            <RaceNav races={races} flagsByRace={flagsByRace} selection={selection} onSelect={onSelectNav} />
             <Button onClick={() => setAddOpen(true)} variant="outline" className="gap-1.5">
               <Plus className="h-4 w-4" /> Race
             </Button>
@@ -134,8 +208,9 @@ function Dashboard() {
                   img.compressed_path ? removeFile("compressed", img.compressed_path).catch(() => {}) : Promise.resolve(),
                 ]));
                 await supabase.from("slider_images").delete().in("id", selectedImgs.map((i) => i.id));
+                const raceIds = new Set(selectedImgs.map((i) => i.race_id));
                 setSelected(new Set());
-                load();
+                await Promise.all([loadFlags(), ...Array.from(raceIds).map((id) => loadRace(id))]);
               }}
               disabled={selected.size === 0}
               variant="outline"
@@ -179,33 +254,67 @@ function Dashboard() {
               </Button>
             </div>
           </div>
+        ) : selection.kind === "series" ? (
+          <RaceListView
+            races={visibleRaces}
+            flagsByRace={flagsByRace}
+            onOpen={(raceId) => onSelectNav({ kind: "race", raceId })}
+          />
         ) : (
-          visibleRaces.map((race) => (
-            <RaceCard
-              key={race.id}
-              race={race}
-              sections={sectionsByRace.get(race.id) ?? []}
-              images={imagesByRace.get(race.id) ?? []}
-              selected={selected}
-              onToggleSelect={toggle}
-              onReload={load}
-              onExport={(imgs) => { setExportMode("export"); setExportImages(imgs); setExportOpen(true); }}
-              onCompress={(imgs) => { setExportMode("compress"); setExportImages(imgs); setExportOpen(true); }}
-            />
-          ))
+          visibleRaces.map((race) => {
+            const bundle = bundleByRace.get(race.id);
+            const isLoading = loadingRaceIds.has(race.id);
+            if (!bundle) {
+              return (
+                <div
+                  key={race.id}
+                  className="grid h-40 place-items-center rounded-lg border border-border bg-surface-2/40 text-sm text-muted-foreground"
+                >
+                  {isLoading ? "Loading race…" : "Preparing…"}
+                </div>
+              );
+            }
+            return (
+              <RaceCard
+                key={race.id}
+                race={race}
+                sections={bundle.sections}
+                images={bundle.images}
+                selected={selected}
+                onToggleSelect={toggle}
+                onReload={() => {
+                  loadRace(race.id);
+                  loadFlags();
+                }}
+                onExport={(imgs) => { setExportMode("export"); setExportImages(imgs); setExportOpen(true); }}
+                onCompress={(imgs) => { setExportMode("compress"); setExportImages(imgs); setExportOpen(true); }}
+              />
+            );
+          })
         )}
       </main>
 
-      <AddRaceDialog open={addOpen} onOpenChange={setAddOpen} onCreated={load} />
+      <AddRaceDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onCreated={async () => {
+          await Promise.all([loadRaces(), loadFlags()]);
+        }}
+      />
       <ExportDialog
         open={exportOpen}
         onOpenChange={(v) => { setExportOpen(v); if (!v) { setExportImages(null); setExportMode("export"); } }}
         images={exportImages ?? selectedImgs}
         races={races}
         mode={exportMode}
-        onDone={() => { if (!exportImages && exportMode === "export") setSelected(new Set()); setExportImages(null); setExportMode("export"); load(); }}
+        onDone={async () => {
+          if (!exportImages && exportMode === "export") setSelected(new Set());
+          setExportImages(null);
+          setExportMode("export");
+          await loadFlags();
+          if (selection.kind === "race") await loadRace(selection.raceId);
+        }}
       />
-
     </div>
   );
 }
