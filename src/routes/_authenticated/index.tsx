@@ -89,7 +89,12 @@ function Dashboard() {
   }, [images]);
 
 
-  const visibleRaces = filter === "all" ? races : races.filter((r) => r.series === filter);
+  const visibleRaces =
+    selection.kind === "all"
+      ? races
+      : selection.kind === "series"
+        ? races.filter((r) => r.series === selection.series)
+        : races.filter((r) => r.id === selection.raceId);
 
   function toggle(id: string) {
     setSelected((s) => {
