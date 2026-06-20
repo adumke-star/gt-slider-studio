@@ -40,7 +40,7 @@ function Dashboard() {
   const [exportOpen, setExportOpen] = useState(false);
   const [exportImages, setExportImages] = useState<SliderImage[] | null>(null);
   const [exportMode, setExportMode] = useState<"export" | "compress">("export");
-  const [selection, setSelection] = useState<NavSelection>({ kind: "all" });
+  const [selection, setSelection] = useState<NavSelection>({ kind: "series", series: "f1" });
   const [loading, setLoading] = useState(true);
 
 
@@ -90,11 +90,9 @@ function Dashboard() {
 
 
   const visibleRaces =
-    selection.kind === "all"
-      ? races
-      : selection.kind === "series"
-        ? races.filter((r) => r.series === selection.series)
-        : races.filter((r) => r.id === selection.raceId);
+    selection.kind === "series"
+      ? races.filter((r) => r.series === selection.series)
+      : races.filter((r) => r.id === selection.raceId);
 
   function toggle(id: string) {
     setSelected((s) => {

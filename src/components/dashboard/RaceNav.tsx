@@ -20,7 +20,6 @@ export type NavRace = {
 };
 
 export type NavSelection =
-  | { kind: "all" }
   | { kind: "series"; series: Series }
   | { kind: "race"; raceId: string };
 
@@ -112,17 +111,6 @@ export function RaceNav({
 
   return (
     <div className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-background p-0.5">
-      <button
-        onClick={() => onSelect({ kind: "all" })}
-        className={cn(
-          baseBtn,
-          selection.kind === "all"
-            ? "bg-primary text-primary-foreground"
-            : "text-muted-foreground hover:text-foreground",
-        )}
-      >
-        All
-      </button>
 
       {SERIES.map((s) => {
         const list = racesBySeries.get(s.key) ?? [];
