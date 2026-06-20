@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ChevronDown } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +8,6 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { SliderImage } from "./ImageCell";
 
 export type Series = "f1" | "motogp" | "dtm" | "wsbk";
 
@@ -18,6 +16,8 @@ export type NavRace = {
   name: string;
   series: Series;
 };
+
+export type RaceFlags = { hasChanges: boolean; hasOpenComments: boolean };
 
 export type NavSelection =
   | { kind: "series"; series: Series }
@@ -32,39 +32,15 @@ const SERIES: { key: Series; label: string }[] = [
 
 export function RaceNav({
   races,
-  images,
+  flagsByRace,
   selection,
   onSelect,
 }: {
   races: NavRace[];
-  images: SliderImage[];
+  flagsByRace: Map<string, RaceFlags>;
   selection: NavSelection;
   onSelect: (sel: NavSelection) => void;
 }) {
-  const [openCommentImageIds, setOpenCommentImageIds] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (images.length === 0) return;
-    let alive = true;
-    const refetch = async () => {
-      const { data } = await supabase
-        .from("comments")
-        .select("image_id")
-        .is("resolved_at", null);
-      if (!alive) return;
-      setOpenCommentImageIds(new Set((data ?? []).map((r) => r.image_id as string)));
-    };
-    refetch();
-    const channel = supabase
-      .channel("nav-open-comments")
-      .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, () => refetch())
-      .subscribe();
-    return () => {
-      alive = false;
-      supabase.removeChannel(channel);
-    };
-  }, [images.length]);
-
   const racesBySeries = useMemo(() => {
     const m = new Map<Series, NavRace[]>();
     for (const r of races) {
@@ -74,23 +50,11 @@ export function RaceNav({
     return m;
   }, [races]);
 
-  const imagesByRace = useMemo(() => {
-    const m = new Map<string, SliderImage[]>();
-    for (const i of images) {
-      if (!m.has(i.race_id)) m.set(i.race_id, []);
-      m.get(i.race_id)!.push(i);
-    }
-    return m;
-  }, [images]);
-
-  function raceFlags(raceId: string) {
-    const imgs = imagesByRace.get(raceId) ?? [];
-    const hasChanges = imgs.some((i) => i.status === "changes");
-    const hasOpenComments = imgs.some((i) => openCommentImageIds.has(i.id));
-    return { hasChanges, hasOpenComments };
+  function raceFlags(raceId: string): RaceFlags {
+    return flagsByRace.get(raceId) ?? { hasChanges: false, hasOpenComments: false };
   }
 
-  function seriesFlags(series: Series) {
+  function seriesFlags(series: Series): RaceFlags {
     const list = racesBySeries.get(series) ?? [];
     let hasChanges = false;
     let hasOpenComments = false;
@@ -111,7 +75,6 @@ export function RaceNav({
 
   return (
     <div className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-background p-0.5">
-
       {SERIES.map((s) => {
         const list = racesBySeries.get(s.key) ?? [];
         const active =
