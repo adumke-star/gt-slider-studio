@@ -1,45 +1,41 @@
 ## Ziel
-Aktuell lädt das Dashboard beim Login **alle** Rennen, **alle** Sections und **alle** Bilder auf einmal. Bei wachsender Datenbank wird das langsam. Künftig soll nur das ausgewählte Rennen vollständig geladen werden — alles andere bleibt minimal.
+Speicherplatz minimieren: Bilder werden bereits beim Upload verkleinert, nach der Komprimierung wird die Originaldatei automatisch gelöscht, und beim Entfernen eines Bildes werden alle zugehörigen Dateien aus dem Speicher entfernt.
 
-## Vorgeschlagene Lösung
+## Änderungen
 
-### 1. Beim Login nur das Nötigste laden
-- **Rennen-Liste** (`races`): weiter komplett laden — sehr leichtgewichtig, wird für die Navigation gebraucht.
-- **Sections** und **Bilder**: NICHT mehr global laden.
-- **Status-Aggregat pro Rennen** (für die orangen/gelben Punkte in der Nav): eine schlanke Abfrage, die pro Rennen nur zwei Booleans liefert:
-  - `has_changes` — gibt es mindestens ein Bild mit `status = 'changes'`?
-  - `has_open_comments` — gibt es mindestens einen unresolved Comment?
+### 1. Resize direkt beim Upload (Browser-seitig)
+Bevor die Datei in den `originals`-Bucket hochgeladen wird, wird sie im Browser über ein `<canvas>` verkleinert:
+- Maximale Kantenlänge: **2000px** (lange Seite), Seitenverhältnis bleibt erhalten
+- Format: JPEG, Qualität 0.92 (gut genug als „Master" für späteres Re-Compress)
+- Dadurch wird z. B. ein 24 MP Foto (~8 MB) auf typischerweise ~500 KB–1 MB reduziert, bleibt aber hochwertig genug, falls man später neu komprimieren / zuschneiden will
 
-  Umgesetzt als Postgres-View oder RPC `race_status_flags()`, die für alle Rennen je eine Zeile mit `{ race_id, has_changes, has_open_comments }` zurückgibt. Damit bleibt die Navigation aussagekräftig, ohne dass Bilder ins Frontend müssen.
+Vorteil gegenüber „nur komprimiert hochladen": Du behältst kurz eine etwas größere Version, solange du im Tool an dem Bild arbeitest (Crop, neue Export-Größe usw.), ohne dass es riesig ist.
 
-### 2. Beim Auswählen eines Rennens vollständig laden
-- Sobald `selection.kind === "race"` (oder `"series"` mit nur einem sichtbaren Rennen), werden für **genau diese Rennen-IDs** geladen:
-  - `slider_sections` (where `race_id IN (...)`)
-  - `slider_images` (where `race_id IN (...)`)
-- Reload und Realtime werden ebenfalls nur für die geladenen Rennen registriert.
+### 2. Original nach erfolgreicher Komprimierung löschen
+Nach erfolgreichem Export in den `compressed`-Bucket (`ExportDialog`):
+- Datei aus `originals`-Bucket entfernen
+- `slider_images.original_path` auf `NULL` setzen
+- In der UI wird ohnehin schon die komprimierte Version bevorzugt angezeigt → kein sichtbarer Unterschied
 
-### 3. „Serien-Auswahl" (mehrere Rennen)
-Da du oben in der Nav eine Serie auswählen kannst (z. B. „Alle F1 Rennen"), wäre das wieder viele Bilder auf einmal. Zwei Optionen:
-- **(a) Empfohlen:** Wenn eine Serie ausgewählt ist, im Hauptbereich nur die **Liste der Rennen-Titel** als anklickbare Karten anzeigen (mit Status-Punkten), aber noch keine Bilder. Erst beim Klick auf ein Rennen werden Sections + Bilder geladen.
-- **(b) Alternativ:** Alle Rennen der Serie vollständig laden wie heute (kann träge werden, sobald eine Serie viele Rennen hat).
+Ergebnis: pro Bild bleibt nur **eine** kleine Datei (~30–80 KB) übrig.
 
-### 4. Cache / UX
-- Geladene Rennen werden im State gecached, damit ein Wechsel zwischen zwei kürzlich angesehenen Rennen sofort ist.
-- Beim Wechsel wird kurz ein schlanker Loading-Indikator im Hauptbereich gezeigt (nicht der ganze Screen).
-- Realtime-Subscription auf `slider_images` / `comments` läuft nur für aktuell geladene Rennen + global für die Status-Flags der Nav.
+### 3. Beim Löschen aus dem Tool: Storage mit aufräumen
+Aktuell macht `handleRemove` in `RaceCard.tsx` das bereits — wird überprüft und sichergestellt, dass:
+- `originals/<path>` gelöscht wird (falls noch vorhanden)
+- `compressed/<path>` gelöscht wird
+- DB-Zeile in `slider_images` gelöscht wird
+- Bei Fehlern (z. B. Datei schon weg) wird trotzdem weitergeräumt, damit keine Karteileichen entstehen
+
+### 4. Bestehende Altlasten (optional)
+Einmaliger „Cleanup"-Button (Admin) der für alle Bilder mit vorhandenem `compressed_path` das `original_path` löscht und auf NULL setzt. Sag mir, ob du das willst, sonst lasse ich es weg.
 
 ## Technische Details
-- **Neue Postgres-Function/View** `public.race_status_flags()` (SECURITY DEFINER, RLS-konform):
-  liefert `(race_id uuid, has_changes bool, has_open_comments bool)` für alle Rennen, die der eingeloggte User sehen darf.
-- **`src/routes/_authenticated/index.tsx`**:
-  - `images`/`sections` global entfernt; stattdessen pro selektiertem Rennen geladen in einem Map-Cache `{ [raceId]: { sections, images } }`.
-  - `load()` -> aufgeteilt in `loadRaces()`, `loadStatusFlags()`, `loadRace(raceId)`.
-  - Realtime-Subscription auf `slider_images` und `comments` triggert `loadStatusFlags()` (Nav-Punkte) und `loadRace(raceId)` (aktive Karte).
-- **`RaceNav`**: bekommt nicht mehr `images`, sondern eine `Map<raceId, { hasChanges, hasOpenComments }>` aus dem neuen Aggregat — gleiche UI, weniger Daten.
-- **`RaceCard`**: unverändert; bekommt weiterhin `sections` + `images`, jetzt eben nur für sein eigenes Rennen.
-- Bei Serien-Auswahl (Option a oben): neue kleine `RaceListView`-Komponente, die nur Titel + Status-Punkte zeigt.
+- Resize-Helper: neue Datei `src/lib/imageResize.ts` mit `resizeImageFile(file, maxDimension=2000, quality=0.92): Promise<File>`
+- Aufrufstelle: `ImageCell.tsx` / `RaceCard.tsx` (wo `supabase.storage.from('originals').upload(...)` passiert) — Datei wird vor dem Upload durch den Resizer geschickt
+- `ExportDialog.tsx`: nach erfolgreichem Upload in `compressed` → `supabase.storage.from('originals').remove([path])` + `update({ original_path: null })`
+- `RaceCard.handleRemove`: defensive Löschung beider Buckets in `Promise.allSettled`
 
-## Offen
-Welche Variante für die Serien-Auswahl willst du:
-- **(a)** Serie zeigt nur eine Übersichts-Liste der Rennen, Bilder erst nach Klick (am schnellsten, am skalierbarsten),
-- **(b)** Serie lädt weiterhin alle Rennen voll (wie heute, kann langsam werden)?
+## Trade-off, den du absegnen solltest
+Wenn das Original nach dem Komprimieren weg ist und du später **eine andere Export-Größe / neuen Crop** willst, basiert das auf der 2000px-Resize-Version, nicht auf der echten Kameradatei. Für ein Slider-Tool mit Zielgröße 633×382 ist das absolut unkritisch — wollte es nur erwähnt haben.
+
+Soll ich so umsetzen? Und: Cleanup-Button für Altbestände — ja oder nein?

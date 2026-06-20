@@ -105,11 +105,13 @@ export function ImageCell({
     return () => { alive = false; };
   }, [image.id, commentsOpen]);
 
-  async function handleFile(file: File) {
+  async function handleFile(rawFile: File) {
     setBusy(true);
     try {
+      const baseName = rawFile.name.replace(/\.[^.]+$/, "").trim();
+      const { resizeImageFile } = await import("@/lib/imageResize");
+      const file = await resizeImageFile(rawFile);
       const ext = file.name.split(".").pop() || "bin";
-      const baseName = file.name.replace(/\.[^.]+$/, "").trim();
       const folder = image.section_id ?? image.area;
       const path = `${image.race_id}/${folder}/${image.id}-${Date.now()}.${ext}`;
       await uploadFile("originals", path, file, file.type);
@@ -129,8 +131,10 @@ export function ImageCell({
   async function handleRemove() {
     setBusy(true);
     try {
-      if (image.original_path) await removeFile("originals", image.original_path);
-      if (image.compressed_path) await removeFile("compressed", image.compressed_path);
+      await Promise.allSettled([
+        image.original_path ? removeFile("originals", image.original_path) : Promise.resolve(),
+        image.compressed_path ? removeFile("compressed", image.compressed_path) : Promise.resolve(),
+      ]);
       await supabase.from("slider_images").update({
         original_path: null, compressed_path: null, compressed_url: null,
         original_size_kb: null, compressed_size_kb: null, format: null,
