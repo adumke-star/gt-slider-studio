@@ -45,6 +45,7 @@ export function RaceNav({
   const [openCommentImageIds, setOpenCommentImageIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    if (images.length === 0) return;
     let alive = true;
     const refetch = async () => {
       const { data } = await supabase
@@ -63,7 +64,7 @@ export function RaceNav({
       alive = false;
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [images.length]);
 
   const racesBySeries = useMemo(() => {
     const m = new Map<Series, NavRace[]>();
