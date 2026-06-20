@@ -85,6 +85,7 @@ export function RaceNav({
         return (
           <DropdownMenu key={s.key}>
             <DropdownMenuTrigger
+              onClick={() => onSelect({ kind: "series", series: s.key })}
               className={cn(
                 baseBtn,
                 "cursor-pointer outline-none",
@@ -99,13 +100,6 @@ export function RaceNav({
               <ChevronDown className="h-3 w-3 opacity-70" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[12rem]">
-              <DropdownMenuItem
-                onClick={() => onSelect({ kind: "series", series: s.key })}
-                className="text-xs font-semibold uppercase tracking-wider"
-              >
-                All {s.label} races
-              </DropdownMenuItem>
-              {list.length > 0 && <DropdownMenuSeparator />}
               {list.length === 0 ? (
                 <div className="px-2 py-1.5 text-xs text-muted-foreground">No races</div>
               ) : (
