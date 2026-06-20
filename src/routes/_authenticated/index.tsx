@@ -10,6 +10,7 @@ import { ExportDialog } from "@/components/dashboard/ExportDialog";
 import type { SliderImage } from "@/components/dashboard/ImageCell";
 import { dataTransferHasFiles } from "@/lib/dropFiles";
 import { UserMenu } from "@/components/dashboard/UserMenu";
+import { RaceNav, type NavSelection } from "@/components/dashboard/RaceNav";
 import logoAsset from "@/assets/global-tickets-logo.svg.asset.json";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -39,7 +40,7 @@ function Dashboard() {
   const [exportOpen, setExportOpen] = useState(false);
   const [exportImages, setExportImages] = useState<SliderImage[] | null>(null);
   const [exportMode, setExportMode] = useState<"export" | "compress">("export");
-  const [filter, setFilter] = useState<"all" | "f1" | "motogp" | "dtm" | "wsbk">("all");
+  const [selection, setSelection] = useState<NavSelection>({ kind: "all" });
   const [loading, setLoading] = useState(true);
 
 
@@ -88,7 +89,12 @@ function Dashboard() {
   }, [images]);
 
 
-  const visibleRaces = filter === "all" ? races : races.filter((r) => r.series === filter);
+  const visibleRaces =
+    selection.kind === "all"
+      ? races
+      : selection.kind === "series"
+        ? races.filter((r) => r.series === selection.series)
+        : races.filter((r) => r.id === selection.raceId);
 
   function toggle(id: string) {
     setSelected((s) => {
@@ -117,16 +123,7 @@ function Dashboard() {
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <div className="flex rounded-md border border-border bg-background p-0.5">
-              {(["all", "f1", "motogp", "dtm", "wsbk"] as const).map((k) => (
-                <button key={k} onClick={() => setFilter(k)}
-                  className={`rounded px-3 py-1 text-xs font-bold uppercase tracking-wider transition ${
-                    filter === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                  }`}>
-                  {k === "all" ? "All" : k === "motogp" ? "MotoGP" : k.toUpperCase()}
-                </button>
-              ))}
-            </div>
+            <RaceNav races={races} images={images} selection={selection} onSelect={setSelection} />
             <Button onClick={() => setAddOpen(true)} variant="outline" className="gap-1.5">
               <Plus className="h-4 w-4" /> Race
             </Button>
