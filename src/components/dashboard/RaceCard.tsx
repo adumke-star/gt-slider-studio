@@ -159,12 +159,14 @@ export function RaceCard({
     const list = imagesBySection.get(s.id) ?? [];
     let nextPos = (list[list.length - 1]?.position ?? -1) + 1;
     const { uploadFile } = await import("@/lib/storage");
+    const { resizeImageFile } = await import("@/lib/imageResize");
     for (let i = 0; i < imageFiles.length; i++) {
-      const file = imageFiles[i];
+      const raw = imageFiles[i];
       items[i].status = "uploading";
       onProgress?.(items.slice());
+      const baseName = raw.name.replace(/\.[^.]+$/, "").trim();
+      const file = await resizeImageFile(raw);
       const ext = file.name.split(".").pop() || "bin";
-      const baseName = file.name.replace(/\.[^.]+$/, "").trim();
       const { data: row, error } = await supabase.from("slider_images").insert({
         race_id: race.id,
         area: s.kind,

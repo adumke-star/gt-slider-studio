@@ -75,10 +75,20 @@ export function ExportDialog({
         const folder = img.section_id ?? img.area;
         const outPath = `${img.race_id}/${folder}/${img.id}.${ext}`;
         await uploadFile("compressed", outPath, out, mime);
+        // Delete the original — only the compressed version is kept to save storage
+        const origPath = img.original_path!;
+        try {
+          const { removeFile } = await import("@/lib/storage");
+          await removeFile("originals", origPath);
+        } catch (e) {
+          console.warn("failed to delete original after compression", origPath, e);
+        }
         await supabase.from("slider_images").update({
           compressed_path: outPath,
           compressed_size_kb: sizeKB,
           format,
+          original_path: null,
+          original_size_kb: null,
           status: img.status === "live" ? "live" : "image_done",
         }).eq("id", img.id);
 
