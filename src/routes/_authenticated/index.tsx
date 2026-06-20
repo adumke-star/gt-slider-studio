@@ -123,16 +123,7 @@ function Dashboard() {
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <div className="flex rounded-md border border-border bg-background p-0.5">
-              {(["all", "f1", "motogp", "dtm", "wsbk"] as const).map((k) => (
-                <button key={k} onClick={() => setFilter(k)}
-                  className={`rounded px-3 py-1 text-xs font-bold uppercase tracking-wider transition ${
-                    filter === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                  }`}>
-                  {k === "all" ? "All" : k === "motogp" ? "MotoGP" : k.toUpperCase()}
-                </button>
-              ))}
-            </div>
+            <RaceNav races={races} images={images} selection={selection} onSelect={setSelection} />
             <Button onClick={() => setAddOpen(true)} variant="outline" className="gap-1.5">
               <Plus className="h-4 w-4" /> Race
             </Button>
