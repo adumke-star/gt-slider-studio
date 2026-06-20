@@ -40,7 +40,7 @@ function Dashboard() {
   const [exportOpen, setExportOpen] = useState(false);
   const [exportImages, setExportImages] = useState<SliderImage[] | null>(null);
   const [exportMode, setExportMode] = useState<"export" | "compress">("export");
-  const [filter, setFilter] = useState<"all" | "f1" | "motogp" | "dtm" | "wsbk">("all");
+  const [selection, setSelection] = useState<NavSelection>({ kind: "all" });
   const [loading, setLoading] = useState(true);
 
 
