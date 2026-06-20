@@ -10,6 +10,7 @@ import { ExportDialog } from "@/components/dashboard/ExportDialog";
 import type { SliderImage } from "@/components/dashboard/ImageCell";
 import { dataTransferHasFiles } from "@/lib/dropFiles";
 import { UserMenu } from "@/components/dashboard/UserMenu";
+import { RaceNav, type NavSelection } from "@/components/dashboard/RaceNav";
 import logoAsset from "@/assets/global-tickets-logo.svg.asset.json";
 
 export const Route = createFileRoute("/_authenticated/")({
