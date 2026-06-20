@@ -20,7 +20,6 @@ export type NavRace = {
 };
 
 export type NavSelection =
-  | { kind: "all" }
   | { kind: "series"; series: Series }
   | { kind: "race"; raceId: string };
 
