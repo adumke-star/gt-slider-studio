@@ -47,29 +47,21 @@ export async function resizeImageFile(
   return new File([blob], newName, { type: "image/jpeg", lastModified: Date.now() });
 }
 
-async function loadBitmap(file: File): Promise<ImageBitmap & { close?: () => void }> {
+async function loadBitmap(file: File): Promise<{ width: number; height: number; close?: () => void } & CanvasImageSource> {
   if (typeof createImageBitmap === "function") {
-    return (await createImageBitmap(file)) as ImageBitmap & { close?: () => void };
+    const bmp = await createImageBitmap(file);
+    return bmp as unknown as ImageBitmap & { close?: () => void };
   }
-  // Fallback via HTMLImageElement
   const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = reject;
-      el.src = url;
-    });
-    return {
-      width: img.naturalWidth,
-      height: img.naturalHeight,
-      // drawImage accepts HTMLImageElement
-      // @ts-expect-error duck-typed bitmap
-      close: () => {},
-      // @ts-expect-error duck-typed bitmap
-      __img: img,
-    };
-  } finally {
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-  }
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = reject;
+    el.src = url;
+  });
+  return Object.assign(img, {
+    width: img.naturalWidth,
+    height: img.naturalHeight,
+    close: () => URL.revokeObjectURL(url),
+  });
 }
