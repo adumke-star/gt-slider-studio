@@ -53,24 +53,6 @@ function AuthPage() {
     return msg;
   }
 
-  async function signInGoogle() {
-    setError(null);
-    setLoading(true);
-    try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-        extraParams: { prompt: "select_account" },
-      });
-      if (result.error) {
-        const msg = result.error instanceof Error ? result.error.message : String(result.error);
-        setError(translateError(msg));
-        setLoading(false);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? translateError(e.message) : "Login fehlgeschlagen.");
-      setLoading(false);
-    }
-  }
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
