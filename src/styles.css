@@ -46,7 +46,6 @@
   --color-status-todo: var(--status-todo);
   --color-status-blank: var(--status-blank);
   --color-status-changes: var(--status-changes);
-  --color-status-exported: var(--status-exported);
 }
 
 :root {
@@ -83,7 +82,6 @@
   --status-todo: oklch(0.72 0.17 50);      /* orange */
   --status-blank: oklch(0.45 0.015 250);   /* gray */
   --status-changes: #CB4F10;               /* burnt orange */
-  --status-exported: oklch(0.68 0.13 230);  /* blue */
 }
 
 .dark { color-scheme: dark; }

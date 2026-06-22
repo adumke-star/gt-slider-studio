@@ -1,14 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
-import { Download, Plus, X, Trash2, Wand2 } from "lucide-react";
+import { Download, Plus, X, Trash2 } from "lucide-react";
 import { removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { RaceCard, type SliderSection } from "@/components/dashboard/RaceCard";
 import { AddRaceDialog } from "@/components/dashboard/AddRaceDialog";
 import { ExportDialog } from "@/components/dashboard/ExportDialog";
-import { CompressDialog } from "@/components/dashboard/CompressDialog";
 import type { SliderImage } from "@/components/dashboard/ImageCell";
 import { dataTransferHasFiles } from "@/lib/dropFiles";
 import { UserMenu } from "@/components/dashboard/UserMenu";
@@ -46,8 +44,7 @@ function Dashboard() {
   const [addOpen, setAddOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportImages, setExportImages] = useState<SliderImage[] | null>(null);
-  const [compressOpen, setCompressOpen] = useState(false);
-  const [compressImages, setCompressImages] = useState<SliderImage[] | null>(null);
+  const [exportMode, setExportMode] = useState<"export" | "compress">("export");
   const [selection, setSelection] = useState<NavSelection>({ kind: "series", series: "f1" });
   const [loading, setLoading] = useState(true);
 
@@ -224,32 +221,7 @@ function Dashboard() {
             </Button>
 
             <Button
-              onClick={() => {
-                const imgs = selectedImgs.filter((i) => i.original_path);
-                if (imgs.length === 0) {
-                  toast.error("Keine unkomprimierten Bilder ausgewählt.");
-                  return;
-                }
-                setCompressImages(imgs);
-                setCompressOpen(true);
-              }}
-              disabled={selected.size === 0}
-              variant="outline"
-              className="gap-1.5 disabled:opacity-40"
-            >
-              <Wand2 className="h-4 w-4" />
-              Compress {selected.size > 0 && <span className="rounded bg-foreground/10 px-1.5 text-xs">{selected.size}</span>}
-            </Button>
-            <Button
-              onClick={() => {
-                const imgs = selectedImgs.filter((i) => i.compressed_path);
-                if (imgs.length === 0) {
-                  toast.error("Keine komprimierten Bilder ausgewählt. Bitte zuerst komprimieren.");
-                  return;
-                }
-                setExportImages(imgs);
-                setExportOpen(true);
-              }}
+              onClick={() => setExportOpen(true)}
               disabled={selected.size === 0}
               className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
             >
@@ -314,8 +286,8 @@ function Dashboard() {
                   loadRace(race.id);
                   loadFlags();
                 }}
-                onExport={(imgs) => { setExportImages(imgs); setExportOpen(true); }}
-                onCompress={(imgs) => { setCompressImages(imgs); setCompressOpen(true); }}
+                onExport={(imgs) => { setExportMode("export"); setExportImages(imgs); setExportOpen(true); }}
+                onCompress={(imgs) => { setExportMode("compress"); setExportImages(imgs); setExportOpen(true); }}
               />
             );
           })
@@ -329,22 +301,16 @@ function Dashboard() {
           await Promise.all([loadRaces(), loadFlags()]);
         }}
       />
-      <CompressDialog
-        open={compressOpen}
-        onOpenChange={(v) => { setCompressOpen(v); if (!v) setCompressImages(null); }}
-        images={compressImages ?? selectedImgs.filter((i) => i.original_path)}
-        onDone={async () => {
-          setCompressImages(null);
-          await loadFlags();
-          if (selection.kind === "race") await loadRace(selection.raceId);
-        }}
-      />
       <ExportDialog
         open={exportOpen}
-        onOpenChange={(v) => { setExportOpen(v); if (!v) setExportImages(null); }}
-        images={exportImages ?? selectedImgs.filter((i) => i.compressed_path)}
+        onOpenChange={(v) => { setExportOpen(v); if (!v) { setExportImages(null); setExportMode("export"); } }}
+        images={exportImages ?? selectedImgs}
         races={races}
+        mode={exportMode}
         onDone={async () => {
+          if (!exportImages && exportMode === "export") setSelected(new Set());
+          setExportImages(null);
+          setExportMode("export");
           await loadFlags();
           if (selection.kind === "race") await loadRace(selection.raceId);
         }}

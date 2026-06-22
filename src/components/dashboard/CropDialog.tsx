@@ -109,7 +109,7 @@ export function CropDialog({
             onZoomChange={setZoom}
             onCropComplete={onCropComplete}
             onMediaLoaded={setMediaSize}
-            objectFit="cover"
+            objectFit="horizontal-cover"
           />
         </div>
         <div className="space-y-2">
