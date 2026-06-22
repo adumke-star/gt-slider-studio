@@ -346,6 +346,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_edit_content: { Args: { _user_id: string }; Returns: boolean }
+      get_public_profiles: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          full_name: string
+          id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -363,7 +372,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "member"
+      app_role: "admin" | "member" | "editor"
       image_status: "live" | "image_done" | "todo" | "blank" | "changes"
       race_series: "f1" | "motogp" | "dtm" | "wsbk"
       slider_area: "plp" | "pdp"
@@ -494,7 +503,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "member"],
+      app_role: ["admin", "member", "editor"],
       image_status: ["live", "image_done", "todo", "blank", "changes"],
       race_series: ["f1", "motogp", "dtm", "wsbk"],
       slider_area: ["plp", "pdp"],

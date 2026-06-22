@@ -57,8 +57,9 @@ export function CommentsSheet({
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setMeId(data.user?.id ?? null));
-    supabase.from("profiles").select("id, full_name, email, avatar_url").then(({ data }) => {
-      const list = (data ?? []) as Profile[];
+    supabase.rpc("get_public_profiles").then(({ data }) => {
+      const list = ((data ?? []) as Array<{ id: string; full_name: string | null; avatar_url: string | null }>)
+        .map((p) => ({ ...p, email: "" })) as Profile[];
       setAllProfiles(list);
       setProfiles(new Map(list.map((p) => [p.id, p])));
     });
