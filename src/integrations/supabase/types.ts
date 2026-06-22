@@ -379,7 +379,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "member" | "editor"
-      image_status: "live" | "image_done" | "todo" | "blank" | "changes"
+      image_status: "live" | "image_done" | "todo" | "blank" | "changes" | "exported"
       race_series: "f1" | "motogp" | "dtm" | "wsbk"
       slider_area: "plp" | "pdp"
     }
@@ -510,7 +510,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "member", "editor"],
-      image_status: ["live", "image_done", "todo", "blank", "changes"],
+      image_status: ["live", "image_done", "todo", "blank", "changes", "exported"],
       race_series: ["f1", "motogp", "dtm", "wsbk"],
       slider_area: ["plp", "pdp"],
     },

@@ -16,15 +16,21 @@ export function objectPositionFromFocal(focal: FocalPoint): string {
   return `${focal.x * 100}% ${focal.y * 100}%`;
 }
 
-/** Focal point from react-easy-crop croppedAreaPixels (center of visible region). */
+/**
+ * Focal point from react-easy-crop croppedAreaPixels.
+ * Returns the CSS object-position fraction (matches objectPositionFromFocal and drawCover),
+ * i.e. how far the crop window is offset within the overflow, not the crop center.
+ */
 export function focalFromCroppedAreaPixels(
   area: AreaPixels,
   mediaWidth: number,
   mediaHeight: number,
 ): FocalPoint {
+  const denomX = mediaWidth - area.width;
+  const denomY = mediaHeight - area.height;
   return {
-    x: clamp01((area.x + area.width / 2) / mediaWidth),
-    y: clamp01((area.y + area.height / 2) / mediaHeight),
+    x: denomX > 0 ? clamp01(area.x / denomX) : 0.5,
+    y: denomY > 0 ? clamp01(area.y / denomY) : 0.5,
   };
 }
 

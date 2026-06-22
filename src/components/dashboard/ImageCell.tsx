@@ -15,7 +15,7 @@ export type SliderImage = {
   area: "plp" | "pdp";
   section_id: string | null;
   position: number;
-  status: "live" | "image_done" | "todo" | "blank" | "changes";
+  status: "live" | "image_done" | "todo" | "blank" | "changes" | "exported";
   title: string | null;
   original_path: string | null;
   compressed_path: string | null;
@@ -27,12 +27,13 @@ export type SliderImage = {
   crop_y?: number | null;
 };
 
-const STATUS_ORDER: SliderImage["status"][] = ["todo", "changes", "image_done", "live"];
+const STATUS_ORDER: SliderImage["status"][] = ["todo", "changes", "image_done", "exported", "live"];
 
 const STATUS_META: Record<SliderImage["status"], { label: string; cls: string }> = {
   live: { label: "Live", cls: "bg-[var(--status-live)]/15 text-[var(--status-live)] border-[var(--status-live)]/40" },
   image_done: { label: "Image done", cls: "bg-primary/15 text-primary border-primary/40" },
   changes: { label: "Changes", cls: "bg-[var(--status-changes)]/15 text-[var(--status-changes)] border-[var(--status-changes)]/40" },
+  exported: { label: "Exported", cls: "bg-[var(--status-exported)]/15 text-[var(--status-exported)] border-[var(--status-exported)]/40" },
   todo: { label: "To do", cls: "bg-[var(--status-todo)]/15 text-[var(--status-todo)] border-[var(--status-todo)]/40" },
   blank: { label: "To do", cls: "bg-[var(--status-todo)]/15 text-[var(--status-todo)] border-[var(--status-todo)]/40" },
 };
