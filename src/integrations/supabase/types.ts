@@ -211,6 +211,8 @@ export type Database = {
           compressed_size_kb: number | null
           compressed_url: string | null
           created_at: string
+          crop_x: number | null
+          crop_y: number | null
           format: string | null
           id: string
           original_path: string | null
@@ -229,6 +231,8 @@ export type Database = {
           compressed_size_kb?: number | null
           compressed_url?: string | null
           created_at?: string
+          crop_x?: number | null
+          crop_y?: number | null
           format?: string | null
           id?: string
           original_path?: string | null
@@ -247,6 +251,8 @@ export type Database = {
           compressed_size_kb?: number | null
           compressed_url?: string | null
           created_at?: string
+          crop_x?: number | null
+          crop_y?: number | null
           format?: string | null
           id?: string
           original_path?: string | null
