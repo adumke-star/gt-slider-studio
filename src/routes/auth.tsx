@@ -1,6 +1,9 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import logoAsset from "@/assets/global-tickets-logo.svg.asset.json";
@@ -19,6 +22,9 @@ function AuthPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((evt, session) => {
@@ -27,7 +33,27 @@ function AuthPage() {
     return () => sub.subscription.unsubscribe();
   }, [navigate]);
 
-  async function signIn() {
+  function translateError(msg: string): string {
+    const lower = msg.toLowerCase();
+    if (lower.includes("nicht freigeschaltet") || msg.includes("42501")) {
+      return "Diese E-Mail-Adresse ist nicht freigeschaltet. Bitte beim Admin melden.";
+    }
+    if (lower.includes("invalid login credentials")) {
+      return "E-Mail oder Passwort ist falsch.";
+    }
+    if (lower.includes("user already registered")) {
+      return "Es existiert bereits ein Konto mit dieser E-Mail. Bitte anmelden.";
+    }
+    if (lower.includes("password should be")) {
+      return "Das Passwort muss mindestens 6 Zeichen lang sein.";
+    }
+    if (lower.includes("pwned") || lower.includes("compromised")) {
+      return "Dieses Passwort wurde in Datenleaks gefunden. Bitte ein anderes wählen.";
+    }
+    return msg;
+  }
+
+  async function signInGoogle() {
     setError(null);
     setLoading(true);
     try {
@@ -37,15 +63,39 @@ function AuthPage() {
       });
       if (result.error) {
         const msg = result.error instanceof Error ? result.error.message : String(result.error);
-        setError(
-          msg.toLowerCase().includes("nicht freigeschaltet") || msg.includes("42501")
-            ? "This email address is not allow-listed. Please contact an admin."
-            : msg,
-        );
+        setError(translateError(msg));
         setLoading(false);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Login failed.");
+      setError(e instanceof Error ? translateError(e.message) : "Login fehlgeschlagen.");
+      setLoading(false);
+    }
+  }
+
+  async function handleEmailSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      if (mode === "signin") {
+        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+        if (err) {
+          setError(translateError(err.message));
+          setLoading(false);
+        }
+      } else {
+        const { error: err } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin },
+        });
+        if (err) {
+          setError(translateError(err.message));
+          setLoading(false);
+        }
+      }
+    } catch (e) {
+      setError(e instanceof Error ? translateError(e.message) : "Anmeldung fehlgeschlagen.");
       setLoading(false);
     }
   }
@@ -66,14 +116,51 @@ function AuthPage() {
         </div>
 
         <p className="mb-6 text-sm text-muted-foreground">
-          Melde dich mit deinem Google-Konto an. Zugriff haben nur freigeschaltete
-          Mitarbeiter.
+          Zugriff haben nur freigeschaltete Mitarbeiter.
         </p>
 
-        <Button onClick={signIn} disabled={loading} className="w-full gap-2">
+        <Button onClick={signInGoogle} disabled={loading} className="w-full gap-2" variant="outline">
           <GoogleIcon className="h-4 w-4" />
-          {loading ? "Weiterleitung …" : "Mit Google anmelden"}
+          Mit Google anmelden
         </Button>
+
+        <div className="my-5 flex items-center gap-3 text-[11px] uppercase tracking-widest text-muted-foreground">
+          <div className="h-px flex-1 bg-border" />
+          oder
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        <Tabs value={mode} onValueChange={(v) => { setMode(v as "signin" | "signup"); setError(null); }}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="signin">Anmelden</TabsTrigger>
+            <TabsTrigger value="signup">Registrieren</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="signin" className="mt-4">
+            <form onSubmit={handleEmailSubmit} className="space-y-3">
+              <EmailPasswordFields
+                email={email} setEmail={setEmail}
+                password={password} setPassword={setPassword}
+              />
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? "Anmelden …" : "Anmelden"}
+              </Button>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="signup" className="mt-4">
+            <form onSubmit={handleEmailSubmit} className="space-y-3">
+              <EmailPasswordFields
+                email={email} setEmail={setEmail}
+                password={password} setPassword={setPassword}
+                minLength={8}
+              />
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? "Konto wird erstellt …" : "Konto erstellen"}
+              </Button>
+            </form>
+          </TabsContent>
+        </Tabs>
 
         {error && (
           <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -82,6 +169,32 @@ function AuthPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function EmailPasswordFields({
+  email, setEmail, password, setPassword, minLength = 6,
+}: {
+  email: string;
+  setEmail: (v: string) => void;
+  password: string;
+  setPassword: (v: string) => void;
+  minLength?: number;
+}) {
+  return (
+    <>
+      <div className="space-y-1.5">
+        <Label htmlFor="email">E-Mail</Label>
+        <Input id="email" type="email" autoComplete="email" required
+          value={email} onChange={(e) => setEmail(e.target.value)} />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="password">Passwort</Label>
+        <Input id="password" type="password" autoComplete="current-password" required
+          minLength={minLength}
+          value={password} onChange={(e) => setPassword(e.target.value)} />
+      </div>
+    </>
   );
 }
 

@@ -1,41 +1,41 @@
 ## Ziel
-Speicherplatz minimieren: Bilder werden bereits beim Upload verkleinert, nach der Komprimierung wird die Originaldatei automatisch gelöscht, und beim Entfernen eines Bildes werden alle zugehörigen Dateien aus dem Speicher entfernt.
 
-## Änderungen
+E-Mail/Passwort-Anmeldung im Backend aktivieren, **ohne** dass neue Nutzer eine Bestätigungs-E-Mail erhalten. Neue Accounts sind sofort einsatzbereit.
 
-### 1. Resize direkt beim Upload (Browser-seitig)
-Bevor die Datei in den `originals`-Bucket hochgeladen wird, wird sie im Browser über ein `<canvas>` verkleinert:
-- Maximale Kantenlänge: **2000px** (lange Seite), Seitenverhältnis bleibt erhalten
-- Format: JPEG, Qualität 0.92 (gut genug als „Master" für späteres Re-Compress)
-- Dadurch wird z. B. ein 24 MP Foto (~8 MB) auf typischerweise ~500 KB–1 MB reduziert, bleibt aber hochwertig genug, falls man später neu komprimieren / zuschneiden will
+## Was zu tun ist
 
-Vorteil gegenüber „nur komprimiert hochladen": Du behältst kurz eine etwas größere Version, solange du im Tool an dem Bild arbeitest (Crop, neue Export-Größe usw.), ohne dass es riesig ist.
+1. **E-Mail-Provider im Backend aktivieren**
+   Aktuell wirft das Backend `email_provider_disabled` (siehe Auth-Logs). Diese Einstellung kann ich aus dem Code nicht umlegen — du musst sie einmalig im Backend-Dashboard einschalten:
+   - "View Backend" → Auth-Einstellungen → **Email Provider aktivieren**
+   Sobald das aktiv ist, übernehme ich den Rest automatisch.
 
-### 2. Original nach erfolgreicher Komprimierung löschen
-Nach erfolgreichem Export in den `compressed`-Bucket (`ExportDialog`):
-- Datei aus `originals`-Bucket entfernen
-- `slider_images.original_path` auf `NULL` setzen
-- In der UI wird ohnehin schon die komprimierte Version bevorzugt angezeigt → kein sichtbarer Unterschied
+2. **Auto-Confirm aktivieren (keine Bestätigungsmail)**
+   Ich setze über das Auth-Config-Tool:
+   - `auto_confirm_email: true` → Nutzer ist sofort eingeloggt, keine Bestätigungs-E-Mail
+   - `disable_signup: false` → Registrierung erlaubt
+   - `password_hibp_enabled: true` → Schutz gegen geleakte Passwörter (empfohlen, kein Mehraufwand)
 
-Ergebnis: pro Bild bleibt nur **eine** kleine Datei (~30–80 KB) übrig.
+3. **Login-Seite erweitern**
+   Aktuell zeigt `src/routes/auth.tsx` nur den Google-Button. Ich ergänze:
+   - Tabs / Umschalter: **Anmelden** ↔ **Registrieren**
+   - E-Mail + Passwort Felder mit Validierung
+   - Buttons "Anmelden" (`signInWithPassword`) und "Konto erstellen" (`signUp`)
+   - Fehlerbehandlung inkl. der bestehenden Allowlist-Meldung
+     (`handle_new_user` blockt nicht-freigeschaltete E-Mails weiterhin per Exception — funktioniert automatisch mit, da der Trigger bei jedem Signup läuft)
+   - Google-Button bleibt oben als Hauptoption, E-Mail darunter mit Trenner
 
-### 3. Beim Löschen aus dem Tool: Storage mit aufräumen
-Aktuell macht `handleRemove` in `RaceCard.tsx` das bereits — wird überprüft und sichergestellt, dass:
-- `originals/<path>` gelöscht wird (falls noch vorhanden)
-- `compressed/<path>` gelöscht wird
-- DB-Zeile in `slider_images` gelöscht wird
-- Bei Fehlern (z. B. Datei schon weg) wird trotzdem weitergeräumt, damit keine Karteileichen entstehen
+## Bewusst nicht enthalten
 
-### 4. Bestehende Altlasten (optional)
-Einmaliger „Cleanup"-Button (Admin) der für alle Bilder mit vorhandenem `compressed_path` das `original_path` löscht und auf NULL setzt. Sag mir, ob du das willst, sonst lasse ich es weg.
+- **Kein "Passwort vergessen"-Flow** (separate Seite, kannst du später nachfordern)
+- **Keine eigene Bestätigungs-E-Mail-Vorlage** — entfällt, da Auto-Confirm an ist
+- **Keine Änderung an der Allowlist-Logik** — bleibt wie sie ist
 
 ## Technische Details
-- Resize-Helper: neue Datei `src/lib/imageResize.ts` mit `resizeImageFile(file, maxDimension=2000, quality=0.92): Promise<File>`
-- Aufrufstelle: `ImageCell.tsx` / `RaceCard.tsx` (wo `supabase.storage.from('originals').upload(...)` passiert) — Datei wird vor dem Upload durch den Resizer geschickt
-- `ExportDialog.tsx`: nach erfolgreichem Upload in `compressed` → `supabase.storage.from('originals').remove([path])` + `update({ original_path: null })`
-- `RaceCard.handleRemove`: defensive Löschung beider Buckets in `Promise.allSettled`
 
-## Trade-off, den du absegnen solltest
-Wenn das Original nach dem Komprimieren weg ist und du später **eine andere Export-Größe / neuen Crop** willst, basiert das auf der 2000px-Resize-Version, nicht auf der echten Kameradatei. Für ein Slider-Tool mit Zielgröße 633×382 ist das absolut unkritisch — wollte es nur erwähnt haben.
+- `src/routes/auth.tsx`: neue State-Variablen (`mode`, `email`, `password`), Form-Handler, UI mit shadcn `Tabs`, `Input`, `Label`
+- `supabase--configure_auth` Aufruf mit den oben genannten Flags
+- Keine DB-Migrationen nötig — Profiles/Roles werden bereits durch den `handle_new_user`-Trigger korrekt angelegt
 
-Soll ich so umsetzen? Und: Cleanup-Button für Altbestände — ja oder nein?
+## Was du tun musst, bevor ich starten kann
+
+Bitte den E-Mail-Provider im Backend einmal manuell aktivieren (Schritt 1). Danach klick auf "Implement plan" und ich erledige Schritt 2 und 3.
