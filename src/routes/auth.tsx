@@ -22,7 +22,9 @@ function AuthPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [showReset, setShowReset] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -42,7 +44,7 @@ function AuthPage() {
       return "E-Mail oder Passwort ist falsch.";
     }
     if (lower.includes("user already registered")) {
-      return "Es existiert bereits ein Konto mit dieser E-Mail. Bitte anmelden.";
+      return "Es existiert bereits ein Konto mit dieser E-Mail. Bitte anmelden oder Passwort zurücksetzen.";
     }
     if (lower.includes("password should be")) {
       return "Das Passwort muss mindestens 6 Zeichen lang sein.";
@@ -57,6 +59,7 @@ function AuthPage() {
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     setLoading(true);
     try {
       if (mode === "signin") {
@@ -82,6 +85,27 @@ function AuthPage() {
     }
   }
 
+  async function handlePasswordReset(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setInfo(null);
+    setLoading(true);
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (err) {
+        setError(translateError(err.message));
+      } else {
+        setInfo("Wenn ein Konto mit dieser E-Mail existiert, wurde ein Link zum Zurücksetzen verschickt.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? translateError(e.message) : "Anfrage fehlgeschlagen.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="grid min-h-screen place-items-center bg-background px-6 text-foreground">
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface-2 p-8 shadow-lg">
@@ -101,7 +125,7 @@ function AuthPage() {
           Zugriff haben nur freigeschaltete Mitarbeiter.
         </p>
 
-        <Tabs value={mode} onValueChange={(v) => { setMode(v as "signin" | "signup"); setError(null); }}>
+        <Tabs value={mode} onValueChange={(v) => { setMode(v as "signin" | "signup"); setError(null); setInfo(null); setShowReset(false); }}>
 
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="signin">Anmelden</TabsTrigger>
@@ -109,15 +133,36 @@ function AuthPage() {
           </TabsList>
 
           <TabsContent value="signin" className="mt-4">
-            <form onSubmit={handleEmailSubmit} className="space-y-3">
-              <EmailPasswordFields
-                email={email} setEmail={setEmail}
-                password={password} setPassword={setPassword}
-              />
-              <Button type="submit" disabled={loading} className="w-full">
-                {loading ? "Anmelden …" : "Anmelden"}
-              </Button>
-            </form>
+            {showReset ? (
+              <form onSubmit={handlePasswordReset} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="reset-email">E-Mail</Label>
+                  <Input id="reset-email" type="email" autoComplete="email" required
+                    value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <Button type="submit" disabled={loading} className="w-full">
+                  {loading ? "Sende Link …" : "Link zum Zurücksetzen senden"}
+                </Button>
+                <button type="button" className="w-full text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => { setShowReset(false); setError(null); setInfo(null); }}>
+                  Zurück zur Anmeldung
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleEmailSubmit} className="space-y-3">
+                <EmailPasswordFields
+                  email={email} setEmail={setEmail}
+                  password={password} setPassword={setPassword}
+                />
+                <Button type="submit" disabled={loading} className="w-full">
+                  {loading ? "Anmelden …" : "Anmelden"}
+                </Button>
+                <button type="button" className="w-full text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => { setShowReset(true); setError(null); setInfo(null); }}>
+                  Passwort vergessen?
+                </button>
+              </form>
+            )}
           </TabsContent>
 
           <TabsContent value="signup" className="mt-4">
@@ -137,6 +182,11 @@ function AuthPage() {
         {error && (
           <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             {error}
+          </div>
+        )}
+        {info && (
+          <div className="mt-4 rounded-md border border-border bg-surface-1 px-3 py-2 text-xs text-muted-foreground">
+            {info}
           </div>
         )}
       </div>
