@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, LayoutGrid } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,10 +20,11 @@ export type NavRace = {
 export type RaceFlags = { hasChanges: boolean; hasOpenComments: boolean };
 
 export type NavSelection =
+  | { kind: "overview" }
   | { kind: "series"; series: Series }
   | { kind: "race"; raceId: string };
 
-const SERIES: { key: Series; label: string }[] = [
+export const SERIES: { key: Series; label: string }[] = [
   { key: "f1", label: "F1" },
   { key: "motogp", label: "MotoGP" },
   { key: "dtm", label: "DTM" },
@@ -75,6 +76,19 @@ export function RaceNav({
 
   return (
     <div className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-background p-0.5">
+      <button
+        onClick={() => onSelect({ kind: "overview" })}
+        className={cn(
+          baseBtn,
+          "cursor-pointer outline-none",
+          selection.kind === "overview"
+            ? "bg-primary text-primary-foreground"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <LayoutGrid className="h-3 w-3" />
+        <span>Übersicht</span>
+      </button>
       {SERIES.map((s) => {
         const list = racesBySeries.get(s.key) ?? [];
         const active =

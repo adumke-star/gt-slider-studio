@@ -5,6 +5,16 @@ import { Download, Plus, X, Trash2, Wand2 } from "lucide-react";
 import { removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { RaceCard, type SliderSection } from "@/components/dashboard/RaceCard";
 import { AddRaceDialog } from "@/components/dashboard/AddRaceDialog";
 import { ExportDialog } from "@/components/dashboard/ExportDialog";
@@ -14,6 +24,7 @@ import { dataTransferHasFiles } from "@/lib/dropFiles";
 import { UserMenu } from "@/components/dashboard/UserMenu";
 import { RaceNav, type NavSelection, type RaceFlags } from "@/components/dashboard/RaceNav";
 import { RaceListView } from "@/components/dashboard/RaceListView";
+import { OverviewDashboard } from "@/components/dashboard/OverviewDashboard";
 import logoUrl from "@/assets/global-tickets-logo.png";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -48,7 +59,9 @@ function Dashboard() {
   const [exportImages, setExportImages] = useState<SliderImage[] | null>(null);
   const [compressOpen, setCompressOpen] = useState(false);
   const [compressImages, setCompressImages] = useState<SliderImage[] | null>(null);
-  const [selection, setSelection] = useState<NavSelection>({ kind: "series", series: "f1" });
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [selection, setSelection] = useState<NavSelection>({ kind: "overview" });
   const [loading, setLoading] = useState(true);
 
   const bundleRef = useRef(bundleByRace);
@@ -118,9 +131,11 @@ function Dashboard() {
   // Visible races based on selection
   const visibleRaces = useMemo(
     () =>
-      selection.kind === "series"
-        ? races.filter((r) => r.series === selection.series)
-        : races.filter((r) => r.id === selection.raceId),
+      selection.kind === "overview"
+        ? races
+        : selection.kind === "series"
+          ? races.filter((r) => r.series === selection.series)
+          : races.filter((r) => r.id === selection.raceId),
     [races, selection],
   );
 
@@ -176,6 +191,28 @@ function Dashboard() {
 
   const selectedImgs = loadedImages.filter((i) => selected.has(i.id));
 
+  async function performDelete() {
+    if (selectedImgs.length === 0) return;
+    setDeleting(true);
+    try {
+      await Promise.all(selectedImgs.flatMap((img) => [
+        img.original_path ? removeFile("originals", img.original_path).catch(() => {}) : Promise.resolve(),
+        img.compressed_path ? removeFile("compressed", img.compressed_path).catch(() => {}) : Promise.resolve(),
+      ]));
+      await supabase.from("slider_images").delete().in("id", selectedImgs.map((i) => i.id));
+      const raceIds = new Set(selectedImgs.map((i) => i.race_id));
+      setSelected(new Set());
+      await Promise.all([loadFlags(), ...Array.from(raceIds).map((id) => loadRace(id))]);
+      toast.success(`${selectedImgs.length} Slot${selectedImgs.length === 1 ? "" : "s"} gelöscht`);
+      setDeleteOpen(false);
+    } catch (e) {
+      console.error(e);
+      toast.error("Löschen fehlgeschlagen");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const onSelectNav = (sel: NavSelection) => {
     setSelected(new Set());
     setSelection(sel);
@@ -185,7 +222,11 @@ function Dashboard() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-surface-2/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-4 px-6 py-4">
-          <div className="flex items-center gap-3">
+          <button
+            onClick={() => onSelectNav({ kind: "overview" })}
+            className="flex items-center gap-3 text-left outline-none"
+            title="Zur Übersicht"
+          >
             <img src={logoUrl} alt="Global Tickets" className="h-9 w-auto" />
             <div className="min-w-0">
               <h1 className="font-display text-xl font-black uppercase leading-none tracking-tight">
@@ -195,7 +236,7 @@ function Dashboard() {
                 WEB-READY ASSETS
               </p>
             </div>
-          </div>
+          </button>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <RaceNav races={races} flagsByRace={flagsByRace} selection={selection} onSelect={onSelectNav} />
@@ -203,17 +244,9 @@ function Dashboard() {
               <Plus className="h-4 w-4" /> Race
             </Button>
             <Button
-              onClick={async () => {
+              onClick={() => {
                 if (selectedImgs.length === 0) return;
-                if (!confirm(`Permanently delete ${selectedImgs.length} slot(s)? Their images will also be removed.`)) return;
-                await Promise.all(selectedImgs.flatMap((img) => [
-                  img.original_path ? removeFile("originals", img.original_path).catch(() => {}) : Promise.resolve(),
-                  img.compressed_path ? removeFile("compressed", img.compressed_path).catch(() => {}) : Promise.resolve(),
-                ]));
-                await supabase.from("slider_images").delete().in("id", selectedImgs.map((i) => i.id));
-                const raceIds = new Set(selectedImgs.map((i) => i.race_id));
-                setSelected(new Set());
-                await Promise.all([loadFlags(), ...Array.from(raceIds).map((id) => loadRace(id))]);
+                setDeleteOpen(true);
               }}
               disabled={selected.size === 0}
               variant="outline"
@@ -272,7 +305,7 @@ function Dashboard() {
       <main className="mx-auto max-w-[1600px] space-y-4 px-6 py-6">
         {loading ? (
           <div className="grid h-[40vh] place-items-center text-sm text-muted-foreground">Loading…</div>
-        ) : visibleRaces.length === 0 ? (
+        ) : races.length === 0 ? (
           <div className="grid h-[50vh] place-items-center rounded-lg border border-dashed border-border bg-surface-2/40 text-center">
             <div>
               <h2 className="font-display text-2xl uppercase">No races yet</h2>
@@ -282,12 +315,25 @@ function Dashboard() {
               </Button>
             </div>
           </div>
-        ) : selection.kind === "series" ? (
-          <RaceListView
-            races={visibleRaces}
+        ) : selection.kind === "overview" ? (
+          <OverviewDashboard
+            races={races}
             flagsByRace={flagsByRace}
-            onOpen={(raceId) => onSelectNav({ kind: "race", raceId })}
+            onOpenRace={(raceId) => onSelectNav({ kind: "race", raceId })}
+            onOpenSeries={(series) => onSelectNav({ kind: "series", series })}
           />
+        ) : selection.kind === "series" ? (
+          visibleRaces.length === 0 ? (
+            <div className="grid h-[30vh] place-items-center rounded-lg border border-dashed border-border bg-surface-2/40 text-center text-sm text-muted-foreground">
+              Keine Rennen in dieser Serie.
+            </div>
+          ) : (
+            <RaceListView
+              races={visibleRaces}
+              flagsByRace={flagsByRace}
+              onOpen={(raceId) => onSelectNav({ kind: "race", raceId })}
+            />
+          )
         ) : (
           visibleRaces.map((race) => {
             const bundle = bundleByRace.get(race.id);
@@ -349,6 +395,28 @@ function Dashboard() {
           if (selection.kind === "race") await loadRace(selection.raceId);
         }}
       />
+      <AlertDialog open={deleteOpen} onOpenChange={(v) => { if (!deleting) setDeleteOpen(v); }}>
+        <AlertDialogContent className="bg-surface-2">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-xl">
+              {selectedImgs.length} Slot{selectedImgs.length === 1 ? "" : "s"} wirklich löschen?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Die ausgewählten Slots werden dauerhaft entfernt – inklusive der zugehörigen Original- und komprimierten Bilder. Dieser Vorgang kann nicht rückgängig gemacht werden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); performDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Lösche…" : "Endgültig löschen"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
