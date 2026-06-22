@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { transformImage, extForFormat, type ExportFormat } from "@/lib/imageProcess";
+import { resolveFocal } from "@/lib/cropUtils";
 import { signedUrl, uploadFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import type { SliderImage } from "./ImageCell";
@@ -67,7 +68,11 @@ export function ExportDialog({
         if (!origUrl) continue;
         const blob = await (await fetch(origUrl)).blob();
         const result = await transformImage(blob, {
-          format, targetKB, width: 633, height: 382,
+          format,
+          targetKB,
+          width: 633,
+          height: 382,
+          focalPoint: resolveFocal(img.crop_x, img.crop_y),
         });
         const { blob: out, mime, sizeKB, overTarget, downscaled } = result;
         if (overTarget) toast.warning(`Image ${img.id.slice(0, 6)} could not stay under ${targetKB} KB (${sizeKB} KB).`);

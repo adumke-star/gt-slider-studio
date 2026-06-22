@@ -110,7 +110,10 @@ export function RaceNav({
                     <DropdownMenuItem
                       key={r.id}
                       onClick={() => onSelect({ kind: "race", raceId: r.id })}
-                      className={cn("flex items-center justify-between gap-3", isSel && "bg-accent")}
+                      className={cn(
+                        "flex items-center justify-between gap-3",
+                        isSel && "bg-accent text-[#5c4900] focus:text-[#5c4900]",
+                      )}
                     >
                       <span className="truncate">{r.name}</span>
                       <span className="flex items-center gap-1">

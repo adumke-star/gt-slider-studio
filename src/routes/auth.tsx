@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 
-import logoAsset from "@/assets/global-tickets-logo.svg.asset.json";
+import logoUrl from "@/assets/global-tickets-logo.png";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -110,7 +110,7 @@ function AuthPage() {
     <div className="grid min-h-screen place-items-center bg-background px-6 text-foreground">
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface-2 p-8 shadow-lg">
         <div className="mb-6 flex items-center gap-3">
-          <img src={logoAsset.url} alt="Global Tickets" className="h-9 w-auto" />
+          <img src={logoUrl} alt="Global Tickets" className="h-9 w-auto" />
           <div>
             <h1 className="font-display text-lg font-black uppercase leading-none">
               Slider <span className="text-primary">Studio</span>

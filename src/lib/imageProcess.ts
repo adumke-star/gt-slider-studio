@@ -1,8 +1,11 @@
 /**
  * Client-side image transformation using Canvas.
- * Target: 633 x 382, cover fill, center crop.
+ * Target: 633 x 382, cover fill, configurable focal crop.
  * Iterative quality + resolution tuning to STAY UNDER target size (KB).
  */
+
+import type { FocalPoint } from "@/lib/cropUtils";
+import { resolveFocal, SLIDER_OUTPUT_HEIGHT, SLIDER_OUTPUT_WIDTH } from "@/lib/cropUtils";
 
 export type ExportFormat = "jpeg" | "png" | "webp" | "avif";
 
@@ -11,6 +14,7 @@ export interface TransformOptions {
   height?: number;
   targetKB?: number;
   format: ExportFormat;
+  focalPoint?: FocalPoint | null;
 }
 
 export interface TransformResult {
@@ -25,8 +29,8 @@ export interface TransformResult {
   downscaled: boolean;
 }
 
-const DEFAULT_W = 633;
-const DEFAULT_H = 382;
+const DEFAULT_W = SLIDER_OUTPUT_WIDTH;
+const DEFAULT_H = SLIDER_OUTPUT_HEIGHT;
 
 export async function fileToImage(file: Blob): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(file);
@@ -46,6 +50,7 @@ export function drawCover(
   img: HTMLImageElement,
   w = DEFAULT_W,
   h = DEFAULT_H,
+  focal: FocalPoint = { x: 0.5, y: 0.5 },
 ): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
@@ -56,8 +61,8 @@ export function drawCover(
   const scale = Math.max(w / iw, h / ih);
   const dw = iw * scale;
   const dh = ih * scale;
-  const dx = (w - dw) / 2;
-  const dy = (h - dh) / 2;
+  const dx = dw > w ? focal.x * (w - dw) : (w - dw) / 2;
+  const dy = dh > h ? focal.y * (h - dh) : (h - dh) / 2;
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, dx, dy, dw, dh);
   return canvas;
@@ -93,16 +98,17 @@ export async function transformImage(
   const baseH = opts.height ?? DEFAULT_H;
   const mime = MIME[opts.format];
   const target = opts.targetKB ?? 0;
+  const focal = resolveFocal(opts.focalPoint?.x ?? null, opts.focalPoint?.y ?? null);
 
   // PNG is lossless: try downscaling only when target is set.
   if (opts.format === "png") {
     let scale = 1;
-    let canvas = drawCover(img, baseW, baseH);
+    let canvas = drawCover(img, baseW, baseH, focal);
     let blob = await canvasToBlob(canvas, mime);
     if (target > 0) {
       while (blob.size / 1024 > target && scale > 0.35) {
         scale *= 0.85;
-        canvas = drawCover(img, Math.round(baseW * scale), Math.round(baseH * scale));
+        canvas = drawCover(img, Math.round(baseW * scale), Math.round(baseH * scale), focal);
         blob = await canvasToBlob(canvas, mime);
       }
     }
@@ -117,7 +123,7 @@ export async function transformImage(
 
   // Lossy formats: search quality first, then downscale if still too big.
   let scale = 1;
-  let canvas = drawCover(img, baseW, baseH);
+  let canvas = drawCover(img, baseW, baseH, focal);
   let q = 0.85;
   let blob = await canvasToBlob(canvas, mime, q);
   let downscaled = false;
@@ -150,7 +156,7 @@ export async function transformImage(
   while (target > 0 && blob.size / 1024 > target && scale > 0.35) {
     scale *= 0.85;
     downscaled = true;
-    canvas = drawCover(img, Math.round(baseW * scale), Math.round(baseH * scale));
+    canvas = drawCover(img, Math.round(baseW * scale), Math.round(baseH * scale), focal);
     await fitQualityUnderTarget();
   }
 

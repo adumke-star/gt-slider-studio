@@ -12,7 +12,7 @@ import { dataTransferHasFiles } from "@/lib/dropFiles";
 import { UserMenu } from "@/components/dashboard/UserMenu";
 import { RaceNav, type NavSelection, type RaceFlags } from "@/components/dashboard/RaceNav";
 import { RaceListView } from "@/components/dashboard/RaceListView";
-import logoAsset from "@/assets/global-tickets-logo.svg.asset.json";
+import logoUrl from "@/assets/global-tickets-logo.png";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -183,7 +183,7 @@ function Dashboard() {
       <header className="sticky top-0 z-30 border-b border-border bg-surface-2/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-4 px-6 py-4">
           <div className="flex items-center gap-3">
-            <img src={logoAsset.url} alt="Global Tickets" className="h-9 w-auto" />
+            <img src={logoUrl} alt="Global Tickets" className="h-9 w-auto" />
             <div className="min-w-0">
               <h1 className="font-display text-xl font-black uppercase leading-none tracking-tight">
                 Slider <span className="text-primary">Studio</span>
