@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+
 import logoAsset from "@/assets/global-tickets-logo.svg.asset.json";
 
 export const Route = createFileRoute("/auth")({
@@ -53,24 +53,6 @@ function AuthPage() {
     return msg;
   }
 
-  async function signInGoogle() {
-    setError(null);
-    setLoading(true);
-    try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-        extraParams: { prompt: "select_account" },
-      });
-      if (result.error) {
-        const msg = result.error instanceof Error ? result.error.message : String(result.error);
-        setError(translateError(msg));
-        setLoading(false);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? translateError(e.message) : "Login fehlgeschlagen.");
-      setLoading(false);
-    }
-  }
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -119,18 +101,8 @@ function AuthPage() {
           Zugriff haben nur freigeschaltete Mitarbeiter.
         </p>
 
-        <Button onClick={signInGoogle} disabled={loading} className="w-full gap-2" variant="outline">
-          <GoogleIcon className="h-4 w-4" />
-          Mit Google anmelden
-        </Button>
-
-        <div className="my-5 flex items-center gap-3 text-[11px] uppercase tracking-widest text-muted-foreground">
-          <div className="h-px flex-1 bg-border" />
-          oder
-          <div className="h-px flex-1 bg-border" />
-        </div>
-
         <Tabs value={mode} onValueChange={(v) => { setMode(v as "signin" | "signup"); setError(null); }}>
+
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="signin">Anmelden</TabsTrigger>
             <TabsTrigger value="signup">Registrieren</TabsTrigger>
@@ -198,10 +170,3 @@ function EmailPasswordFields({
   );
 }
 
-function GoogleIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.4-1.66 4.1-5.5 4.1-3.31 0-6-2.74-6-6.1S8.69 6 12 6c1.88 0 3.14.8 3.86 1.49l2.63-2.53C16.83 3.43 14.62 2.5 12 2.5 6.76 2.5 2.5 6.76 2.5 12S6.76 21.5 12 21.5c6.93 0 9.5-4.86 9.5-7.78 0-.52-.06-.91-.13-1.32H12z"/>
-    </svg>
-  );
-}
