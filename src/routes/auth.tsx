@@ -101,18 +101,8 @@ function AuthPage() {
           Zugriff haben nur freigeschaltete Mitarbeiter.
         </p>
 
-        <Button onClick={signInGoogle} disabled={loading} className="w-full gap-2" variant="outline">
-          <GoogleIcon className="h-4 w-4" />
-          Mit Google anmelden
-        </Button>
-
-        <div className="my-5 flex items-center gap-3 text-[11px] uppercase tracking-widest text-muted-foreground">
-          <div className="h-px flex-1 bg-border" />
-          oder
-          <div className="h-px flex-1 bg-border" />
-        </div>
-
         <Tabs value={mode} onValueChange={(v) => { setMode(v as "signin" | "signup"); setError(null); }}>
+
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="signin">Anmelden</TabsTrigger>
             <TabsTrigger value="signup">Registrieren</TabsTrigger>
