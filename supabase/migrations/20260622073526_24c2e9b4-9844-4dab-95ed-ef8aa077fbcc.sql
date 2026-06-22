@@ -1,0 +1,1 @@
+INSERT INTO public.allowed_emails (email, role) VALUES ('a.dumke@global-tickets.com', 'admin') ON CONFLICT (email) DO UPDATE SET role = 'admin';
