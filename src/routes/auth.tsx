@@ -22,7 +22,9 @@ function AuthPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [showReset, setShowReset] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -42,7 +44,7 @@ function AuthPage() {
       return "E-Mail oder Passwort ist falsch.";
     }
     if (lower.includes("user already registered")) {
-      return "Es existiert bereits ein Konto mit dieser E-Mail. Bitte anmelden.";
+      return "Es existiert bereits ein Konto mit dieser E-Mail. Bitte anmelden oder Passwort zurücksetzen.";
     }
     if (lower.includes("password should be")) {
       return "Das Passwort muss mindestens 6 Zeichen lang sein.";
@@ -57,6 +59,7 @@ function AuthPage() {
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     setLoading(true);
     try {
       if (mode === "signin") {
@@ -78,6 +81,27 @@ function AuthPage() {
       }
     } catch (e) {
       setError(e instanceof Error ? translateError(e.message) : "Anmeldung fehlgeschlagen.");
+      setLoading(false);
+    }
+  }
+
+  async function handlePasswordReset(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setInfo(null);
+    setLoading(true);
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (err) {
+        setError(translateError(err.message));
+      } else {
+        setInfo("Wenn ein Konto mit dieser E-Mail existiert, wurde ein Link zum Zurücksetzen verschickt.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? translateError(e.message) : "Anfrage fehlgeschlagen.");
+    } finally {
       setLoading(false);
     }
   }
