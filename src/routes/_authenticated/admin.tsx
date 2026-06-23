@@ -1,21 +1,47 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Trash2, UserPlus, ShieldCheck, ShieldOff } from "lucide-react";
+import { ArrowLeft, Trash2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  INVITE_ROLES,
+  ROLE_LABELS,
+  isSuperuserEmail,
+  normalizeRole,
+  type AppRole,
+} from "@/lib/roles";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Allowlist — Slider Studio" }] }),
   component: AdminPage,
 });
 
-type Allowed = { id: string; email: string; role: "admin" | "member"; created_at: string };
+type Allowed = { id: string; email: string; role: string; created_at: string };
+
+function roleBadgeClass(role: AppRole) {
+  if (role === "admin") return "border-primary/40 bg-primary/15 text-primary";
+  if (role === "editor") return "border-amber-500/40 bg-amber-500/15 text-amber-600";
+  return "border-border bg-muted text-muted-foreground";
+}
+
+async function syncUserRoleForEmail(email: string, role: AppRole) {
+  if (isSuperuserEmail(email)) return;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+  if (!profile) return;
+  await supabase.from("user_roles").delete().eq("user_id", profile.id);
+  await supabase.from("user_roles").insert({ user_id: profile.id, role });
+}
 
 function AdminPage() {
   const [rows, setRows] = useState<Allowed[]>([]);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"admin" | "member">("member");
+  const [role, setRole] = useState<AppRole>("viewer");
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,15 +75,27 @@ function AdminPage() {
     }
   }
 
-  async function remove(id: string) {
+  async function remove(id: string, rowEmail: string) {
+    if (isSuperuserEmail(rowEmail)) {
+      setError("The primary administrator cannot be removed from the allowlist.");
+      return;
+    }
     if (!confirm("Really delete this entry? The user won't be able to sign in again (existing sessions stay active).")) return;
     await supabase.from("allowed_emails").delete().eq("id", id);
     load();
   }
 
-  async function toggleRole(row: Allowed) {
-    const next = row.role === "admin" ? "member" : "admin";
-    await supabase.from("allowed_emails").update({ role: next }).eq("id", row.id);
+  async function changeRole(row: Allowed, next: AppRole) {
+    if (isSuperuserEmail(row.email) && next !== "admin") {
+      setError("The primary administrator must remain an admin.");
+      return;
+    }
+    const { error: err } = await supabase.from("allowed_emails").update({ role: next }).eq("id", row.id);
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    await syncUserRoleForEmail(row.email, next);
     load();
   }
 
@@ -99,16 +137,20 @@ function AdminPage() {
             />
             <select
               value={role}
-              onChange={(e) => setRole(e.target.value as "admin" | "member")}
+              onChange={(e) => setRole(e.target.value as AppRole)}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm"
             >
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
+              {INVITE_ROLES.map((r) => (
+                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+              ))}
             </select>
             <Button onClick={add} className="gap-1.5">
               <UserPlus className="h-4 w-4" /> Add
             </Button>
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Viewer — read &amp; comment only · Editor — manage races &amp; images · Admin — plus allowlist &amp; history
+          </p>
           {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
         </section>
 
@@ -119,24 +161,52 @@ function AdminPage() {
             </thead>
             <tbody>
               {rows.length === 0 && <tr><td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">No entries yet.</td></tr>}
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b border-border/50 last:border-b-0">
-                  <td className="px-4 py-2">{r.email}</td>
-                  <td className="px-4 py-2">
-                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${r.role === "admin" ? "border-primary/40 bg-primary/15 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
-                      {r.role}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <button onClick={() => toggleRole(r)} title="Toggle role" className="mr-1 inline-flex items-center rounded p-1.5 text-muted-foreground hover:bg-background hover:text-primary">
-                      {r.role === "admin" ? <ShieldOff className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
-                    </button>
-                    <button onClick={() => remove(r.id)} title="Delete" className="inline-flex items-center rounded p-1.5 text-muted-foreground hover:bg-background hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const normalized = normalizeRole(r.role);
+                const locked = isSuperuserEmail(r.email);
+                return (
+                  <tr key={r.id} className="border-b border-border/50 last:border-b-0">
+                    <td className="px-4 py-2">
+                      {r.email}
+                      {locked && (
+                        <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                          (primary admin)
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {locked ? (
+                        <span className={cn(
+                          "inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                          roleBadgeClass("admin"),
+                        )}>
+                          {ROLE_LABELS.admin}
+                        </span>
+                      ) : (
+                        <select
+                          value={normalized}
+                          onChange={(e) => changeRole(r, e.target.value as AppRole)}
+                          className={cn(
+                            "rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                            roleBadgeClass(normalized),
+                          )}
+                        >
+                          {INVITE_ROLES.map((opt) => (
+                            <option key={opt} value={opt}>{ROLE_LABELS[opt]}</option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {!locked && (
+                        <button onClick={() => remove(r.id, r.email)} title="Delete" className="inline-flex items-center rounded p-1.5 text-muted-foreground hover:bg-background hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </section>

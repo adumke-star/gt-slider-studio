@@ -59,7 +59,6 @@ export function ExportDialog({
     const wantIndividual = !asZip || eligible.length === 1;
     const canUseFsApi = wantIndividual && eligible.length > 1 && "showDirectoryPicker" in window;
 
-    // Ordnerauswahl muss innerhalb der User-Geste passieren (vor dem Laden der Blobs).
     let dirHandle: FileSystemDirectoryHandle | null = null;
     if (canUseFsApi) {
       try {
@@ -67,8 +66,8 @@ export function ExportDialog({
           showDirectoryPicker: (o?: { mode?: string }) => Promise<FileSystemDirectoryHandle>;
         }).showDirectoryPicker({ mode: "readwrite" });
       } catch (e) {
-        if ((e as DOMException)?.name === "AbortError") return; // Nutzer hat abgebrochen
-        dirHandle = null; // Fallback auf gestaffelte Einzeldownloads
+        if ((e as DOMException)?.name === "AbortError") return;
+        dirHandle = null;
       }
     }
 
@@ -85,14 +84,14 @@ export function ExportDialog({
         results.push({ id: img.id, name: exportName(img), blob });
       } catch (e) {
         console.error("export failed for", img.id, e);
-        toast.error(`Export fehlgeschlagen für Bild ${img.id.slice(0, 6)}`);
+        toast.error(`Export failed for image ${img.id.slice(0, 6)}`);
       }
       done++;
       setProgress(done);
     }
 
     if (results.length === 0) {
-      toast.error("Keine Bilder zum Herunterladen.");
+      toast.error("No images to download.");
       setRunning(false);
       return;
     }
@@ -121,7 +120,6 @@ export function ExportDialog({
           await writable.close();
         }
       } else {
-        // Browser blockieren mehrere gleichzeitige Downloads — daher gestaffelt
         for (let i = 0; i < results.length; i++) {
           triggerDownload(results[i].blob, uniqueName(results[i].name));
           if (i < results.length - 1) {
@@ -129,7 +127,6 @@ export function ExportDialog({
           }
         }
       }
-      // Status der exportierten Bilder auf "exported" setzen (Export selbst nicht blockieren)
       try {
         const { error } = await supabase
           .from("slider_images")
@@ -139,7 +136,7 @@ export function ExportDialog({
           console.error("status update failed", error);
           if (error.message.includes("exported") || error.message.includes("invalid input value")) {
             toast.warning(
-              'Status "Exported" fehlt noch in der Datenbank. Bitte die Migration ausführen (image_status um "exported" erweitern).',
+              'Status "Exported" is missing in the database. Please run the migration (add "exported" to image_status).',
               { duration: 8000 },
             );
           }
@@ -148,14 +145,14 @@ export function ExportDialog({
         console.error(e);
       }
 
-      toast.success(`${results.length} Bild${results.length === 1 ? "" : "er"} gespeichert`);
+      toast.success(`${results.length} image${results.length === 1 ? "" : "s"} saved`);
       setRunning(false);
       onDone();
       onOpenChange(false);
       return;
     } catch (e) {
       console.error(e);
-      toast.error("Download fehlgeschlagen");
+      toast.error("Download failed");
     }
 
     setRunning(false);
@@ -167,17 +164,17 @@ export function ExportDialog({
       <DialogContent className="bg-surface-2 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
-            Export {eligible.length} Bild{eligible.length === 1 ? "" : "er"}
+            Export {eligible.length} image{eligible.length === 1 ? "" : "s"}
           </DialogTitle>
           <DialogDescription>
-            Bereits komprimierte Bilder herunterladen (einzeln oder als ZIP). Es wird nichts neu komprimiert.
+            Download already compressed images (individually or as ZIP). Nothing is re-compressed.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-2">
           {eligible.length > 1 && (
             <div className="flex items-center justify-between rounded border border-border bg-background/50 p-3">
               <label htmlFor="zip" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Als ZIP bündeln
+                Bundle as ZIP
               </label>
               <input
                 id="zip"
@@ -193,33 +190,33 @@ export function ExportDialog({
           {eligible.length > 1 && !asZip && (
             <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
               {"showDirectoryPicker" in window
-                ? "Du wirst nach einem Zielordner gefragt – alle Bilder werden direkt dort gespeichert."
-                : "Dein Browser lädt die Bilder einzeln herunter und fragt ggf. einmalig, ob mehrere Dateien erlaubt sind."}
+                ? "You will be asked for a destination folder — all images will be saved there directly."
+                : "Your browser will download images one by one and may ask once whether multiple downloads are allowed."}
             </div>
           )}
 
           {notCompressed > 0 && (
             <div className="rounded border border-[var(--status-todo)]/40 bg-[var(--status-todo)]/10 p-3 text-xs text-[var(--status-todo)]">
-              {notCompressed} von {images.length} Bildern sind noch nicht komprimiert und werden nicht exportiert. Bitte zuerst „Compress“ ausführen.
+              {notCompressed} of {images.length} images are not compressed yet and will be skipped. Please run Compress first.
             </div>
           )}
 
           <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
-            Bereit zum Export: <span className="text-foreground">{eligible.length}</span> von {images.length} ausgewählt.
+            Ready to export: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
           </div>
           {running && (
             <div className="text-sm text-primary">
-              Lade {progress} / {eligible.length}…
+              Loading {progress} / {eligible.length}…
             </div>
           )}
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={running}>Schließen</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={running}>Close</Button>
           <Button onClick={run} disabled={running || eligible.length === 0}
             className="bg-primary text-primary-foreground hover:bg-primary/90">
             {running
-              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Exportiere</>
-              : "Jetzt herunterladen"}
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Exporting</>
+              : "Download now"}
           </Button>
         </DialogFooter>
       </DialogContent>

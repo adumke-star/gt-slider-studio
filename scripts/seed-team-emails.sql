@@ -7,5 +7,6 @@ ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role;
 
 -- Add more team emails (uncomment and edit):
 -- INSERT INTO public.allowed_emails (email, role) VALUES
---   ('colleague@global-tickets.com', 'editor')
+--   ('colleague@global-tickets.com', 'editor'),
+--   ('manager@global-tickets.com', 'viewer')
 -- ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role;

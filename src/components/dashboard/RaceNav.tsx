@@ -87,7 +87,7 @@ export function RaceNav({
         )}
       >
         <LayoutGrid className="h-3 w-3" />
-        <span>Übersicht</span>
+        <span>Overview</span>
       </button>
       {SERIES.map((s) => {
         const list = racesBySeries.get(s.key) ?? [];

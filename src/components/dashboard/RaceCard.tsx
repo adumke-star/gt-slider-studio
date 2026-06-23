@@ -32,6 +32,7 @@ export function RaceCard({
   sections,
   images,
   selected,
+  canEdit,
   onToggleSelect,
   onReload,
   onExport,
@@ -42,6 +43,7 @@ export function RaceCard({
   sections: SliderSection[];
   images: SliderImage[];
   selected: Set<string>;
+  canEdit: boolean;
   onToggleSelect: (id: string) => void;
   onReload: () => void;
   onExport: (images: SliderImage[]) => void;
@@ -275,19 +277,23 @@ export function RaceCard({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <Button size="sm" variant="ghost" onClick={() => addSection("plp")} className="h-7 gap-1 text-xs">
-            <Plus className="h-3.5 w-3.5" /> PLP
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => addSection("pdp")} className="h-7 gap-1 text-xs">
-            <Plus className="h-3.5 w-3.5" /> PDP
-          </Button>
-          <button
-            onClick={() => onRequestDeleteRace(race)}
-            className="rounded p-2 text-muted-foreground hover:bg-background hover:text-destructive"
-            title="Delete race"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {canEdit && (
+            <>
+              <Button size="sm" variant="ghost" onClick={() => addSection("plp")} className="h-7 gap-1 text-xs">
+                <Plus className="h-3.5 w-3.5" /> PLP
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => addSection("pdp")} className="h-7 gap-1 text-xs">
+                <Plus className="h-3.5 w-3.5" /> PDP
+              </Button>
+              <button
+                onClick={() => onRequestDeleteRace(race)}
+                className="rounded p-2 text-muted-foreground hover:bg-background hover:text-destructive"
+                title="Delete race"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -306,6 +312,7 @@ export function RaceCard({
                 section={s}
                 images={list}
                 selected={selected}
+                canEdit={canEdit}
                 onToggleSelect={onToggleSelect}
                 onReload={onReload}
                 onRename={(n) => renameSection(s, n)}
@@ -337,6 +344,7 @@ function SectionBlock({
   section,
   images,
   selected,
+  canEdit,
   onToggleSelect,
   onReload,
   onRename,
@@ -356,6 +364,7 @@ function SectionBlock({
   section: SliderSection;
   images: SliderImage[];
   selected: Set<string>;
+  canEdit: boolean;
   onToggleSelect: (id: string) => void;
   onReload: () => void;
   onRename: (name: string) => void;
@@ -463,6 +472,7 @@ function SectionBlock({
     <div
       ref={rootRef}
       onDragEnter={(e) => {
+        if (!canEdit) return;
         if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
           e.stopPropagation();
@@ -471,6 +481,7 @@ function SectionBlock({
         }
       }}
       onDragOver={(e) => {
+        if (!canEdit) return;
         const types = e.dataTransfer.types;
         if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
@@ -496,6 +507,7 @@ function SectionBlock({
         }
       }}
       onDrop={async (e) => {
+        if (!canEdit) return;
         if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
           e.stopPropagation();
@@ -592,19 +604,23 @@ function SectionBlock({
       )}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
-          <div
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.effectAllowed = "move";
-              e.dataTransfer.setData("text/plain", `section:${section.id}`);
-              onSectionDragStart();
-            }}
-            onDragEnd={onSectionDragEnd}
-            title="Move section"
-            className="grid h-5 w-5 cursor-grab place-items-center rounded text-muted-foreground hover:text-primary active:cursor-grabbing"
-          >
-            <GripVertical className="h-3.5 w-3.5" />
-          </div>
+          {canEdit ? (
+            <div
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", `section:${section.id}`);
+                onSectionDragStart();
+              }}
+              onDragEnd={onSectionDragEnd}
+              title="Move section"
+              className="grid h-5 w-5 cursor-grab place-items-center rounded text-muted-foreground hover:text-primary active:cursor-grabbing"
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </div>
+          ) : (
+            <div className="h-5 w-5" />
+          )}
           <span className={cn(
             "shrink-0 rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest",
             section.kind === "plp" ? "bg-primary/15 text-primary" : "bg-foreground/10 text-foreground",
@@ -623,7 +639,7 @@ function SectionBlock({
               className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#FACC15]"
             />
           )}
-          {editingName ? (
+          {canEdit && editingName ? (
             <div className="flex items-center gap-1">
               <input
                 autoFocus
@@ -637,7 +653,7 @@ function SectionBlock({
                 className="rounded border border-border bg-background px-1.5 py-0.5 text-xs text-foreground focus:border-primary focus:outline-none"
               />
             </div>
-          ) : (
+          ) : canEdit ? (
             <button
               onClick={() => { setNameDraft(section.name); setEditingName(true); }}
               className="font-display text-xs font-black uppercase tracking-widest text-foreground hover:text-primary"
@@ -645,6 +661,10 @@ function SectionBlock({
             >
               {section.name}
             </button>
+          ) : (
+            <span className="font-display text-xs font-black uppercase tracking-widest text-foreground">
+              {section.name}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -660,20 +680,24 @@ function SectionBlock({
               <ExternalLink className="h-3 w-3 shrink-0" /> <span className="truncate">{l.label}</span>
             </a>
           ))}
-          <button
-            onClick={openLinksEditor}
-            className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
-            title={links.length ? "Edit links" : "Add external links"}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <Button size="sm" variant="ghost"
-            disabled={images.filter((i) => i.original_path).length === 0}
-            onClick={() => onCompress(images.filter((i) => i.original_path))}
-            className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-40"
-            title={`Compress ${section.kind.toUpperCase()} images`}>
-            <Wand2 className="h-3.5 w-3.5" /> Compress
-          </Button>
+          {canEdit && (
+            <button
+              onClick={openLinksEditor}
+              className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
+              title={links.length ? "Edit links" : "Add external links"}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {canEdit && (
+            <Button size="sm" variant="ghost"
+              disabled={images.filter((i) => i.original_path).length === 0}
+              onClick={() => onCompress(images.filter((i) => i.original_path))}
+              className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-40"
+              title={`Compress ${section.kind.toUpperCase()} images`}>
+              <Wand2 className="h-3.5 w-3.5" /> Compress
+            </Button>
+          )}
           <Button size="sm" variant="ghost"
             disabled={images.filter((i) => i.compressed_path).length === 0}
             onClick={() => onExport(images.filter((i) => i.compressed_path))}
@@ -681,30 +705,35 @@ function SectionBlock({
             title={`Export ${section.kind.toUpperCase()} images`}>
             <Download className="h-3.5 w-3.5" /> Export
           </Button>
-          <Button size="sm" variant="ghost" onClick={onAddSlot}
-            className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary">
-            <Plus className="h-3.5 w-3.5" /> Slot
-          </Button>
-          <button
-            onClick={onDelete}
-            className="rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive"
-            title="Delete section"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          {canEdit && (
+            <>
+              <Button size="sm" variant="ghost" onClick={onAddSlot}
+                className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary">
+                <Plus className="h-3.5 w-3.5" /> Slot
+              </Button>
+              <button
+                onClick={onDelete}
+                className="rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive"
+                title="Delete section"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
       <div className="relative">
         <div ref={scrollRef} className="flex gap-3 overflow-x-auto scroll-smooth p-3">
           {images.length === 0 && (
             <div className="grid h-[120px] w-full place-items-center text-xs text-muted-foreground">
-              No slots yet — add a slot above.
+              {canEdit ? "Drop images here via drag & drop" : "No images in this section yet"}
             </div>
           )}
           {images.map((img) => (
             <ImageCell
               key={img.id}
               image={img}
+              canEdit={canEdit}
               selected={selected.has(img.id)}
               onToggleSelect={() => onToggleSelect(img.id)}
               onChanged={onReload}

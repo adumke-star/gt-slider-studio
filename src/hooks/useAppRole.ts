@@ -1,0 +1,33 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  canEditContent,
+  isAdminRole,
+  pickPrimaryRole,
+  type AppRole,
+} from "@/lib/roles";
+
+export function useAppRole() {
+  const [role, setRole] = useState<AppRole | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) {
+        if (alive) setRole(null);
+        return;
+      }
+      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
+      if (alive) setRole(pickPrimaryRole(roles ?? []));
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  return {
+    role,
+    loading: role === null,
+    isAdmin: role != null && isAdminRole(role),
+    canEdit: role != null && canEditContent(role),
+  };
+}

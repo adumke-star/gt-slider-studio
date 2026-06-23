@@ -46,6 +46,7 @@ export function slugifyName(s: string) {
 export function ImageCell({
   image,
   selected,
+  canEdit,
   onToggleSelect,
   onChanged,
   onDragStart,
@@ -56,6 +57,7 @@ export function ImageCell({
 }: {
   image: SliderImage;
   selected: boolean;
+  canEdit: boolean;
   onToggleSelect: () => void;
   onChanged: () => void;
   onDragStart: () => void;
@@ -183,6 +185,7 @@ export function ImageCell({
     <div
       ref={rootRef}
       onDragOver={(e) => {
+        if (!canEdit) return;
         e.preventDefault();
         // Side detection only when moving an image, not a file
         if (dataTransferHasFiles(e.dataTransfer)) {
@@ -197,6 +200,7 @@ export function ImageCell({
       }}
       onDragLeave={() => setDropSide(null)}
       onDrop={async (e) => {
+        if (!canEdit) return;
         if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
           e.stopPropagation();
@@ -235,14 +239,16 @@ export function ImageCell({
         {selected && <Check className="h-3.5 w-3.5 text-primary" strokeWidth={3} />}
       </label>
 
-      <div
-        draggable
-        onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", image.id); e.dataTransfer.setData("application/x-slider-image", image.id); onDragStart(); }}
-        title="Drag to reorder"
-        className="absolute right-1.5 top-1.5 z-10 grid h-5 w-5 cursor-grab place-items-center rounded border border-border bg-background/80 text-muted-foreground backdrop-blur active:cursor-grabbing"
-      >
-        <GripVertical className="h-3 w-3" />
-      </div>
+      {canEdit && (
+        <div
+          draggable
+          onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", image.id); e.dataTransfer.setData("application/x-slider-image", image.id); onDragStart(); }}
+          title="Drag to reorder"
+          className="absolute right-1.5 top-1.5 z-10 grid h-5 w-5 cursor-grab place-items-center rounded border border-border bg-background/80 text-muted-foreground backdrop-blur active:cursor-grabbing"
+        >
+          <GripVertical className="h-3 w-3" />
+        </div>
+      )}
 
       <div className="relative aspect-[633/382] w-full overflow-hidden bg-background">
         {preview ? (
@@ -253,16 +259,22 @@ export function ImageCell({
             style={showCropPreview ? { objectPosition: objectPositionFromFocal(focal) } : undefined}
           />
         ) : (
-          <label className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-1 text-muted-foreground hover:text-primary">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground">
             <ImageIcon className="h-6 w-6" />
-            <span className="text-[10px] uppercase tracking-wider">Drop / click</span>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-            />
-          </label>
+            <span className="text-[10px] uppercase tracking-wider">
+              {canEdit ? "Drop / click" : "Empty slot"}
+            </span>
+            {canEdit && (
+              <label className="absolute inset-0 cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                />
+              </label>
+            )}
+          </div>
         )}
         {busy && (
           <div className="absolute inset-0 grid place-items-center bg-background/70 text-xs text-primary">
@@ -277,49 +289,64 @@ export function ImageCell({
       </div>
 
       <div className="px-2 pt-1.5">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={saveName}
-          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-          placeholder="Image name…"
-          className="w-full rounded border border-border bg-background/50 px-1.5 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-        />
+        {canEdit ? (
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={saveName}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            placeholder="Image name…"
+            className="w-full rounded border border-border bg-background/50 px-1.5 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+          />
+        ) : (
+          <div className="truncate px-0.5 py-1 text-xs text-foreground" title={name || undefined}>
+            {name || "Untitled"}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-1 px-2 py-1.5">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className={cn(
-                "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition hover:scale-105",
-                meta.cls,
-              )}
-            >
-              {meta.label}
-              <ChevronDown className="h-3 w-3 opacity-60" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-[8rem]">
-            {STATUS_ORDER.map((s) => {
-              const m = STATUS_META[s];
-              return (
-                <DropdownMenuItem
-                  key={s}
-                  onClick={() => setStatus(s)}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-2 text-xs",
-                    s === image.status && "font-semibold",
-                  )}
-                >
-                  <span className={cn("h-2 w-2 rounded-full", m.cls.replace(/border-\S+/g, "").replace(/text-\S+/g, "").replace(/bg-\[/g, "bg-[").replace(/\/15/g, ""))} />
-                  {m.label}
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {canEdit ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition hover:scale-105",
+                  meta.cls,
+                )}
+              >
+                {meta.label}
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[8rem]">
+              {STATUS_ORDER.map((s) => {
+                const m = STATUS_META[s];
+                return (
+                  <DropdownMenuItem
+                    key={s}
+                    onClick={() => setStatus(s)}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 text-xs",
+                      s === image.status && "font-semibold",
+                    )}
+                  >
+                    <span className={cn("h-2 w-2 rounded-full", m.cls.replace(/border-\S+/g, "").replace(/text-\S+/g, "").replace(/bg-\[/g, "bg-[").replace(/\/15/g, ""))} />
+                    {m.label}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <span className={cn(
+            "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+            meta.cls,
+          )}>
+            {meta.label}
+          </span>
+        )}
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setCommentsOpen(true)}
@@ -334,16 +361,16 @@ export function ImageCell({
               )}>{unreadMentions > 0 ? unreadMentions : commentCount}</span>
             )}
           </button>
-          {canCrop && (
+          {canEdit && canCrop && (
             <button
               onClick={() => setCropOpen(true)}
-              title="Zuschnitt anpassen"
+              title="Adjust crop"
               className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
             >
               <Crop className="h-3.5 w-3.5" />
             </button>
           )}
-          {image.original_path && onCompress && (
+          {canEdit && image.original_path && onCompress && (
             <button
               onClick={onCompress}
               title="Compress image"
@@ -370,21 +397,25 @@ export function ImageCell({
               <Download className="h-3.5 w-3.5" />
             </button>
           )}
-          <label className="cursor-pointer rounded p-1 text-muted-foreground hover:bg-background hover:text-primary">
-            <Upload className="h-3.5 w-3.5" />
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-            />
-          </label>
-          <button
-            onClick={handleRemove}
-            className="rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          {canEdit && (
+            <>
+              <label className="cursor-pointer rounded p-1 text-muted-foreground hover:bg-background hover:text-primary">
+                <Upload className="h-3.5 w-3.5" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                />
+              </label>
+              <button
+                onClick={handleRemove}
+                className="rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 

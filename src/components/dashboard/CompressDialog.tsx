@@ -38,7 +38,7 @@ export function CompressDialog({
     let skipped = 0;
 
     for (const img of eligible) {
-      const label = img.title?.trim() || `Bild ${img.id.slice(0, 6)}`;
+      const label = img.title?.trim() || `Image ${img.id.slice(0, 6)}`;
       try {
         const origUrl = await signedUrl("originals", img.original_path!);
         if (!origUrl) continue;
@@ -52,21 +52,19 @@ export function CompressDialog({
         });
         const { blob: out, mime, sizeKB, overTarget, downscaled } = result;
 
-        // Harte Grenze: über dem Limit wird NICHT gespeichert, Original bleibt erhalten.
         if (overTarget) {
           toast.error(
-            `${label} konnte ${targetKB} KB nicht erreichen (${sizeKB} KB) – nicht gespeichert. Original bleibt erhalten.`,
+            `${label} could not reach ${targetKB} KB (${sizeKB} KB) — not saved. Original kept.`,
             { duration: 7000 },
           );
           skipped++;
           continue;
         }
 
-        if (downscaled) toast.info(`${label}: Auflösung reduziert, um ${targetKB} KB zu erreichen.`);
+        if (downscaled) toast.info(`${label}: resolution reduced to reach ${targetKB} KB.`);
         const folder = img.section_id ?? img.area;
         const outPath = `${img.race_id}/${folder}/${img.id}.${ext}`;
         await uploadFile("compressed", outPath, out, mime);
-        // Delete the original — only the compressed version is kept to save storage
         const origPath = img.original_path!;
         try {
           await removeFile("originals", origPath);
@@ -84,17 +82,17 @@ export function CompressDialog({
         ok++;
       } catch (e) {
         console.error("compress failed for", img.id, e);
-        toast.error(`Komprimierung fehlgeschlagen für ${label}`);
+        toast.error(`Compression failed for ${label}`);
       } finally {
         done++;
         setProgress(done);
       }
     }
 
-    if (ok > 0) toast.success(`${ok} Bild${ok === 1 ? "" : "er"} komprimiert`);
+    if (ok > 0) toast.success(`${ok} image${ok === 1 ? "" : "s"} compressed`);
     if (skipped > 0) {
       toast.warning(
-        `${skipped} Bild${skipped === 1 ? "" : "er"} über ${targetKB} KB – nicht gespeichert. Versuche ein höheres Limit oder WebP.`,
+        `${skipped} image${skipped === 1 ? "" : "s"} over ${targetKB} KB — not saved. Try a higher limit or WebP.`,
         { duration: 7000 },
       );
     }
@@ -109,16 +107,16 @@ export function CompressDialog({
       <DialogContent className="bg-surface-2 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
-            Compress {eligible.length} Bild{eligible.length === 1 ? "" : "er"}
+            Compress {eligible.length} image{eligible.length === 1 ? "" : "s"}
           </DialogTitle>
           <DialogDescription>
-            Auf 633×382 zuschneiden und komprimieren. Die komprimierte Version wird in Supabase gespeichert, das Original wird gelöscht.
+            Crop to 633×382 and compress. The compressed version is saved to Supabase; the original is deleted.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-2">
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-bold uppercase tracking-wider text-muted-foreground">Zielgröße</span>
+              <span className="font-bold uppercase tracking-wider text-muted-foreground">Target size</span>
               <span className="font-display text-lg text-primary">{targetKB} KB</span>
             </div>
             <Slider value={[targetKB]} min={10} max={500} step={1}
@@ -132,31 +130,31 @@ export function CompressDialog({
             <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)} disabled={running}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="webp">WebP (empfohlen)</SelectItem>
+                <SelectItem value="webp">WebP (recommended)</SelectItem>
                 <SelectItem value="avif">AVIF</SelectItem>
                 <SelectItem value="jpeg">JPG</SelectItem>
-                <SelectItem value="png">PNG (verlustfrei)</SelectItem>
+                <SelectItem value="png">PNG (lossless)</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
-            Ausgabe: <span className="text-foreground">633 × 382 px</span> · Cover-Fill, zentriert zugeschnitten.
-            Geeignet: <span className="text-foreground">{eligible.length}</span> von {images.length} ausgewählt.
+            Output: <span className="text-foreground">633 × 382 px</span> · cover fill, center crop.
+            Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
           </div>
           {running && (
             <div className="text-sm text-primary">
-              Verarbeite {progress} / {eligible.length}…
+              Processing {progress} / {eligible.length}…
             </div>
           )}
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={running}>Abbrechen</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={running}>Cancel</Button>
           <Button onClick={run} disabled={running || eligible.length === 0}
             className="bg-primary text-primary-foreground hover:bg-primary/90">
             {running
-              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Komprimiere</>
-              : "Jetzt komprimieren"}
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Compressing</>
+              : "Compress now"}
           </Button>
         </DialogFooter>
       </DialogContent>

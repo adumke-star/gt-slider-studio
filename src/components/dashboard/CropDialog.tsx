@@ -46,7 +46,7 @@ export function CropDialog({
 
   async function save() {
     if (!croppedAreaPixels || !mediaSize) {
-      toast.error("Crop-Bereich noch nicht bereit — bitte kurz warten oder das Bild leicht verschieben.");
+      toast.error("Crop area not ready — wait a moment or move the image slightly.");
       return;
     }
     setSaving(true);
@@ -66,25 +66,25 @@ export function CropDialog({
       if (error) {
         if (error.message.includes("crop_x") && error.message.includes("does not exist")) {
           toast.error(
-            "Crop-Spalten fehlen in der Datenbank. Bitte die Supabase-Migration ausführen (crop_x, crop_y auf slider_images).",
+            "Crop columns are missing in the database. Please run the Supabase migration (crop_x, crop_y on slider_images).",
             { duration: 8000 },
           );
         } else {
-          toast.error(`Crop konnte nicht gespeichert werden: ${error.message}`);
+          toast.error(`Could not save crop: ${error.message}`);
         }
         return;
       }
       if (!data) {
-        toast.error("Crop konnte nicht gespeichert werden — keine Berechtigung oder Bild nicht gefunden.");
+        toast.error("Could not save crop — no permission or image not found.");
         return;
       }
 
-      toast.success("Zuschnitt gespeichert");
+      toast.success("Crop saved");
       onSaved(focal);
       onOpenChange(false);
     } catch (e) {
       console.error(e);
-      toast.error("Crop konnte nicht gespeichert werden");
+      toast.error("Could not save crop");
     } finally {
       setSaving(false);
     }
@@ -94,9 +94,9 @@ export function CropDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-surface-2 sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Zuschnitt für 633×382 festlegen</DialogTitle>
+          <DialogTitle className="font-display text-xl">Set crop for 633×382</DialogTitle>
           <DialogDescription>
-            Verschiebe und zoome das Bild. Nach dem Komprimieren ist der Zuschnitt endgültig.
+            Pan and zoom the image. The crop is final after compression.
           </DialogDescription>
         </DialogHeader>
         <div className="relative h-[min(50vh,320px)] w-full overflow-hidden rounded-md bg-background">
@@ -126,14 +126,14 @@ export function CropDialog({
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Abbrechen
+            Cancel
           </Button>
           <Button
             onClick={save}
             disabled={saving || !croppedAreaPixels || !mediaSize}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Speichern…</> : "Zuschnitt speichern"}
+            {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : "Save crop"}
           </Button>
         </DialogFooter>
       </DialogContent>

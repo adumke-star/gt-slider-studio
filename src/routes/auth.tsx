@@ -37,20 +37,20 @@ function AuthPage() {
 
   function translateError(msg: string): string {
     const lower = msg.toLowerCase();
-    if (lower.includes("nicht freigeschaltet") || msg.includes("42501")) {
-      return "Diese E-Mail-Adresse ist nicht freigeschaltet. Bitte beim Admin melden.";
+    if (lower.includes("nicht freigeschaltet") || lower.includes("not allowlisted") || msg.includes("42501")) {
+      return "This email address is not allowlisted. Please contact an admin.";
     }
     if (lower.includes("invalid login credentials")) {
-      return "E-Mail oder Passwort ist falsch.";
+      return "Incorrect email or password.";
     }
     if (lower.includes("user already registered")) {
-      return "Es existiert bereits ein Konto mit dieser E-Mail. Bitte anmelden oder Passwort zurücksetzen.";
+      return "An account with this email already exists. Please sign in or reset your password.";
     }
     if (lower.includes("password should be")) {
-      return "Das Passwort muss mindestens 6 Zeichen lang sein.";
+      return "Password must be at least 6 characters.";
     }
     if (lower.includes("pwned") || lower.includes("compromised")) {
-      return "Dieses Passwort wurde in Datenleaks gefunden. Bitte ein anderes wählen.";
+      return "This password was found in a data breach. Please choose a different one.";
     }
     return msg;
   }
@@ -80,7 +80,7 @@ function AuthPage() {
         }
       }
     } catch (e) {
-      setError(e instanceof Error ? translateError(e.message) : "Anmeldung fehlgeschlagen.");
+      setError(e instanceof Error ? translateError(e.message) : "Sign-in failed.");
       setLoading(false);
     }
   }
@@ -97,10 +97,10 @@ function AuthPage() {
       if (err) {
         setError(translateError(err.message));
       } else {
-        setInfo("Wenn ein Konto mit dieser E-Mail existiert, wurde ein Link zum Zurücksetzen verschickt.");
+        setInfo("If an account exists for this email, a reset link has been sent.");
       }
     } catch (e) {
-      setError(e instanceof Error ? translateError(e.message) : "Anfrage fehlgeschlagen.");
+      setError(e instanceof Error ? translateError(e.message) : "Request failed.");
     } finally {
       setLoading(false);
     }
@@ -122,30 +122,30 @@ function AuthPage() {
         </div>
 
         <p className="mb-6 text-sm text-muted-foreground">
-          Zugriff haben nur freigeschaltete Mitarbeiter.
+          Access is limited to allowlisted team members.
         </p>
 
         <Tabs value={mode} onValueChange={(v) => { setMode(v as "signin" | "signup"); setError(null); setInfo(null); setShowReset(false); }}>
 
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="signin">Anmelden</TabsTrigger>
-            <TabsTrigger value="signup">Registrieren</TabsTrigger>
+            <TabsTrigger value="signin">Sign in</TabsTrigger>
+            <TabsTrigger value="signup">Sign up</TabsTrigger>
           </TabsList>
 
           <TabsContent value="signin" className="mt-4">
             {showReset ? (
               <form onSubmit={handlePasswordReset} className="space-y-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="reset-email">E-Mail</Label>
+                  <Label htmlFor="reset-email">Email</Label>
                   <Input id="reset-email" type="email" autoComplete="email" required
                     value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
                 <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? "Sende Link …" : "Link zum Zurücksetzen senden"}
+                  {loading ? "Sending link…" : "Send reset link"}
                 </Button>
                 <button type="button" className="w-full text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => { setShowReset(false); setError(null); setInfo(null); }}>
-                  Zurück zur Anmeldung
+                  Back to sign in
                 </button>
               </form>
             ) : (
@@ -155,11 +155,11 @@ function AuthPage() {
                   password={password} setPassword={setPassword}
                 />
                 <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? "Anmelden …" : "Anmelden"}
+                  {loading ? "Signing in…" : "Sign in"}
                 </Button>
                 <button type="button" className="w-full text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => { setShowReset(true); setError(null); setInfo(null); }}>
-                  Passwort vergessen?
+                  Forgot password?
                 </button>
               </form>
             )}
@@ -173,7 +173,7 @@ function AuthPage() {
                 minLength={8}
               />
               <Button type="submit" disabled={loading} className="w-full">
-                {loading ? "Konto wird erstellt …" : "Konto erstellen"}
+                {loading ? "Creating account…" : "Create account"}
               </Button>
             </form>
           </TabsContent>
@@ -206,12 +206,12 @@ function EmailPasswordFields({
   return (
     <>
       <div className="space-y-1.5">
-        <Label htmlFor="email">E-Mail</Label>
+        <Label htmlFor="email">Email</Label>
         <Input id="email" type="email" autoComplete="email" required
           value={email} onChange={(e) => setEmail(e.target.value)} />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="password">Passwort</Label>
+        <Label htmlFor="password">Password</Label>
         <Input id="password" type="password" autoComplete="current-password" required
           minLength={minLength}
           value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -219,4 +219,3 @@ function EmailPasswordFields({
     </>
   );
 }
-

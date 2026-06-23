@@ -378,7 +378,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "member" | "editor"
+      app_role: "admin" | "member" | "editor" | "viewer"
       image_status: "live" | "image_done" | "todo" | "blank" | "changes" | "exported"
       race_series: "f1" | "motogp" | "dtm" | "wsbk"
       slider_area: "plp" | "pdp"
@@ -509,7 +509,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "member", "editor"],
+      app_role: ["admin", "member", "editor", "viewer"],
       image_status: ["live", "image_done", "todo", "blank", "changes", "exported"],
       race_series: ["f1", "motogp", "dtm", "wsbk"],
       slider_area: ["plp", "pdp"],

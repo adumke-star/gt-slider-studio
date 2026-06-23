@@ -58,18 +58,18 @@ export function UserMenu() {
           <>
             <DropdownMenuItem asChild>
               <Link to="/admin" className="flex w-full items-center gap-2">
-                <Settings className="h-4 w-4" /> Allowlist verwalten
+                <Settings className="h-4 w-4" /> Manage allowlist
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to="/audit" className="flex w-full items-center gap-2">
-                <Settings className="h-4 w-4" /> Änderungs-Verlauf
+                <Settings className="h-4 w-4" /> Change history
               </Link>
             </DropdownMenuItem>
           </>
         )}
         <DropdownMenuItem onClick={signOut} className="gap-2">
-          <LogOut className="h-4 w-4" /> Abmelden
+          <LogOut className="h-4 w-4" /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

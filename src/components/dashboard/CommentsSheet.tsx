@@ -271,14 +271,14 @@ export function CommentsSheet({
                 }
               }}
               rows={2}
-              placeholder="Kommentar schreiben… nutze @ um jemanden zu markieren"
+              placeholder="Write a comment… use @ to mention someone"
               className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
             />
             <Button onClick={submit} disabled={!body.trim()} className="self-end gap-1">
               <Send className="h-3.5 w-3.5" />
             </Button>
           </div>
-          <p className="mt-1 text-[10px] text-muted-foreground">⌘/Ctrl + Enter zum Senden</p>
+          <p className="mt-1 text-[10px] text-muted-foreground">⌘/Ctrl + Enter to send</p>
         </div>
       </SheetContent>
     </Sheet>

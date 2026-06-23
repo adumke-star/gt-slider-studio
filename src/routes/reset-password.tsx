@@ -9,7 +9,7 @@ import logoUrl from "@/assets/global-tickets-logo.png";
 
 export const Route = createFileRoute("/reset-password")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Passwort zurücksetzen — Slider Studio" }] }),
+  head: () => ({ meta: [{ title: "Reset password — Slider Studio" }] }),
   component: ResetPasswordPage,
 });
 
@@ -38,11 +38,11 @@ function ResetPasswordPage() {
     e.preventDefault();
     setError(null);
     if (password.length < 8) {
-      setError("Das Passwort muss mindestens 8 Zeichen lang sein.");
+      setError("Password must be at least 8 characters.");
       return;
     }
     if (password !== confirm) {
-      setError("Die Passwörter stimmen nicht überein.");
+      setError("Passwords do not match.");
       return;
     }
     setLoading(true);
@@ -63,36 +63,36 @@ function ResetPasswordPage() {
           <img src={logoUrl} alt="Global Tickets" className="h-9 w-auto" />
           <div>
             <h1 className="font-display text-lg font-black uppercase leading-none">
-              Neues <span className="text-primary">Passwort</span>
+              New <span className="text-primary">password</span>
             </h1>
             <p className="mt-0.5 text-[11px] uppercase tracking-widest text-muted-foreground">
-              Zurücksetzen
+              Reset
             </p>
           </div>
         </div>
 
         {!ready ? (
           <p className="text-sm text-muted-foreground">
-            Link wird geprüft … Bitte öffne diese Seite über den Link in deiner E-Mail.
+            Verifying link… Please open this page from the link in your email.
           </p>
         ) : success ? (
           <p className="text-sm text-muted-foreground">
-            Passwort aktualisiert. Du wirst weitergeleitet …
+            Password updated. Redirecting…
           </p>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="password">Neues Passwort</Label>
+              <Label htmlFor="password">New password</Label>
               <Input id="password" type="password" autoComplete="new-password" required minLength={8}
                 value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="confirm">Passwort bestätigen</Label>
+              <Label htmlFor="confirm">Confirm password</Label>
               <Input id="confirm" type="password" autoComplete="new-password" required minLength={8}
                 value={confirm} onChange={(e) => setConfirm(e.target.value)} />
             </div>
             <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Speichern …" : "Passwort speichern"}
+              {loading ? "Saving…" : "Save password"}
             </Button>
             {error && (
               <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">

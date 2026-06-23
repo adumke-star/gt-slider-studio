@@ -26,6 +26,8 @@ import { RaceNav, type NavSelection, type RaceFlags } from "@/components/dashboa
 import { RaceListView } from "@/components/dashboard/RaceListView";
 import { OverviewDashboard } from "@/components/dashboard/OverviewDashboard";
 import logoUrl from "@/assets/global-tickets-logo.png";
+import { useAppRole } from "@/hooks/useAppRole";
+import { ROLE_LABELS } from "@/lib/roles";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -65,6 +67,8 @@ function Dashboard() {
   const [deletingRace, setDeletingRace] = useState(false);
   const [selection, setSelection] = useState<NavSelection>({ kind: "overview" });
   const [loading, setLoading] = useState(true);
+  const { canEdit, role: appRole, loading: roleLoading } = useAppRole();
+  const showEditUI = !roleLoading && canEdit;
 
   const bundleRef = useRef(bundleByRace);
   bundleRef.current = bundleByRace;
@@ -205,11 +209,11 @@ function Dashboard() {
       const raceIds = new Set(selectedImgs.map((i) => i.race_id));
       setSelected(new Set());
       await Promise.all([loadFlags(), ...Array.from(raceIds).map((id) => loadRace(id))]);
-      toast.success(`${selectedImgs.length} Slot${selectedImgs.length === 1 ? "" : "s"} gelöscht`);
+      toast.success(`${selectedImgs.length} slot${selectedImgs.length === 1 ? "" : "s"} deleted`);
       setDeleteOpen(false);
     } catch (e) {
       console.error(e);
-      toast.error("Löschen fehlgeschlagen");
+      toast.error("Delete failed");
     } finally {
       setDeleting(false);
     }
@@ -233,7 +237,7 @@ function Dashboard() {
       const { error } = await supabase.from("races").delete().eq("id", id);
       if (error) {
         console.error("delete race failed", error);
-        toast.error(`Rennen konnte nicht gelöscht werden: ${error.message}`);
+        toast.error(`Could not delete race: ${error.message}`);
         return;
       }
 
@@ -247,11 +251,11 @@ function Dashboard() {
         setSelection({ kind: "overview" });
       }
       await Promise.all([loadRaces(), loadFlags()]);
-      toast.success(`Rennen „${name}" gelöscht`);
+      toast.success(`Race "${name}" deleted`);
       setRaceToDelete(null);
     } catch (e) {
       console.error(e);
-      toast.error("Rennen konnte nicht gelöscht werden");
+      toast.error("Could not delete race");
     } finally {
       setDeletingRace(false);
     }
@@ -269,7 +273,7 @@ function Dashboard() {
           <button
             onClick={() => onSelectNav({ kind: "overview" })}
             className="flex items-center gap-3 text-left outline-none"
-            title="Zur Übersicht"
+            title="Back to overview"
           >
             <img src={logoUrl} alt="Global Tickets" className="h-9 w-auto" />
             <div className="min-w-0">
@@ -277,51 +281,57 @@ function Dashboard() {
                 Slider <span className="text-primary">Studio</span>
               </h1>
               <p className="mt-0.5 text-[11px] uppercase tracking-widest text-muted-foreground">
-                WEB-READY ASSETS
+                {appRole && !canEdit ? `${ROLE_LABELS.viewer} mode` : "WEB-READY ASSETS"}
               </p>
             </div>
           </button>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <RaceNav races={races} flagsByRace={flagsByRace} selection={selection} onSelect={onSelectNav} />
-            <Button onClick={() => setAddOpen(true)} variant="outline" className="gap-1.5">
-              <Plus className="h-4 w-4" /> Race
-            </Button>
-            <Button
-              onClick={() => {
-                if (selectedImgs.length === 0) return;
-                setDeleteOpen(true);
-              }}
-              disabled={selected.size === 0}
-              variant="outline"
-              className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete {selected.size > 0 && <span className="rounded bg-destructive/20 px-1.5 text-xs">{selected.size}</span>}
-            </Button>
+            {showEditUI && (
+              <Button onClick={() => setAddOpen(true)} variant="outline" className="gap-1.5">
+                <Plus className="h-4 w-4" /> Race
+              </Button>
+            )}
+            {showEditUI && (
+              <Button
+                onClick={() => {
+                  if (selectedImgs.length === 0) return;
+                  setDeleteOpen(true);
+                }}
+                disabled={selected.size === 0}
+                variant="outline"
+                className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete {selected.size > 0 && <span className="rounded bg-destructive/20 px-1.5 text-xs">{selected.size}</span>}
+              </Button>
+            )}
 
-            <Button
-              onClick={() => {
-                const imgs = selectedImgs.filter((i) => i.original_path);
-                if (imgs.length === 0) {
-                  toast.error("Keine unkomprimierten Bilder ausgewählt.");
-                  return;
-                }
-                setCompressImages(imgs);
-                setCompressOpen(true);
-              }}
-              disabled={selected.size === 0}
-              variant="outline"
-              className="gap-1.5 disabled:opacity-40"
-            >
-              <Wand2 className="h-4 w-4" />
-              Compress {selected.size > 0 && <span className="rounded bg-foreground/10 px-1.5 text-xs">{selected.size}</span>}
-            </Button>
+            {showEditUI && (
+              <Button
+                onClick={() => {
+                  const imgs = selectedImgs.filter((i) => i.original_path);
+                  if (imgs.length === 0) {
+                    toast.error("No uncompressed images selected.");
+                    return;
+                  }
+                  setCompressImages(imgs);
+                  setCompressOpen(true);
+                }}
+                disabled={selected.size === 0}
+                variant="outline"
+                className="gap-1.5 disabled:opacity-40"
+              >
+                <Wand2 className="h-4 w-4" />
+                Compress {selected.size > 0 && <span className="rounded bg-foreground/10 px-1.5 text-xs">{selected.size}</span>}
+              </Button>
+            )}
             <Button
               onClick={() => {
                 const imgs = selectedImgs.filter((i) => i.compressed_path);
                 if (imgs.length === 0) {
-                  toast.error("Keine komprimierten Bilder ausgewählt. Bitte zuerst komprimieren.");
+                  toast.error("No compressed images selected. Please compress first.");
                   return;
                 }
                 setExportImages(imgs);
@@ -354,15 +364,18 @@ function Dashboard() {
             <div>
               <h2 className="font-display text-2xl uppercase">No races yet</h2>
               <p className="mt-2 text-sm text-muted-foreground">Add your first race to start managing slider images.</p>
-              <Button onClick={() => setAddOpen(true)} className="mt-4 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
-                <Plus className="h-4 w-4" /> New race
-              </Button>
+              {showEditUI && (
+                <Button onClick={() => setAddOpen(true)} className="mt-4 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Plus className="h-4 w-4" /> New race
+                </Button>
+              )}
             </div>
           </div>
         ) : selection.kind === "overview" ? (
           <OverviewDashboard
             races={races}
             flagsByRace={flagsByRace}
+            canEdit={showEditUI}
             onOpenRace={(raceId) => onSelectNav({ kind: "race", raceId })}
             onOpenSeries={(series) => onSelectNav({ kind: "series", series })}
             onRequestDeleteRace={(race) => setRaceToDelete({ id: race.id, name: race.name })}
@@ -370,7 +383,7 @@ function Dashboard() {
         ) : selection.kind === "series" ? (
           visibleRaces.length === 0 ? (
             <div className="grid h-[30vh] place-items-center rounded-lg border border-dashed border-border bg-surface-2/40 text-center text-sm text-muted-foreground">
-              Keine Rennen in dieser Serie.
+              No races in this series.
             </div>
           ) : (
             <RaceListView
@@ -400,6 +413,7 @@ function Dashboard() {
                 sections={bundle.sections}
                 images={bundle.images}
                 selected={selected}
+                canEdit={showEditUI}
                 onToggleSelect={toggle}
                 onReload={() => {
                   loadRace(race.id);
@@ -445,20 +459,20 @@ function Dashboard() {
         <AlertDialogContent className="bg-surface-2">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display text-xl">
-              {selectedImgs.length} Slot{selectedImgs.length === 1 ? "" : "s"} wirklich löschen?
+              Delete {selectedImgs.length} slot{selectedImgs.length === 1 ? "" : "s"}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Die ausgewählten Slots werden dauerhaft entfernt – inklusive der zugehörigen Original- und komprimierten Bilder. Dieser Vorgang kann nicht rückgängig gemacht werden.
+              The selected slots will be permanently removed, including their original and compressed images. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); performDelete(); }}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? "Lösche…" : "Endgültig löschen"}
+              {deleting ? "Deleting…" : "Delete permanently"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -467,20 +481,20 @@ function Dashboard() {
         <AlertDialogContent className="bg-surface-2">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display text-xl">
-              Rennen „{raceToDelete?.name}" löschen?
+              Delete race "{raceToDelete?.name}"?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Das Rennen wird mit allen Sektionen, Bild-Slots und gespeicherten Dateien dauerhaft entfernt. Dieser Vorgang kann nicht rückgängig gemacht werden.
+              The race will be permanently removed along with all sections, image slots, and stored files. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingRace}>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel disabled={deletingRace}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); performDeleteRace(); }}
               disabled={deletingRace}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deletingRace ? "Lösche…" : "Rennen löschen"}
+              {deletingRace ? "Deleting…" : "Delete race"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
