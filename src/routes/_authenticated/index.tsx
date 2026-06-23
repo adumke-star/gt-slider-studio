@@ -21,6 +21,7 @@ import { ExportDialog } from "@/components/dashboard/ExportDialog";
 import { CompressDialog } from "@/components/dashboard/CompressDialog";
 import type { SliderImage } from "@/components/dashboard/ImageCell";
 import { dataTransferHasFiles } from "@/lib/dropFiles";
+import { isCompressEligible } from "@/lib/compressImage";
 import { UserMenu } from "@/components/dashboard/UserMenu";
 import { RaceNav, type NavSelection, type RaceFlags } from "@/components/dashboard/RaceNav";
 import { RaceListView } from "@/components/dashboard/RaceListView";
@@ -311,9 +312,9 @@ function Dashboard() {
             {showEditUI && (
               <Button
                 onClick={() => {
-                  const imgs = selectedImgs.filter((i) => i.original_path);
+                  const imgs = selectedImgs.filter(isCompressEligible);
                   if (imgs.length === 0) {
-                    toast.error("No uncompressed images selected.");
+                    toast.error("No compressible images selected.");
                     return;
                   }
                   setCompressImages(imgs);
@@ -438,7 +439,7 @@ function Dashboard() {
       <CompressDialog
         open={compressOpen}
         onOpenChange={(v) => { setCompressOpen(v); if (!v) setCompressImages(null); }}
-        images={compressImages ?? selectedImgs.filter((i) => i.original_path)}
+        images={compressImages ?? selectedImgs.filter(isCompressEligible)}
         onDone={async () => {
           setCompressImages(null);
           await loadFlags();

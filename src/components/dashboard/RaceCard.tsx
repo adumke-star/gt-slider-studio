@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ImageCell, type SliderImage } from "./ImageCell";
 import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
+import { isCompressEligible } from "@/lib/compressImage";
 
 type Race = {
   id: string;
@@ -691,8 +692,8 @@ function SectionBlock({
           )}
           {canEdit && (
             <Button size="sm" variant="ghost"
-              disabled={images.filter((i) => i.original_path).length === 0}
-              onClick={() => onCompress(images.filter((i) => i.original_path))}
+              disabled={images.filter(isCompressEligible).length === 0}
+              onClick={() => onCompress(images.filter(isCompressEligible))}
               className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-40"
               title={`Compress ${section.kind.toUpperCase()} images`}>
               <Wand2 className="h-3.5 w-3.5" /> Compress

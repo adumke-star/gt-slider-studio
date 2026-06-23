@@ -8,6 +8,7 @@ import { CommentsSheet } from "./CommentsSheet";
 import { CropDialog } from "./CropDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { hasCustomCrop, objectPositionFromFocal, resolveFocal, type FocalPoint } from "@/lib/cropUtils";
+import { isCompressEligible } from "@/lib/compressImage";
 
 export type SliderImage = {
   id: string;
@@ -370,7 +371,7 @@ export function ImageCell({
               <Crop className="h-3.5 w-3.5" />
             </button>
           )}
-          {canEdit && image.original_path && onCompress && (
+          {canEdit && isCompressEligible(image) && onCompress && (
             <button
               onClick={onCompress}
               title="Compress image"

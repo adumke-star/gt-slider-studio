@@ -7,9 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { transformImage, extForFormat, type ExportFormat } from "@/lib/imageProcess";
 import { resolveFocal } from "@/lib/cropUtils";
-import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
+import { uploadFile, removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchCompressSource, isCompressEligible } from "@/lib/compressImage";
 import type { SliderImage } from "./ImageCell";
+
+function imageLabel(img: SliderImage): string {
+  return img.title?.trim() || `Image ${img.id.slice(0, 6)}`;
+}
 
 export function CompressDialog({
   open,
@@ -27,7 +32,7 @@ export function CompressDialog({
   const [progress, setProgress] = useState(0);
   const [running, setRunning] = useState(false);
 
-  const eligible = images.filter((i) => i.original_path);
+  const eligible = images.filter(isCompressEligible);
 
   async function run() {
     setRunning(true);
@@ -36,25 +41,30 @@ export function CompressDialog({
     let done = 0;
     let ok = 0;
     let skipped = 0;
+    let failed = 0;
 
     for (const img of eligible) {
-      const label = img.title?.trim() || `Image ${img.id.slice(0, 6)}`;
+      const label = imageLabel(img);
       try {
-        const origUrl = await signedUrl("originals", img.original_path!);
-        if (!origUrl) continue;
-        const blob = await (await fetch(origUrl)).blob();
-        const result = await transformImage(blob, {
+        const source = await fetchCompressSource(img);
+        if (!source) {
+          toast.error(`${label}: image file not found in storage. Try re-uploading.`, { duration: 7000 });
+          failed++;
+          continue;
+        }
+
+        const result = await transformImage(source.blob, {
           format,
           targetKB,
           width: 633,
           height: 382,
-          focalPoint: resolveFocal(img.crop_x, img.crop_y),
+          focalPoint: source.from === "originals" ? resolveFocal(img.crop_x, img.crop_y) : undefined,
         });
         const { blob: out, mime, sizeKB, overTarget, downscaled } = result;
 
         if (overTarget) {
           toast.error(
-            `${label} could not reach ${targetKB} KB (${sizeKB} KB) — not saved. Original kept.`,
+            `${label} could not reach ${targetKB} KB (${sizeKB} KB) — not saved.`,
             { duration: 7000 },
           );
           skipped++;
@@ -62,16 +72,15 @@ export function CompressDialog({
         }
 
         if (downscaled) toast.info(`${label}: resolution reduced to reach ${targetKB} KB.`);
+
         const folder = img.section_id ?? img.area;
         const outPath = `${img.race_id}/${folder}/${img.id}.${ext}`;
+        const prevOriginalPath = img.original_path;
+        const prevCompressedPath = img.compressed_path;
+
         await uploadFile("compressed", outPath, out, mime);
-        const origPath = img.original_path!;
-        try {
-          await removeFile("originals", origPath);
-        } catch (e) {
-          console.warn("failed to delete original after compression", origPath, e);
-        }
-        await supabase.from("slider_images").update({
+
+        const { error: dbError } = await supabase.from("slider_images").update({
           compressed_path: outPath,
           compressed_size_kb: sizeKB,
           format,
@@ -79,10 +88,39 @@ export function CompressDialog({
           original_size_kb: null,
           status: img.status === "live" ? "live" : "image_done",
         }).eq("id", img.id);
+
+        if (dbError) {
+          console.error("compress DB update failed for", img.id, dbError);
+          try {
+            await removeFile("compressed", outPath);
+          } catch (e) {
+            console.warn("failed to roll back compressed upload", outPath, e);
+          }
+          toast.error(`${label}: could not save — ${dbError.message}`);
+          failed++;
+          continue;
+        }
+
+        if (prevOriginalPath) {
+          try {
+            await removeFile("originals", prevOriginalPath);
+          } catch (e) {
+            console.warn("failed to delete original after compression", prevOriginalPath, e);
+          }
+        }
+        if (prevCompressedPath && prevCompressedPath !== outPath) {
+          try {
+            await removeFile("compressed", prevCompressedPath);
+          } catch (e) {
+            console.warn("failed to delete previous compressed file", prevCompressedPath, e);
+          }
+        }
+
         ok++;
       } catch (e) {
         console.error("compress failed for", img.id, e);
         toast.error(`Compression failed for ${label}`);
+        failed++;
       } finally {
         done++;
         setProgress(done);
@@ -96,10 +134,18 @@ export function CompressDialog({
         { duration: 7000 },
       );
     }
+    if (failed > 0) {
+      toast.error(`${failed} image${failed === 1 ? "" : "s"} failed. Adjust settings and try again.`, {
+        duration: 7000,
+      });
+    }
 
     setRunning(false);
-    onDone();
-    onOpenChange(false);
+
+    if (ok > 0) {
+      onDone();
+      onOpenChange(false);
+    }
   }
 
   return (
@@ -110,7 +156,8 @@ export function CompressDialog({
             Compress {eligible.length} image{eligible.length === 1 ? "" : "s"}
           </DialogTitle>
           <DialogDescription>
-            Crop to 633×382 and compress. The compressed version is saved to Supabase; the original is deleted.
+            Crop to 633×382 and compress. Uses the original when available; otherwise re-compresses the existing web image.
+            The original is deleted after a successful run.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-2">
