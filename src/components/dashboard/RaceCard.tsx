@@ -36,6 +36,7 @@ export function RaceCard({
   onReload,
   onExport,
   onCompress,
+  onRequestDeleteRace,
 }: {
   race: Race;
   sections: SliderSection[];
@@ -45,6 +46,7 @@ export function RaceCard({
   onReload: () => void;
   onExport: (images: SliderImage[]) => void;
   onCompress: (images: SliderImage[]) => void;
+  onRequestDeleteRace: (race: Race) => void;
 }) {
   const [open, setOpen] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -186,7 +188,7 @@ export function RaceCard({
         await uploadFile("originals", path, file, file.type);
         await supabase.from("slider_images").update({
           original_path: path,
-          original_size_kb: Math.round(file.size / 1024),
+          original_size_kb: Math.round(file.size / 1000),
         }).eq("id", row.id);
         items[i].status = "done";
       } catch (e: any) {
@@ -196,12 +198,6 @@ export function RaceCard({
       }
       onProgress?.(items.slice());
     }
-    onReload();
-  }
-
-  async function deleteRace() {
-    if (!confirm(`Delete race "${race.name}" and all its images?`)) return;
-    await supabase.from("races").delete().eq("id", race.id);
     onReload();
   }
 
@@ -286,7 +282,7 @@ export function RaceCard({
             <Plus className="h-3.5 w-3.5" /> PDP
           </Button>
           <button
-            onClick={deleteRace}
+            onClick={() => onRequestDeleteRace(race)}
             className="rounded p-2 text-muted-foreground hover:bg-background hover:text-destructive"
             title="Delete race"
           >

@@ -32,6 +32,9 @@ export interface TransformResult {
 const DEFAULT_W = SLIDER_OUTPUT_WIDTH;
 const DEFAULT_H = SLIDER_OUTPUT_HEIGHT;
 
+// Decimal kB to match the size shown by the macOS Finder (1 KB = 1000 bytes).
+const BYTES_PER_KB = 1000;
+
 export async function fileToImage(file: Blob): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(file);
   try {
@@ -106,7 +109,7 @@ export async function transformImage(
     let canvas = drawCover(img, baseW, baseH, focal);
     let blob = await canvasToBlob(canvas, mime);
     if (target > 0) {
-      while (blob.size / 1024 > target && scale > 0.35) {
+      while (blob.size / BYTES_PER_KB > target && scale > 0.2) {
         scale *= 0.85;
         canvas = drawCover(img, Math.round(baseW * scale), Math.round(baseH * scale), focal);
         blob = await canvasToBlob(canvas, mime);
@@ -114,9 +117,9 @@ export async function transformImage(
     }
     return {
       blob, mime,
-      sizeKB: Math.round(blob.size / 1024),
+      sizeKB: Math.round(blob.size / BYTES_PER_KB),
       width: canvas.width, height: canvas.height,
-      overTarget: target > 0 && blob.size / 1024 > target,
+      overTarget: target > 0 && blob.size / BYTES_PER_KB > target,
       downscaled: scale < 1,
     };
   }
@@ -136,7 +139,7 @@ export async function transformImage(
     blob = await canvasToBlob(canvas, mime, q);
     // 10 iterations binary search → ~0.001 precision
     for (let i = 0; i < 10; i++) {
-      const kb = blob.size / 1024;
+      const kb = blob.size / BYTES_PER_KB;
       if (kb <= target && target - kb < target * 0.05) break; // close enough under
       if (kb > target) hi = q;
       else lo = q;
@@ -144,7 +147,7 @@ export async function transformImage(
       blob = await canvasToBlob(canvas, mime, q);
     }
     // Final pass: if still above, push quality to lo bound.
-    if (blob.size / 1024 > target) {
+    if (blob.size / BYTES_PER_KB > target) {
       q = lo;
       blob = await canvasToBlob(canvas, mime, q);
     }
@@ -153,7 +156,7 @@ export async function transformImage(
   await fitQualityUnderTarget();
 
   // Still too big at minimum quality → reduce resolution iteratively.
-  while (target > 0 && blob.size / 1024 > target && scale > 0.35) {
+  while (target > 0 && blob.size / BYTES_PER_KB > target && scale > 0.2) {
     scale *= 0.85;
     downscaled = true;
     canvas = drawCover(img, Math.round(baseW * scale), Math.round(baseH * scale), focal);
@@ -162,9 +165,9 @@ export async function transformImage(
 
   return {
     blob, mime,
-    sizeKB: Math.round(blob.size / 1024),
+    sizeKB: Math.round(blob.size / BYTES_PER_KB),
     width: canvas.width, height: canvas.height,
-    overTarget: target > 0 && blob.size / 1024 > target,
+    overTarget: target > 0 && blob.size / BYTES_PER_KB > target,
     downscaled,
   };
 }

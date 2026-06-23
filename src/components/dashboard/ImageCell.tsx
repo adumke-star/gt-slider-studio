@@ -123,7 +123,7 @@ export function ImageCell({
       if (image.original_path) await removeFile("originals", image.original_path);
       await supabase.from("slider_images").update({
         original_path: path,
-        original_size_kb: Math.round(file.size / 1024),
+        original_size_kb: Math.round(file.size / 1000),
         crop_x: null,
         crop_y: null,
         title: baseName || image.title,

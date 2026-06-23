@@ -35,8 +35,10 @@ export function CompressDialog({
     const ext = extForFormat(format);
     let done = 0;
     let ok = 0;
+    let skipped = 0;
 
     for (const img of eligible) {
+      const label = img.title?.trim() || `Bild ${img.id.slice(0, 6)}`;
       try {
         const origUrl = await signedUrl("originals", img.original_path!);
         if (!origUrl) continue;
@@ -49,8 +51,18 @@ export function CompressDialog({
           focalPoint: resolveFocal(img.crop_x, img.crop_y),
         });
         const { blob: out, mime, sizeKB, overTarget, downscaled } = result;
-        if (overTarget) toast.warning(`Bild ${img.id.slice(0, 6)} bleibt über ${targetKB} KB (${sizeKB} KB).`);
-        else if (downscaled) toast.info(`Bild ${img.id.slice(0, 6)}: Auflösung reduziert, um ${targetKB} KB zu erreichen.`);
+
+        // Harte Grenze: über dem Limit wird NICHT gespeichert, Original bleibt erhalten.
+        if (overTarget) {
+          toast.error(
+            `${label} konnte ${targetKB} KB nicht erreichen (${sizeKB} KB) – nicht gespeichert. Original bleibt erhalten.`,
+            { duration: 7000 },
+          );
+          skipped++;
+          continue;
+        }
+
+        if (downscaled) toast.info(`${label}: Auflösung reduziert, um ${targetKB} KB zu erreichen.`);
         const folder = img.section_id ?? img.area;
         const outPath = `${img.race_id}/${folder}/${img.id}.${ext}`;
         await uploadFile("compressed", outPath, out, mime);
@@ -72,13 +84,20 @@ export function CompressDialog({
         ok++;
       } catch (e) {
         console.error("compress failed for", img.id, e);
-        toast.error(`Komprimierung fehlgeschlagen für Bild ${img.id.slice(0, 6)}`);
+        toast.error(`Komprimierung fehlgeschlagen für ${label}`);
+      } finally {
+        done++;
+        setProgress(done);
       }
-      done++;
-      setProgress(done);
     }
 
     if (ok > 0) toast.success(`${ok} Bild${ok === 1 ? "" : "er"} komprimiert`);
+    if (skipped > 0) {
+      toast.warning(
+        `${skipped} Bild${skipped === 1 ? "" : "er"} über ${targetKB} KB – nicht gespeichert. Versuche ein höheres Limit oder WebP.`,
+        { duration: 7000 },
+      );
+    }
 
     setRunning(false);
     onDone();
@@ -102,10 +121,10 @@ export function CompressDialog({
               <span className="font-bold uppercase tracking-wider text-muted-foreground">Zielgröße</span>
               <span className="font-display text-lg text-primary">{targetKB} KB</span>
             </div>
-            <Slider value={[targetKB]} min={20} max={500} step={10}
+            <Slider value={[targetKB]} min={10} max={500} step={1}
               onValueChange={([v]) => setTargetKB(v)} disabled={running} />
             <div className="flex justify-between text-[10px] text-muted-foreground">
-              <span>20 KB</span><span>500 KB</span>
+              <span>10 KB</span><span>500 KB</span>
             </div>
           </div>
           <div className="space-y-2">

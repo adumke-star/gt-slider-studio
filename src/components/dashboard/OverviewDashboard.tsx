@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, AlertCircle, MessageSquare, Flag, CheckCircle2 } from "lucide-react";
+import { Search, AlertCircle, MessageSquare, Flag, CheckCircle2, Trash2 } from "lucide-react";
 import { SERIES, type Series, type RaceFlags } from "./RaceNav";
 
 export type OverviewRace = {
@@ -16,11 +16,13 @@ export function OverviewDashboard({
   flagsByRace,
   onOpenRace,
   onOpenSeries,
+  onRequestDeleteRace,
 }: {
   races: OverviewRace[];
   flagsByRace: Map<string, RaceFlags>;
   onOpenRace: (raceId: string) => void;
   onOpenSeries: (series: Series) => void;
+  onRequestDeleteRace: (race: OverviewRace) => void;
 }) {
   const [query, setQuery] = useState("");
 
@@ -97,7 +99,7 @@ export function OverviewDashboard({
         ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {attention.map((r) => (
-              <RaceTile key={r.id} race={r} flags={flags(r.id)} onOpen={onOpenRace} />
+              <RaceTile key={r.id} race={r} flags={flags(r.id)} onOpen={onOpenRace} onDelete={onRequestDeleteRace} />
             ))}
           </div>
         )}
@@ -138,7 +140,7 @@ export function OverviewDashboard({
               </button>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {g.races.map((r) => (
-                  <RaceTile key={r.id} race={r} flags={flags(r.id)} onOpen={onOpenRace} />
+                  <RaceTile key={r.id} race={r} flags={flags(r.id)} onOpen={onOpenRace} onDelete={onRequestDeleteRace} />
                 ))}
               </div>
             </div>
@@ -176,27 +178,38 @@ function RaceTile({
   race,
   flags,
   onOpen,
+  onDelete,
 }: {
   race: OverviewRace;
   flags: RaceFlags;
   onOpen: (raceId: string) => void;
+  onDelete: (race: OverviewRace) => void;
 }) {
   return (
-    <button
-      onClick={() => onOpen(race.id)}
-      className="group flex items-center justify-between gap-3 rounded-md border border-border bg-surface-2/60 px-4 py-3 text-left transition hover:border-primary hover:bg-surface-2"
-    >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="truncate font-display text-sm font-bold uppercase tracking-wider">{race.name}</span>
-          {flags.hasChanges && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#CB4F10]" />}
-          {flags.hasOpenComments && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FACC15]" />}
+    <div className="group relative">
+      <button
+        onClick={() => onOpen(race.id)}
+        className="flex w-full items-center justify-between gap-3 rounded-md border border-border bg-surface-2/60 px-4 py-3 pr-12 text-left transition hover:border-primary hover:bg-surface-2"
+      >
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate font-display text-sm font-bold uppercase tracking-wider">{race.name}</span>
+            {flags.hasChanges && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#CB4F10]" />}
+            {flags.hasOpenComments && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FACC15]" />}
+          </div>
+          <div className="mt-0.5 text-[11px] uppercase tracking-widest text-muted-foreground">
+            {SERIES_LABEL.get(race.series) ?? race.series} {race.race_date ? `· ${race.race_date}` : ""}
+          </div>
         </div>
-        <div className="mt-0.5 text-[11px] uppercase tracking-widest text-muted-foreground">
-          {SERIES_LABEL.get(race.series) ?? race.series} {race.race_date ? `· ${race.race_date}` : ""}
-        </div>
-      </div>
-      <span className="shrink-0 text-xs text-muted-foreground group-hover:text-primary">Open →</span>
-    </button>
+        <span className="shrink-0 text-xs text-muted-foreground transition group-hover:opacity-0">Open →</span>
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(race); }}
+        title="Rennen löschen"
+        className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded text-muted-foreground opacity-0 transition hover:bg-background hover:text-destructive focus:opacity-100 group-hover:opacity-100"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
   );
 }

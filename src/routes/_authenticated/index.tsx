@@ -61,6 +61,8 @@ function Dashboard() {
   const [compressImages, setCompressImages] = useState<SliderImage[] | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [raceToDelete, setRaceToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deletingRace, setDeletingRace] = useState(false);
   const [selection, setSelection] = useState<NavSelection>({ kind: "overview" });
   const [loading, setLoading] = useState(true);
 
@@ -213,6 +215,48 @@ function Dashboard() {
     }
   }
 
+  async function performDeleteRace() {
+    if (!raceToDelete) return;
+    const { id, name } = raceToDelete;
+    setDeletingRace(true);
+    try {
+      // Collect storage paths first (DB cascade removes the rows, not the files).
+      const { data: imgs } = await supabase
+        .from("slider_images")
+        .select("original_path, compressed_path")
+        .eq("race_id", id);
+      await Promise.all((imgs ?? []).flatMap((img) => [
+        img.original_path ? removeFile("originals", img.original_path).catch(() => {}) : Promise.resolve(),
+        img.compressed_path ? removeFile("compressed", img.compressed_path).catch(() => {}) : Promise.resolve(),
+      ]));
+
+      const { error } = await supabase.from("races").delete().eq("id", id);
+      if (error) {
+        console.error("delete race failed", error);
+        toast.error(`Rennen konnte nicht gelöscht werden: ${error.message}`);
+        return;
+      }
+
+      setBundleByRace((prev) => {
+        const n = new Map(prev);
+        n.delete(id);
+        return n;
+      });
+      setSelected(new Set());
+      if (selection.kind === "race" && selection.raceId === id) {
+        setSelection({ kind: "overview" });
+      }
+      await Promise.all([loadRaces(), loadFlags()]);
+      toast.success(`Rennen „${name}" gelöscht`);
+      setRaceToDelete(null);
+    } catch (e) {
+      console.error(e);
+      toast.error("Rennen konnte nicht gelöscht werden");
+    } finally {
+      setDeletingRace(false);
+    }
+  }
+
   const onSelectNav = (sel: NavSelection) => {
     setSelected(new Set());
     setSelection(sel);
@@ -321,6 +365,7 @@ function Dashboard() {
             flagsByRace={flagsByRace}
             onOpenRace={(raceId) => onSelectNav({ kind: "race", raceId })}
             onOpenSeries={(series) => onSelectNav({ kind: "series", series })}
+            onRequestDeleteRace={(race) => setRaceToDelete({ id: race.id, name: race.name })}
           />
         ) : selection.kind === "series" ? (
           visibleRaces.length === 0 ? (
@@ -362,6 +407,7 @@ function Dashboard() {
                 }}
                 onExport={(imgs) => { setExportImages(imgs); setExportOpen(true); }}
                 onCompress={(imgs) => { setCompressImages(imgs); setCompressOpen(true); }}
+                onRequestDeleteRace={(r) => setRaceToDelete({ id: r.id, name: r.name })}
               />
             );
           })
@@ -413,6 +459,28 @@ function Dashboard() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? "Lösche…" : "Endgültig löschen"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={raceToDelete != null} onOpenChange={(v) => { if (!deletingRace && !v) setRaceToDelete(null); }}>
+        <AlertDialogContent className="bg-surface-2">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-xl">
+              Rennen „{raceToDelete?.name}" löschen?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Das Rennen wird mit allen Sektionen, Bild-Slots und gespeicherten Dateien dauerhaft entfernt. Dieser Vorgang kann nicht rückgängig gemacht werden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingRace}>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); performDeleteRace(); }}
+              disabled={deletingRace}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingRace ? "Lösche…" : "Rennen löschen"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
