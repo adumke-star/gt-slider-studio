@@ -33,7 +33,7 @@ const STATUS_ORDER: SliderImage["status"][] = ["todo", "changes", "image_done", 
 
 const STATUS_META: Record<SliderImage["status"], { label: string; cls: string }> = {
   live: { label: "Live", cls: "bg-[var(--status-live)]/15 text-[var(--status-live)] border-[var(--status-live)]/40" },
-  image_done: { label: "Image done", cls: "bg-primary/15 text-primary border-primary/40" },
+  image_done: { label: "Compressed", cls: "bg-primary/15 text-primary border-primary/40" },
   changes: { label: "Changes", cls: "bg-[var(--status-changes)]/15 text-[var(--status-changes)] border-[var(--status-changes)]/40" },
   exported: { label: "Exported", cls: "bg-[var(--status-exported)]/15 text-[var(--status-exported)] border-[var(--status-exported)]/40" },
   todo: { label: "To do", cls: "bg-[var(--status-todo)]/15 text-[var(--status-todo)] border-[var(--status-todo)]/40" },
@@ -349,7 +349,6 @@ export function ImageCell({
                       s === image.status && "font-semibold",
                     )}
                   >
-                    <span className={cn("h-2 w-2 rounded-full", m.cls.replace(/border-\S+/g, "").replace(/text-\S+/g, "").replace(/bg-\[/g, "bg-[").replace(/\/15/g, ""))} />
                     {m.label}
                   </DropdownMenuItem>
                 );
