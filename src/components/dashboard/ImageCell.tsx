@@ -297,10 +297,10 @@ export function ImageCell({
             onBlur={saveName}
             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
             placeholder="Image name…"
-            className="w-full rounded border border-border bg-background/50 px-1.5 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            className="w-full rounded border border-border bg-background/50 px-1.5 py-1 text-[11px] text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
           />
         ) : (
-          <div className="truncate px-0.5 py-1 text-xs text-foreground" title={name || undefined}>
+          <div className="truncate px-0.5 py-1 text-[11px] text-foreground" title={name || undefined}>
             {name || "Untitled"}
           </div>
         )}

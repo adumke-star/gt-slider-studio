@@ -31,6 +31,18 @@ export const SERIES: { key: Series; label: string }[] = [
   { key: "wsbk", label: "WSBK" },
 ];
 
+function NavStatusDot({ kind }: { kind: "changes" | "comments" }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "inline-block h-1.5 w-1.5 shrink-0 rounded-full ring-1 ring-background",
+        kind === "changes" ? "bg-status-changes" : "bg-status-done",
+      )}
+    />
+  );
+}
+
 export function RaceNav({
   races,
   flagsByRace,
@@ -109,8 +121,8 @@ export function RaceNav({
               )}
             >
               <span>{label}</span>
-              {flags.hasChanges && <span className="h-1.5 w-1.5 rounded-full bg-[#CB4F10]" />}
-              {flags.hasOpenComments && <span className="h-1.5 w-1.5 rounded-full bg-[#FACC15]" />}
+              {flags.hasChanges && <NavStatusDot kind="changes" />}
+              {flags.hasOpenComments && <NavStatusDot kind="comments" />}
               <ChevronDown className="h-3 w-3 opacity-70" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[12rem]">
@@ -131,8 +143,8 @@ export function RaceNav({
                     >
                       <span className="truncate">{r.name}</span>
                       <span className="flex items-center gap-1">
-                        {f.hasChanges && <span className="h-1.5 w-1.5 rounded-full bg-[#CB4F10]" />}
-                        {f.hasOpenComments && <span className="h-1.5 w-1.5 rounded-full bg-[#FACC15]" />}
+                        {f.hasChanges && <NavStatusDot kind="changes" />}
+                        {f.hasOpenComments && <NavStatusDot kind="comments" />}
                       </span>
                     </DropdownMenuItem>
                   );
