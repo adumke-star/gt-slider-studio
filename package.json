@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "standalone:setup": "bash scripts/setup-supabase.sh",
     "standalone:migrate": "node scripts/migrate-from-lovable.mjs",
-    "standalone:verify": "node scripts/verify-migration.mjs"
+    "standalone:verify": "node scripts/verify-migration.mjs",
+    "standalone:smoke": "bash scripts/smoke-check.sh"
   },
   "dependencies": {
     "@fontsource/lato": "^5.2.7",
