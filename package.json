@@ -11,9 +11,12 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "standalone:setup": "bash scripts/setup-supabase.sh",
+    "standalone:fresh-start": "bash scripts/fresh-start.sh",
     "standalone:migrate": "node scripts/migrate-from-lovable.mjs",
     "standalone:verify": "node scripts/verify-migration.mjs",
-    "standalone:smoke": "bash scripts/smoke-check.sh"
+    "standalone:smoke": "bash scripts/smoke-check.sh",
+    "standalone:test-connection": "node scripts/test-supabase-connection.mjs",
+    "standalone:test-auth": "node scripts/test-auth-setup.mjs"
   },
   "dependencies": {
     "@fontsource/lato": "^5.2.7",

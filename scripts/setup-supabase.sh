@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bootstrap standalone Supabase for gt-slider-studio.
-# Prerequisites: supabase login (or SUPABASE_ACCESS_TOKEN), new empty Supabase project created in your org.
+# For full fresh start (link + db push + .env), use: bash scripts/fresh-start.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,12 +17,9 @@ npx supabase link --project-ref "$SUPABASE_PROJECT_REF"
 echo "Pushing migrations (schema + storage buckets)…"
 npx supabase db push
 
+sed -i.bak "s/^project_id = .*/project_id = \"${SUPABASE_PROJECT_REF}\"/" supabase/config.toml
+rm -f supabase/config.toml.bak
+
 echo ""
-echo "Done. Next steps:"
-echo "  1. Copy .env.example → .env and paste anon URL/key from the new project."
-echo "  2. Update supabase/config.toml project_id to ${SUPABASE_PROJECT_REF}"
-echo "  3. In Supabase Dashboard → Authentication → URL Configuration, add:"
-echo "       http://localhost:8080/**"
-echo "       (and your production URL once deployed)"
-echo "  4. Run: npm run standalone:migrate  (after setting OLD_/NEW_ service role keys in .env.migration)"
-echo "  5. Run: npm run standalone:verify"
+echo "Done. Next: bash scripts/fresh-start.sh (if .env not written yet) or copy .env.example → .env"
+echo "Auth redirects: http://localhost:8080/** in Supabase Dashboard → Authentication"
