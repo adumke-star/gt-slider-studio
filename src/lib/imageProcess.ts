@@ -4,8 +4,14 @@
  * Iterative quality + resolution tuning to STAY UNDER target size (KB).
  */
 
-import type { FocalPoint } from "@/lib/cropUtils";
-import { resolveFocal, SLIDER_OUTPUT_HEIGHT, SLIDER_OUTPUT_WIDTH } from "@/lib/cropUtils";
+import type { CropAreaPercentages, FocalPoint } from "@/lib/cropUtils";
+import {
+  croppedAreaPixelsFromPercentages,
+  drawExtractedCrop,
+  resolveFocal,
+  SLIDER_OUTPUT_HEIGHT,
+  SLIDER_OUTPUT_WIDTH,
+} from "@/lib/cropUtils";
 
 export type ExportFormat = "jpeg" | "png" | "webp" | "avif";
 
@@ -14,6 +20,7 @@ export interface TransformOptions {
   height?: number;
   targetKB?: number;
   format: ExportFormat;
+  cropArea?: CropAreaPercentages | null;
   focalPoint?: FocalPoint | null;
 }
 
@@ -92,6 +99,24 @@ const MIME: Record<ExportFormat, string> = {
   avif: "image/avif",
 };
 
+function renderBaseCanvas(
+  img: HTMLImageElement,
+  baseW: number,
+  baseH: number,
+  cropArea: CropAreaPercentages | null | undefined,
+  focal: FocalPoint,
+): HTMLCanvasElement {
+  if (cropArea) {
+    const pixels = croppedAreaPixelsFromPercentages(
+      cropArea,
+      img.naturalWidth,
+      img.naturalHeight,
+    );
+    return drawExtractedCrop(img, pixels, baseW, baseH);
+  }
+  return drawCover(img, baseW, baseH, focal);
+}
+
 export async function transformImage(
   file: Blob,
   opts: TransformOptions,
@@ -102,16 +127,23 @@ export async function transformImage(
   const mime = MIME[opts.format];
   const target = opts.targetKB ?? 0;
   const focal = resolveFocal(opts.focalPoint?.x ?? null, opts.focalPoint?.y ?? null);
+  const cropArea = opts.cropArea ?? null;
 
   // PNG is lossless: try downscaling only when target is set.
   if (opts.format === "png") {
     let scale = 1;
-    let canvas = drawCover(img, baseW, baseH, focal);
+    let canvas = renderBaseCanvas(img, baseW, baseH, cropArea, focal);
     let blob = await canvasToBlob(canvas, mime);
     if (target > 0) {
       while (blob.size / BYTES_PER_KB > target && scale > 0.2) {
         scale *= 0.85;
-        canvas = drawCover(img, Math.round(baseW * scale), Math.round(baseH * scale), focal);
+        canvas = renderBaseCanvas(
+          img,
+          Math.round(baseW * scale),
+          Math.round(baseH * scale),
+          cropArea,
+          focal,
+        );
         blob = await canvasToBlob(canvas, mime);
       }
     }
@@ -126,7 +158,7 @@ export async function transformImage(
 
   // Lossy formats: search quality first, then downscale if still too big.
   let scale = 1;
-  let canvas = drawCover(img, baseW, baseH, focal);
+  let canvas = renderBaseCanvas(img, baseW, baseH, cropArea, focal);
   let q = 0.85;
   let blob = await canvasToBlob(canvas, mime, q);
   let downscaled = false;
@@ -137,16 +169,14 @@ export async function transformImage(
     let hi = 0.95;
     q = 0.85;
     blob = await canvasToBlob(canvas, mime, q);
-    // 10 iterations binary search → ~0.001 precision
     for (let i = 0; i < 10; i++) {
       const kb = blob.size / BYTES_PER_KB;
-      if (kb <= target && target - kb < target * 0.05) break; // close enough under
+      if (kb <= target && target - kb < target * 0.05) break;
       if (kb > target) hi = q;
       else lo = q;
       q = (lo + hi) / 2;
       blob = await canvasToBlob(canvas, mime, q);
     }
-    // Final pass: if still above, push quality to lo bound.
     if (blob.size / BYTES_PER_KB > target) {
       q = lo;
       blob = await canvasToBlob(canvas, mime, q);
@@ -155,11 +185,16 @@ export async function transformImage(
 
   await fitQualityUnderTarget();
 
-  // Still too big at minimum quality → reduce resolution iteratively.
   while (target > 0 && blob.size / BYTES_PER_KB > target && scale > 0.2) {
     scale *= 0.85;
     downscaled = true;
-    canvas = drawCover(img, Math.round(baseW * scale), Math.round(baseH * scale), focal);
+    canvas = renderBaseCanvas(
+      img,
+      Math.round(baseW * scale),
+      Math.round(baseH * scale),
+      cropArea,
+      focal,
+    );
     await fitQualityUnderTarget();
   }
 

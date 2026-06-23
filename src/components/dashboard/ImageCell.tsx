@@ -7,7 +7,7 @@ import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from 
 import { CommentsSheet } from "./CommentsSheet";
 import { CropDialog } from "./CropDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { hasCustomCrop, objectPositionFromFocal, resolveFocal, type FocalPoint } from "@/lib/cropUtils";
+import { hasCustomCrop, hasCustomCropArea, parseCropArea, renderCroppedPreviewUrl } from "@/lib/cropUtils";
 import { isCompressEligible } from "@/lib/compressImage";
 
 export type SliderImage = {
@@ -24,6 +24,7 @@ export type SliderImage = {
   original_size_kb: number | null;
   compressed_size_kb: number | null;
   format: string | null;
+  crop_area?: unknown;
   crop_x?: number | null;
   crop_y?: number | null;
 };
@@ -68,18 +69,17 @@ export function ImageCell({
   onCompress?: () => void;
 }) {
   const [preview, setPreview] = useState<string | null>(null);
+  const [croppedPreview, setCroppedPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState(image.title ?? "");
   const [dropSide, setDropSide] = useState<"left" | "right" | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
-  const [savedCrop, setSavedCrop] = useState<FocalPoint | null>(null);
   const [commentCount, setCommentCount] = useState(0);
   const [unreadMentions, setUnreadMentions] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setName(image.title ?? ""); }, [image.title]);
-  useEffect(() => { setSavedCrop(null); }, [image.id, image.crop_x, image.crop_y]);
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -91,6 +91,22 @@ export function ImageCell({
     })();
     return () => { alive = false; };
   }, [image.compressed_path, image.original_path]);
+
+  const cropArea = parseCropArea(image.crop_area);
+  const showCropPreview = Boolean(preview && image.original_path && !image.compressed_path);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!preview || !showCropPreview || !cropArea) {
+        if (alive) setCroppedPreview(null);
+        return;
+      }
+      const url = await renderCroppedPreviewUrl(preview, cropArea);
+      if (alive) setCroppedPreview(url);
+    })();
+    return () => { alive = false; };
+  }, [preview, showCropPreview, image.crop_area]);
 
   useEffect(() => {
     let alive = true;
@@ -127,6 +143,7 @@ export function ImageCell({
       await supabase.from("slider_images").update({
         original_path: path,
         original_size_kb: Math.round(file.size / 1000),
+        crop_area: null,
         crop_x: null,
         crop_y: null,
         title: baseName || image.title,
@@ -148,6 +165,7 @@ export function ImageCell({
       await supabase.from("slider_images").update({
         original_path: null, compressed_path: null, compressed_url: null,
         original_size_kb: null, compressed_size_kb: null, format: null,
+        crop_area: null,
         crop_x: null, crop_y: null,
         status: "todo",
       }).eq("id", image.id);
@@ -177,10 +195,9 @@ export function ImageCell({
   }
 
   const meta = STATUS_META[image.status];
-  const showCropPreview = Boolean(preview && image.original_path && !image.compressed_path);
-  const focal = savedCrop ?? resolveFocal(image.crop_x, image.crop_y);
-  const cropAdjusted = savedCrop != null || hasCustomCrop(image.crop_x, image.crop_y);
+  const cropAdjusted = hasCustomCropArea(cropArea) || hasCustomCrop(image.crop_x, image.crop_y);
   const canCrop = Boolean(image.original_path && !image.compressed_path && preview);
+  const displayPreview = croppedPreview ?? preview;
 
   return (
     <div
@@ -252,12 +269,11 @@ export function ImageCell({
       )}
 
       <div className="relative aspect-[633/382] w-full overflow-hidden bg-background">
-        {preview ? (
+        {displayPreview ? (
           <img
-            src={preview}
+            src={displayPreview}
             alt={image.title ?? ""}
             className="h-full w-full object-cover"
-            style={showCropPreview ? { objectPosition: objectPositionFromFocal(focal) } : undefined}
           />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground">
@@ -436,10 +452,7 @@ export function ImageCell({
           previewUrl={preview}
           open={cropOpen}
           onOpenChange={setCropOpen}
-          onSaved={(focal) => {
-            setSavedCrop(focal);
-            onChanged();
-          }}
+          onSaved={onChanged}
         />
       )}
     </div>

@@ -211,6 +211,7 @@ export type Database = {
           compressed_size_kb: number | null
           compressed_url: string | null
           created_at: string
+          crop_area: Json | null
           crop_x: number | null
           crop_y: number | null
           format: string | null
@@ -231,6 +232,7 @@ export type Database = {
           compressed_size_kb?: number | null
           compressed_url?: string | null
           created_at?: string
+          crop_area?: Json | null
           crop_x?: number | null
           crop_y?: number | null
           format?: string | null
@@ -251,6 +253,7 @@ export type Database = {
           compressed_size_kb?: number | null
           compressed_url?: string | null
           created_at?: string
+          crop_area?: Json | null
           crop_x?: number | null
           crop_y?: number | null
           format?: string | null

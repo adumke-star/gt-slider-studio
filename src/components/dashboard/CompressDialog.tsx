@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { transformImage, extForFormat, type ExportFormat } from "@/lib/imageProcess";
-import { resolveFocal } from "@/lib/cropUtils";
+import { parseCropArea, resolveFocal } from "@/lib/cropUtils";
 import { uploadFile, removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchCompressSource, isCompressEligible } from "@/lib/compressImage";
@@ -58,7 +58,11 @@ export function CompressDialog({
           targetKB,
           width: 633,
           height: 382,
-          focalPoint: source.from === "originals" ? resolveFocal(img.crop_x, img.crop_y) : undefined,
+          cropArea: source.from === "originals" ? parseCropArea(img.crop_area) : null,
+          focalPoint:
+            source.from === "originals" && !parseCropArea(img.crop_area)
+              ? resolveFocal(img.crop_x, img.crop_y)
+              : undefined,
         });
         const { blob: out, mime, sizeKB, overTarget, downscaled } = result;
 

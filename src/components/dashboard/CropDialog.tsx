@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Cropper, { type Area, type MediaSize } from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
 import { toast } from "sonner";
@@ -8,8 +8,9 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   focalFromCroppedAreaPixels,
+  parseCropArea,
   SLIDER_ASPECT,
-  type FocalPoint,
+  type CropAreaPercentages,
 } from "@/lib/cropUtils";
 import type { SliderImage } from "./ImageCell";
 
@@ -24,28 +25,38 @@ export function CropDialog({
   previewUrl: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onSaved: (focal: FocalPoint) => void;
+  onSaved: () => void;
 }) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [mediaSize, setMediaSize] = useState<MediaSize | null>(null);
+  const [croppedArea, setCroppedArea] = useState<CropAreaPercentages | null>(null);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const savedCropArea = useMemo(() => parseCropArea(image.crop_area), [image.crop_area]);
 
   useEffect(() => {
     if (!open) return;
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setMediaSize(null);
+    setCroppedArea(savedCropArea);
     setCroppedAreaPixels(null);
-  }, [open, image.id, previewUrl]);
+  }, [open, image.id, previewUrl, savedCropArea]);
 
-  const onCropComplete = useCallback((_area: Area, pixels: Area) => {
+  const onCropComplete = useCallback((area: Area, pixels: Area) => {
+    setCroppedArea({
+      x: area.x,
+      y: area.y,
+      width: area.width,
+      height: area.height,
+    });
     setCroppedAreaPixels(pixels);
   }, []);
 
   async function save() {
-    if (!croppedAreaPixels || !mediaSize) {
+    if (!croppedArea || !croppedAreaPixels || !mediaSize) {
       toast.error("Crop area not ready — wait a moment or move the image slightly.");
       return;
     }
@@ -58,15 +69,24 @@ export function CropDialog({
       );
       const { data, error } = await supabase
         .from("slider_images")
-        .update({ crop_x: focal.x, crop_y: focal.y })
+        .update({
+          crop_area: croppedArea,
+          crop_x: focal.x,
+          crop_y: focal.y,
+        })
         .eq("id", image.id)
-        .select("crop_x, crop_y")
+        .select("crop_area, crop_x, crop_y")
         .single();
 
       if (error) {
-        if (error.message.includes("crop_x") && error.message.includes("does not exist")) {
+        if (error.message.includes("crop_area") && error.message.includes("does not exist")) {
           toast.error(
-            "Crop columns are missing in the database. Please run the Supabase migration (crop_x, crop_y on slider_images).",
+            "Crop column is missing in the database. Please run: npx supabase db push",
+            { duration: 8000 },
+          );
+        } else if (error.message.includes("crop_x") && error.message.includes("does not exist")) {
+          toast.error(
+            "Crop columns are missing in the database. Please run: npx supabase db push",
             { duration: 8000 },
           );
         } else {
@@ -80,7 +100,7 @@ export function CropDialog({
       }
 
       toast.success("Crop saved");
-      onSaved(focal);
+      onSaved();
       onOpenChange(false);
     } catch (e) {
       console.error(e);
@@ -110,6 +130,7 @@ export function CropDialog({
             onCropComplete={onCropComplete}
             onMediaLoaded={setMediaSize}
             objectFit="cover"
+            initialCroppedAreaPercentages={savedCropArea ?? undefined}
           />
         </div>
         <div className="space-y-2">
@@ -130,7 +151,7 @@ export function CropDialog({
           </Button>
           <Button
             onClick={save}
-            disabled={saving || !croppedAreaPixels || !mediaSize}
+            disabled={saving || !croppedArea || !croppedAreaPixels || !mediaSize}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : "Save crop"}
