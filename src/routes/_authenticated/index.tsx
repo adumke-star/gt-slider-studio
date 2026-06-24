@@ -86,6 +86,7 @@ function Dashboard() {
       m.set(r.race_id as string, {
         hasChanges: !!r.has_changes,
         hasOpenComments: !!r.has_open_comments,
+        hasSolved: !!r.has_solved,
       });
     }
     setFlagsByRace(m);

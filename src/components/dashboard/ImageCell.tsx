@@ -16,7 +16,7 @@ export type SliderImage = {
   area: "plp" | "pdp";
   section_id: string | null;
   position: number;
-  status: "live" | "image_done" | "todo" | "blank" | "changes" | "exported";
+  status: "live" | "image_done" | "todo" | "blank" | "changes" | "exported" | "solved";
   title: string | null;
   original_path: string | null;
   compressed_path: string | null;
@@ -29,12 +29,13 @@ export type SliderImage = {
   crop_y?: number | null;
 };
 
-const STATUS_ORDER: SliderImage["status"][] = ["todo", "changes", "image_done", "exported", "live"];
+const STATUS_ORDER: SliderImage["status"][] = ["todo", "changes", "solved", "image_done", "exported", "live"];
 
 const STATUS_META: Record<SliderImage["status"], { label: string; cls: string }> = {
   live: { label: "Live", cls: "bg-[var(--status-live)]/15 text-[var(--status-live)] border-[var(--status-live)]/40" },
   image_done: { label: "Compressed", cls: "bg-primary/15 text-primary border-primary/40" },
   changes: { label: "Changes", cls: "bg-[var(--status-changes)]/15 text-[var(--status-changes)] border-[var(--status-changes)]/40" },
+  solved: { label: "Solved", cls: "bg-[var(--status-solved)]/15 text-[var(--status-solved)] border-[var(--status-solved)]/40" },
   exported: { label: "Exported", cls: "bg-[var(--status-exported)]/15 text-[var(--status-exported)] border-[var(--status-exported)]/40" },
   todo: { label: "To do", cls: "bg-[var(--status-todo)]/15 text-[var(--status-todo)] border-[var(--status-todo)]/40" },
   blank: { label: "To do", cls: "bg-[var(--status-todo)]/15 text-[var(--status-todo)] border-[var(--status-todo)]/40" },
@@ -239,7 +240,9 @@ export function ImageCell({
       }}
       className={cn(
         "group relative flex w-[180px] shrink-0 flex-col overflow-hidden rounded-md border transition",
-        image.status === "changes" ? "bg-[#CB4F10]/20 border-[#CB4F10]/50" : image.status === "image_done" ? "bg-[#D4A843]/20 border-[#D4A843]/50" : "bg-surface-2 border-border hover:border-primary/40",
+        image.status === "changes" ? "bg-[#CB4F10]/20 border-[#CB4F10]/50" :
+        image.status === "solved" ? "bg-[var(--status-solved)]/20 border-[var(--status-solved)]/50" :
+        image.status === "image_done" ? "bg-[#D4A843]/20 border-[#D4A843]/50" : "bg-surface-2 border-border hover:border-primary/40",
         selected ? "ring-2 ring-primary/40" : "",
       )}
     >
@@ -323,13 +326,13 @@ export function ImageCell({
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-1 px-2 py-1.5">
+      <div className="flex flex-col gap-1.5 px-2 py-1.5">
         {canEdit ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 className={cn(
-                  "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition hover:scale-105",
+                  "flex items-center gap-1 self-start rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition hover:scale-105",
                   meta.cls,
                 )}
               >
@@ -357,7 +360,7 @@ export function ImageCell({
           </DropdownMenu>
         ) : (
           <span className={cn(
-            "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+            "flex items-center gap-1 self-start rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
             meta.cls,
           )}>
             {meta.label}
@@ -443,7 +446,7 @@ export function ImageCell({
         </div>
       )}
 
-      <CommentsSheet image={image} open={commentsOpen} onOpenChange={setCommentsOpen} />
+      <CommentsSheet image={image} open={commentsOpen} onOpenChange={setCommentsOpen} onChanged={onChanged} />
       {canCrop && preview && (
         <CropDialog
           key={image.id}

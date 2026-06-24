@@ -16,7 +16,9 @@
     "standalone:verify": "node scripts/verify-migration.mjs",
     "standalone:smoke": "bash scripts/smoke-check.sh",
     "standalone:test-connection": "node scripts/test-supabase-connection.mjs",
-    "standalone:test-auth": "node scripts/test-auth-setup.mjs"
+    "standalone:test-auth": "node scripts/test-auth-setup.mjs",
+    "backup": "node scripts/backup.mjs",
+    "restore": "node scripts/restore.mjs"
   },
   "dependencies": {
     "@fontsource/lato": "^5.2.7",

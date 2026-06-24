@@ -37,10 +37,12 @@ export function CommentsSheet({
   image,
   open,
   onOpenChange,
+  onChanged,
 }: {
   image: SliderImage | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  onChanged?: () => void;
 }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [mentions, setMentions] = useState<Mention[]>([]);
@@ -148,6 +150,7 @@ export function CommentsSheet({
     }
     setBody("");
     setComments((c) => [...c, ins as Comment]);
+    onChanged?.();
   }
 
   async function toggleResolved(c: Comment) {
@@ -156,6 +159,7 @@ export function CommentsSheet({
     const nextBy = c.resolved_at ? null : meId;
     setComments((list) => list.map((x) => x.id === c.id ? { ...x, resolved_at: nextResolved, resolved_by: nextBy } : x));
     await supabase.from("comments").update({ resolved_at: nextResolved, resolved_by: nextBy }).eq("id", c.id);
+    onChanged?.();
   }
 
   const filteredSuggest = suggest.open

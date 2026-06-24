@@ -20,7 +20,7 @@ export function RaceListView({
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
       {races.map((r) => {
-        const f = flagsByRace.get(r.id) ?? { hasChanges: false, hasOpenComments: false };
+        const f = flagsByRace.get(r.id) ?? { hasChanges: false, hasOpenComments: false, hasSolved: false };
         return (
           <button
             key={r.id}
@@ -32,6 +32,7 @@ export function RaceListView({
                 <span className="font-display text-sm font-bold uppercase tracking-wider">{r.name}</span>
                 {f.hasChanges && <span className="h-1.5 w-1.5 rounded-full bg-[#CB4F10]" />}
                 {f.hasOpenComments && <span className="h-1.5 w-1.5 rounded-full bg-[#FACC15]" />}
+                {f.hasSolved && <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-solved)]" />}
               </div>
               <div className="mt-0.5 text-[11px] uppercase tracking-widest text-muted-foreground">
                 {r.series} {r.race_date ? `· ${r.race_date}` : ""}

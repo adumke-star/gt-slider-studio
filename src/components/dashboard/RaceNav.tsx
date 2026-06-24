@@ -17,7 +17,7 @@ export type NavRace = {
   series: Series;
 };
 
-export type RaceFlags = { hasChanges: boolean; hasOpenComments: boolean };
+export type RaceFlags = { hasChanges: boolean; hasOpenComments: boolean; hasSolved: boolean };
 
 export type NavSelection =
   | { kind: "overview" }
@@ -31,13 +31,13 @@ export const SERIES: { key: Series; label: string }[] = [
   { key: "wsbk", label: "WSBK" },
 ];
 
-function NavStatusDot({ kind }: { kind: "changes" | "comments" }) {
+function NavStatusDot({ kind }: { kind: "changes" | "comments" | "solved" }) {
   return (
     <span
       aria-hidden
       className={cn(
         "inline-block h-1.5 w-1.5 shrink-0 rounded-full ring-1 ring-background",
-        kind === "changes" ? "bg-status-changes" : "bg-status-done",
+        kind === "changes" ? "bg-status-changes" : kind === "solved" ? "bg-status-solved" : "bg-status-done",
       )}
     />
   );
@@ -64,20 +64,22 @@ export function RaceNav({
   }, [races]);
 
   function raceFlags(raceId: string): RaceFlags {
-    return flagsByRace.get(raceId) ?? { hasChanges: false, hasOpenComments: false };
+    return flagsByRace.get(raceId) ?? { hasChanges: false, hasOpenComments: false, hasSolved: false };
   }
 
   function seriesFlags(series: Series): RaceFlags {
     const list = racesBySeries.get(series) ?? [];
     let hasChanges = false;
     let hasOpenComments = false;
+    let hasSolved = false;
     for (const r of list) {
       const f = raceFlags(r.id);
       if (f.hasChanges) hasChanges = true;
       if (f.hasOpenComments) hasOpenComments = true;
-      if (hasChanges && hasOpenComments) break;
+      if (f.hasSolved) hasSolved = true;
+      if (hasChanges && hasOpenComments && hasSolved) break;
     }
-    return { hasChanges, hasOpenComments };
+    return { hasChanges, hasOpenComments, hasSolved };
   }
 
   const selectedRace =
@@ -123,6 +125,7 @@ export function RaceNav({
               <span>{label}</span>
               {flags.hasChanges && <NavStatusDot kind="changes" />}
               {flags.hasOpenComments && <NavStatusDot kind="comments" />}
+              {flags.hasSolved && <NavStatusDot kind="solved" />}
               <ChevronDown className="h-3 w-3 opacity-70" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[12rem]">
@@ -145,6 +148,7 @@ export function RaceNav({
                       <span className="flex items-center gap-1">
                         {f.hasChanges && <NavStatusDot kind="changes" />}
                         {f.hasOpenComments && <NavStatusDot kind="comments" />}
+                        {f.hasSolved && <NavStatusDot kind="solved" />}
                       </span>
                     </DropdownMenuItem>
                   );

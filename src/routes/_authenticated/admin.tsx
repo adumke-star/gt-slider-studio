@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeft, Trash2, UserPlus, HardDriveDownload, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { createBackupZip } from "@/lib/backupClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -44,6 +46,8 @@ function AdminPage() {
   const [role, setRole] = useState<AppRole>("viewer");
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [backupRunning, setBackupRunning] = useState(false);
+  const [backupMsg, setBackupMsg] = useState<string | null>(null);
 
   async function load() {
     const { data } = await supabase.from("allowed_emails").select("*").order("created_at", { ascending: false });
@@ -83,6 +87,34 @@ function AdminPage() {
     if (!confirm("Really delete this entry? The user won't be able to sign in again (existing sessions stay active).")) return;
     await supabase.from("allowed_emails").delete().eq("id", id);
     load();
+  }
+
+  async function runBackup() {
+    setBackupRunning(true);
+    setBackupMsg("Starting…");
+    try {
+      const { blob, counts } = await createBackupZip((msg) => setBackupMsg(msg));
+      const d = new Date();
+      const p = (n: number) => String(n).padStart(2, "0");
+      const stamp = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `gt-slider-backup-${stamp}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast.success(
+        `Backup ready: ${counts.images_saved} images${counts.images_failed ? `, ${counts.images_failed} failed` : ""}`,
+      );
+    } catch (e) {
+      console.error(e);
+      toast.error(`Backup failed: ${(e as Error).message ?? e}`);
+    } finally {
+      setBackupRunning(false);
+      setBackupMsg(null);
+    }
   }
 
   async function changeRole(row: Allowed, next: AppRole) {
@@ -152,6 +184,24 @@ function AdminPage() {
             Viewer — read &amp; comment only · Editor — manage races &amp; images · Admin — plus allowlist &amp; history
           </p>
           {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+        </section>
+
+        <section className="rounded-lg border border-border bg-surface-2 p-4">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted-foreground">Backup</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={runBackup} disabled={backupRunning} className="gap-1.5">
+              {backupRunning
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating backup…</>
+                : <><HardDriveDownload className="h-4 w-4" /> Download backup (ZIP)</>}
+            </Button>
+            {backupRunning && backupMsg && (
+              <span className="text-xs text-muted-foreground">{backupMsg}</span>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Downloads all races, sections, slots and comments as JSON plus every compressed image,
+            organised by series / race / section. Keep the file somewhere safe (e.g. Drive).
+          </p>
         </section>
 
         <section className="rounded-lg border border-border bg-surface-2">

@@ -57,6 +57,7 @@ export function RaceCard({
   const [hasOpenComments, setHasOpenComments] = useState(false);
 
   const hasChanges = useMemo(() => images.some((i) => i.status === "changes"), [images]);
+  const hasSolved = useMemo(() => images.some((i) => i.status === "solved"), [images]);
 
   useEffect(() => {
     if (images.length === 0) {
@@ -272,6 +273,9 @@ export function RaceCard({
           )}
           {!open && hasOpenComments && (
             <span title="Open comments" className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#FACC15]" />
+          )}
+          {!open && hasSolved && (
+            <span title="Comments solved" className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--status-solved)]" />
           )}
           {race.race_date && (
             <span className="hidden text-xs text-muted-foreground sm:inline">{race.race_date}</span>
@@ -638,6 +642,12 @@ function SectionBlock({
             <span
               title="Open comments"
               className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#FACC15]"
+            />
+          )}
+          {images.some((i) => i.status === "solved") && (
+            <span
+              title="Comments solved"
+              className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--status-solved)]"
             />
           )}
           {canEdit && editingName ? (

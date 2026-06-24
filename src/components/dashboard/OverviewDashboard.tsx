@@ -29,7 +29,7 @@ export function OverviewDashboard({
   const [query, setQuery] = useState("");
 
   const flags = (id: string): RaceFlags =>
-    flagsByRace.get(id) ?? { hasChanges: false, hasOpenComments: false };
+    flagsByRace.get(id) ?? { hasChanges: false, hasOpenComments: false, hasSolved: false };
 
   const changesCount = useMemo(
     () => races.filter((r) => flags(r.id).hasChanges).length,
@@ -37,6 +37,10 @@ export function OverviewDashboard({
   );
   const commentsCount = useMemo(
     () => races.filter((r) => flags(r.id).hasOpenComments).length,
+    [races, flagsByRace],
+  );
+  const solvedCount = useMemo(
+    () => races.filter((r) => flags(r.id).hasSolved).length,
     [races, flagsByRace],
   );
 
@@ -66,7 +70,7 @@ export function OverviewDashboard({
 
   return (
     <div className="space-y-8">
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           icon={<Flag className="h-4 w-4" />}
           label="Total races"
@@ -86,6 +90,12 @@ export function OverviewDashboard({
           label="Open comments"
           value={commentsCount}
           hint={commentsCount === 0 ? "No open comments" : "Races with open comments"}
+        />
+        <KpiCard
+          icon={<CheckCircle2 className="h-4 w-4 text-[var(--status-solved)]" />}
+          label="Solved"
+          value={solvedCount}
+          hint={solvedCount === 0 ? "No solved slots" : "Races with solved comment threads"}
         />
       </section>
 
@@ -200,6 +210,7 @@ function RaceTile({
             <span className="truncate font-display text-sm font-bold uppercase tracking-wider">{race.name}</span>
             {flags.hasChanges && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#CB4F10]" />}
             {flags.hasOpenComments && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FACC15]" />}
+            {flags.hasSolved && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--status-solved)]" />}
           </div>
           <div className="mt-0.5 text-[11px] uppercase tracking-widest text-muted-foreground">
             {SERIES_LABEL.get(race.series) ?? race.series} {race.race_date ? `· ${race.race_date}` : ""}
