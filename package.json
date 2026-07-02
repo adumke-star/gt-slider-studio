@@ -21,7 +21,8 @@
     "standalone:test-connection": "node scripts/test-supabase-connection.mjs",
     "standalone:test-auth": "node scripts/test-auth-setup.mjs",
     "backup": "node scripts/backup.mjs",
-    "restore": "node scripts/restore.mjs"
+    "restore": "node scripts/restore.mjs",
+    "verify:live": "node scripts/verify-live-deploy.mjs"
   },
   "dependencies": {
     "@fontsource/lato": "^5.2.7",

@@ -42,19 +42,21 @@ This is a one-time account setup. The build itself can already succeed before th
 
 | Setting | Value |
 |---------|--------|
-| **Build command** | `npm run build` |
-| **Deploy command** | `npm run deploy:cf` |
+| **Build command** | `bun run build` or `npm run build` |
+| **Deploy command** | `npm run deploy:cf` (not plain `npx wrangler deploy`) |
 | **Node.js version** | `22` — add as **Text** variable `NODE_VERSION` = `22` |
 
 Cloudflare’s free plan is enough for testing (100k Worker requests/day, 500 builds/month).
 
 After the first deploy you get a URL like `https://gt-slider-studio.<your-subdomain>.workers.dev`.
 
-Cloudflare may auto-detect `bun run build` and `npx wrangler deploy` — that is fine. Our scripts (`npm run build`, `npm run deploy:cf`) do the same.
+**Do not** leave the auto-detected deploy command as `npx wrangler deploy` — it omits `--keep-vars` and can wipe dashboard variables.
 
 ## 2. Environment variables
 
-Set these in Cloudflare → **Workers & Pages** → your project → **Settings** → **Variables and Secrets**.
+Set these under **Settings → Build → Variables and secrets** (build-time). That is where `VITE_*` must live so `bun run build` / `npm run build` can inline them into the client bundle.
+
+Optionally mirror the same values under **Settings → Variables and Secrets** (worker runtime) for SSR/server code — but **build variables alone are not enough** if you only set worker runtime vars, and **worker runtime vars alone are not enough** for `VITE_*` (they must be present at build time).
 
 **Production** (and **Preview** if you use branch previews):
 
@@ -88,6 +90,13 @@ Supabase Dashboard → **Authentication** → **URL Configuration**:
   - `https://gt-slider-studio.<your-subdomain>.workers.dev/**`
   - `http://localhost:8080/**` (local dev)
 
+Also under **Authentication** → **Providers** → **Email**:
+
+- **Enable Email provider** must be on
+- For instant sign-up without a confirmation mail (recommended for this app): turn **Confirm email** off, or enable **Auto Confirm** if your Supabase UI offers it
+
+If email confirmation stays on, new users must click the link in their inbox before sign-in works; the app now shows that message instead of freezing on “Creating account…”.
+
 Add preview URLs later if you enable non-production branch deploys.
 
 ## 4. Deploy from your machine (alternative)
@@ -113,6 +122,67 @@ For local Wrangler preview, copy `.env.example` to `.dev.vars` (gitignored) and 
 - Open a race, upload / compress an image
 - Admin: allowlist, backup ZIP
 - Profile → Change password
+
+From your machine (checks the live JS bundle was built with Supabase env):
+
+```bash
+npm run verify:live
+```
+
+## 6. Auto-deploy on push (recommended: GitHub Actions)
+
+Cloudflare’s built-in **Workers Builds** Git integration often does not trigger reliably (Deployments may only show manual Wrangler uploads). Use **GitHub Actions** instead — visible under the repo **Actions** tab on every push to `main`.
+
+Workflow file: [`.github/workflows/deploy-cloudflare.yml`](../.github/workflows/deploy-cloudflare.yml)
+
+### One-time setup (GitHub secrets)
+
+GitHub → `adumke-star/gt-slider-studio` → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+
+| Secret | Value |
+|--------|--------|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → Create → template **Edit Cloudflare Workers** (or custom: Account / Workers Scripts / Edit) |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard URL or Workers overview (32-char hex) |
+| `VITE_SUPABASE_URL` | `https://<project-ref>.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key |
+| `VITE_SUPABASE_PROJECT_ID` | Supabase project ref |
+
+Use the same values as in your local `.env`. The workflow mirrors them to `SUPABASE_*` at build time.
+
+### Avoid double deploys
+
+If Cloudflare **Workers Builds** is still connected to Git, either:
+
+- **Disconnect** Git under Cloudflare → Settings → Build, **or**
+- Leave it — but then one push might run two pipelines (wasteful)
+
+GitHub Actions alone is enough.
+
+### Verify it works
+
+1. Push to `main`
+2. GitHub → **Actions** → **Deploy Cloudflare Workers** → latest run should be green
+3. `npm run verify:live`
+4. Hard-refresh the site (`Cmd+Shift+R`)
+
+Manual re-run anytime: Actions → workflow → **Run workflow**.
+
+### Fallback: Cloudflare Workers Builds
+
+If you prefer Cloudflare-native builds instead of GitHub Actions:
+
+| Tab | What it shows |
+|-----|----------------|
+| **Builds** | Git-triggered build + deploy (commit SHA) |
+| **Deployments** | Worker versions live in production |
+
+Checklist: production branch `main`, deploy command `npm run deploy:cf`, **Build → Variables and secrets** filled (not “None”).
+
+If no build starts after push: **Builds → Create deployment**, or reconnect Git under Settings → Build.
+
+### If build succeeds but the site breaks
+
+Almost always: `VITE_*` missing during **build** → bundle contains `Missing Supabase` → run `npm run verify:live` to confirm, then fix secrets / build variables and redeploy.
 
 ## Notes
 

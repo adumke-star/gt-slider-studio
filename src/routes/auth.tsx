@@ -43,6 +43,9 @@ function AuthPage() {
     if (lower.includes("invalid login credentials")) {
       return "Incorrect email or password.";
     }
+    if (lower.includes("email not confirmed")) {
+      return "Please confirm your email first (check your inbox), then sign in.";
+    }
     if (lower.includes("user already registered")) {
       return "An account with this email already exists. Please sign in or reset your password.";
     }
@@ -63,24 +66,35 @@ function AuthPage() {
     setLoading(true);
     try {
       if (mode === "signin") {
-        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) {
           setError(translateError(err.message));
-          setLoading(false);
+          return;
         }
+        if (data.session) navigate({ to: "/" });
       } else {
-        const { error: err } = await supabase.auth.signUp({
+        const { data, error: err } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: { emailRedirectTo: `${window.location.origin}/auth` },
         });
         if (err) {
           setError(translateError(err.message));
-          setLoading(false);
+          return;
+        }
+        if (data.session) {
+          navigate({ to: "/" });
+        } else if (data.user) {
+          setInfo(
+            "Account created. Check your inbox for a confirmation link, then sign in here.",
+          );
+        } else {
+          setInfo("Registration submitted. Try signing in, or check your email for a confirmation link.");
         }
       }
     } catch (e) {
       setError(e instanceof Error ? translateError(e.message) : "Sign-in failed.");
+    } finally {
       setLoading(false);
     }
   }
@@ -212,7 +226,7 @@ function EmailPasswordFields({
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="password">Password</Label>
-        <Input id="password" type="password" autoComplete="current-password" required
+        <Input id="password" type="password" autoComplete={minLength >= 8 ? "new-password" : "current-password"} required
           minLength={minLength}
           value={password} onChange={(e) => setPassword(e.target.value)} />
       </div>
