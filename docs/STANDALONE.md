@@ -35,7 +35,7 @@ This runs `db push` (schema + storage buckets), writes `.env`, and verifies the 
 Supabase Dashboard → **Authentication** → URL Configuration:
 
 - `http://localhost:8080/**`
-- your production URL once deployed
+- your production URL once deployed (see [DEPLOY_CLOUDFLARE.md](DEPLOY_CLOUDFLARE.md))
 
 ### 4. Run locally
 
