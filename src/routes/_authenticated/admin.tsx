@@ -163,7 +163,7 @@ function AdminPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@global-tickets.com"
+              placeholder="name@example.com"
               className="min-w-[260px] flex-1"
               onKeyDown={(e) => { if (e.key === "Enter") add(); }}
             />

@@ -55,6 +55,9 @@ function AuthPage() {
     if (lower.includes("pwned") || lower.includes("compromised")) {
       return "This password was found in a data breach. Please choose a different one.";
     }
+    if (lower.includes("rate limit") || lower.includes("too many requests")) {
+      return "Too many attempts — please wait a few minutes and try again, or use Sign in if you already registered.";
+    }
     return msg;
   }
 
