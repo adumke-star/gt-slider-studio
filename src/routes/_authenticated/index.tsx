@@ -421,6 +421,7 @@ function Dashboard() {
                   loadRace(race.id);
                   loadFlags();
                 }}
+                onRaceRenamed={loadRaces}
                 onExport={(imgs) => { setExportImages(imgs); setExportOpen(true); }}
                 onCompress={(imgs) => { setCompressImages(imgs); setCompressOpen(true); }}
                 onRequestDeleteRace={(r) => setRaceToDelete({ id: r.id, name: r.name })}

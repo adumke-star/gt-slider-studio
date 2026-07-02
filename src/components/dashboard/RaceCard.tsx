@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ImageCell, type SliderImage } from "./ImageCell";
@@ -39,6 +40,7 @@ export function RaceCard({
   onExport,
   onCompress,
   onRequestDeleteRace,
+  onRaceRenamed,
 }: {
   race: Race;
   sections: SliderSection[];
@@ -50,14 +52,39 @@ export function RaceCard({
   onExport: (images: SliderImage[]) => void;
   onCompress: (images: SliderImage[]) => void;
   onRequestDeleteRace: (race: Race) => void;
+  onRaceRenamed?: () => void;
 }) {
   const [open, setOpen] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
   const [sectionDragId, setSectionDragId] = useState<string | null>(null);
   const [hasOpenComments, setHasOpenComments] = useState(false);
+  const [editingRaceName, setEditingRaceName] = useState(false);
+  const [raceNameDraft, setRaceNameDraft] = useState(race.name);
 
   const hasChanges = useMemo(() => images.some((i) => i.status === "changes"), [images]);
   const hasSolved = useMemo(() => images.some((i) => i.status === "solved"), [images]);
+
+  useEffect(() => {
+    if (!editingRaceName) setRaceNameDraft(race.name);
+  }, [race.name, editingRaceName]);
+
+  async function renameRace(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === race.name) return;
+    const { error } = await supabase.from("races").update({ name: trimmed }).eq("id", race.id);
+    if (error) {
+      toast.error("Could not rename race");
+      return;
+    }
+    toast.success("Race renamed");
+    onRaceRenamed?.();
+    onReload();
+  }
+
+  function commitRaceName() {
+    setEditingRaceName(false);
+    void renameRace(raceNameDraft);
+  }
 
   useEffect(() => {
     if (images.length === 0) {
@@ -267,7 +294,36 @@ export function RaceCard({
           )}>
             {race.series === "f1" ? "F1" : race.series === "motogp" ? "MotoGP" : race.series.toUpperCase()}
           </span>
-          <h2 className="truncate font-display text-lg font-black uppercase tracking-tight">{race.name}</h2>
+          {canEdit && editingRaceName ? (
+            <input
+              autoFocus
+              value={raceNameDraft}
+              onChange={(e) => setRaceNameDraft(e.target.value)}
+              onBlur={commitRaceName}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitRaceName();
+                if (e.key === "Escape") {
+                  setEditingRaceName(false);
+                  setRaceNameDraft(race.name);
+                }
+              }}
+              className="min-w-0 max-w-[min(100%,20rem)] truncate rounded border border-border bg-background px-2 py-0.5 font-display text-lg font-black uppercase tracking-tight text-foreground focus:border-primary focus:outline-none"
+            />
+          ) : canEdit ? (
+            <button
+              type="button"
+              onClick={() => {
+                setRaceNameDraft(race.name);
+                setEditingRaceName(true);
+              }}
+              className="min-w-0 truncate text-left font-display text-lg font-black uppercase tracking-tight hover:text-primary"
+              title="Rename race"
+            >
+              {race.name}
+            </button>
+          ) : (
+            <h2 className="truncate font-display text-lg font-black uppercase tracking-tight">{race.name}</h2>
+          )}
           {!open && hasChanges && (
             <span title="Changes pending" className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#CB4F10]" />
           )}
