@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { LogOut, Settings, User as UserIcon } from "lucide-react";
+import { KeyRound, LogOut, Settings, User as UserIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
@@ -68,6 +68,11 @@ export function UserMenu() {
             </DropdownMenuItem>
           </>
         )}
+        <DropdownMenuItem asChild>
+          <Link to="/password" className="flex w-full items-center gap-2">
+            <KeyRound className="h-4 w-4" /> Change password
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={signOut} className="gap-2">
           <LogOut className="h-4 w-4" /> Sign out
         </DropdownMenuItem>
