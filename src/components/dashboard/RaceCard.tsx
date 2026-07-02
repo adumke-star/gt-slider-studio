@@ -527,7 +527,12 @@ function SectionBlock({
     onSetLinks(cleaned);
   }
 
-  const dragCounterRef = useRef(0);
+  const clearFileHover = () => setFileHover(false);
+
+  useEffect(() => {
+    window.addEventListener("dragend", clearFileHover);
+    return () => window.removeEventListener("dragend", clearFileHover);
+  }, []);
 
   return (
     <div
@@ -537,7 +542,6 @@ function SectionBlock({
         if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
           e.stopPropagation();
-          dragCounterRef.current += 1;
           setFileHover(true);
         }
       }}
@@ -558,11 +562,9 @@ function SectionBlock({
         setSectionDropSide(e.clientY < r.top + r.height / 2 ? "before" : "after");
       }}
       onDragLeave={(e) => {
-        if (dataTransferHasFiles(e.dataTransfer)) {
-          dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
-          if (dragCounterRef.current === 0) setFileHover(false);
-          return;
-        }
+        const related = e.relatedTarget as Node | null;
+        if (related && rootRef.current?.contains(related)) return;
+        setFileHover(false);
         if (e.currentTarget === e.target) {
           setSectionDropSide(null);
         }
@@ -572,7 +574,6 @@ function SectionBlock({
         if (dataTransferHasFiles(e.dataTransfer)) {
           e.preventDefault();
           e.stopPropagation();
-          dragCounterRef.current = 0;
           setFileHover(false);
           const files = await collectFilesFromDataTransfer(e.dataTransfer);
           const images = files.filter(isImageFile);
@@ -808,7 +809,9 @@ function SectionBlock({
               onDropBefore={() => onDropOn(img.id, "before")}
               onDropAfter={() => onDropOn(img.id, "after")}
               onCompress={() => onCompress([img])}
+              onFileDropHandled={clearFileHover}
               onMultiFileDrop={async (files) => {
+                clearFileHover();
                 setUploading(true);
                 setBatchItems(files.map((f) => ({ name: f.name, status: "pending" as const })));
                 try {

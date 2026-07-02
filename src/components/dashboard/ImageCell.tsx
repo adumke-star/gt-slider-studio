@@ -56,6 +56,7 @@ export function ImageCell({
   onDropBefore,
   onDropAfter,
   onMultiFileDrop,
+  onFileDropHandled,
   onCompress,
 }: {
   image: SliderImage;
@@ -67,6 +68,7 @@ export function ImageCell({
   onDropBefore: () => void;
   onDropAfter: () => void;
   onMultiFileDrop?: (files: File[]) => void;
+  onFileDropHandled?: () => void;
   onCompress?: () => void;
 }) {
   const [preview, setPreview] = useState<string | null>(null);
@@ -224,6 +226,7 @@ export function ImageCell({
           e.preventDefault();
           e.stopPropagation();
           setDropSide(null);
+          onFileDropHandled?.();
           const arr = (await collectFilesFromDataTransfer(e.dataTransfer)).filter(isImageFile);
           if (arr.length > 1 && onMultiFileDrop) {
             onMultiFileDrop(arr);
