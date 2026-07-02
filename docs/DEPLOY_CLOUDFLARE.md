@@ -22,6 +22,15 @@ Alternative direct link (if your account supports it):
 
 Your app URL will be: `https://gt-slider-studio.<your-subdomain>.workers.dev`
 
+**If CI keeps failing** (Wrangler cannot register the subdomain in non-interactive mode), run once locally:
+
+```bash
+npx wrangler login
+npm run deploy
+```
+
+Wrangler will ask interactively for your `workers.dev` subdomain. After that, **Retry deployment** in Workers Builds.
+
 This is a one-time account setup. The build itself can already succeed before this step.
 
 ## 1. Connect GitHub (recommended)
@@ -35,7 +44,7 @@ This is a one-time account setup. The build itself can already succeed before th
 |---------|--------|
 | **Build command** | `npm run build` |
 | **Deploy command** | `npm run deploy:cf` |
-| **Node.js version** | `22` (environment variable `NODE_VERSION=22`) |
+| **Node.js version** | `22` — add as **Text** variable `NODE_VERSION` = `22` |
 
 Cloudflare’s free plan is enough for testing (100k Worker requests/day, 500 builds/month).
 
@@ -49,18 +58,26 @@ Set these in Cloudflare → **Workers & Pages** → your project → **Settings*
 
 **Production** (and **Preview** if you use branch previews):
 
-| Variable | Value |
-|----------|--------|
-| `VITE_SUPABASE_URL` | `https://<project-ref>.supabase.co` |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Anon key (Supabase → Settings → API) |
-| `VITE_SUPABASE_PROJECT_ID` | Project reference ID |
-| `SUPABASE_URL` | Same as `VITE_SUPABASE_URL` |
-| `SUPABASE_PUBLISHABLE_KEY` | Same as anon key |
-| `SUPABASE_PROJECT_ID` | Same as project ref |
+Cloudflare asks for type **Text**, **Secret**, or **JSON** when adding each entry.
 
-`VITE_*` variables must be present at **build time** (Vite inlines them into the client bundle).
+| Variable | Type | Value |
+|----------|------|--------|
+| `VITE_SUPABASE_URL` | **Text** | `https://<project-ref>.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | **Text** | Anon key (Supabase → Settings → API) |
+| `VITE_SUPABASE_PROJECT_ID` | **Text** | Project reference ID |
+| `SUPABASE_URL` | **Text** | Same as `VITE_SUPABASE_URL` |
+| `SUPABASE_PUBLISHABLE_KEY` | **Text** | Same as anon key |
+| `SUPABASE_PROJECT_ID` | **Text** | Same as project ref |
 
-Do **not** add `SUPABASE_SERVICE_ROLE_KEY` to Cloudflare (only needed locally for `npm run backup` / `npm run restore`).
+Use **Text** for all of the above — not **Secret** or **JSON**. `VITE_*` values must be available at **build time**; Cloudflare **Secrets** are only injected at **runtime** (too late for `npm run build`). The anon key is public in the browser bundle anyway.
+
+**Important:** `wrangler deploy` **deletes** dashboard variables unless you pass `--keep-vars`. Our `npm run deploy:cf` script includes `--keep-vars` so dashboard entries survive local deploys. After adding variables in the dashboard, trigger a **new CI build** (or `npm run deploy` locally) so `VITE_*` are baked into the bundle.
+
+Paste values **without extra spaces or line breaks** — a bad `VITE_SUPABASE_PROJECT_ID` (e.g. tab/newline before the ref) breaks the app.
+
+`VITE_*` variables must be present at **build time** (Vite inlines them into the client bundle). After adding or changing them, trigger a **new deploy**.
+
+Do **not** add `SUPABASE_SERVICE_ROLE_KEY` to Cloudflare (only needed locally for `npm run backup` / `npm run restore`). If you ever added it, use type **Secret** — never Text or JSON.
 
 ## 3. Supabase Auth URLs
 
@@ -80,7 +97,7 @@ npx wrangler login
 npm run deploy
 ```
 
-`npm run deploy` runs `npm run build` then `wrangler deploy` from `.output/server/`.
+`npm run deploy` runs `npm run build` then `wrangler deploy` from the project root (Nitro writes `.wrangler/deploy/config.json` to point at `.output/server/wrangler.json`).
 
 Preview the production build locally:
 
