@@ -4,6 +4,26 @@ GT Slider Studio is a TanStack Start app built with **Nitro** (`cloudflare-modul
 
 The build outputs to `.output/` (gitignored). Nitro generates `.output/server/wrangler.json` automatically.
 
+## 0. Register workers.dev (required once)
+
+Before the first deploy, your Cloudflare account needs a **workers.dev subdomain**. Without it, CI fails at deploy with:
+
+> You can either deploy your worker to one or more routes … or register a workers.dev subdomain
+
+The `/workers/onboarding` URL from older Wrangler errors often 404s. Use the dashboard instead:
+
+1. Open [Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
+2. On the overview page, find **Your subdomain** (right sidebar or top area)
+3. Click **Change** (or **Set up** if none exists yet) and pick a subdomain, e.g. `global-tickets`
+4. Save, then **Retry deployment** in Workers Builds
+
+Alternative direct link (if your account supports it):  
+[Workers subdomain settings](https://dash.cloudflare.com/?to=/:account/workers/subdomain)
+
+Your app URL will be: `https://gt-slider-studio.<your-subdomain>.workers.dev`
+
+This is a one-time account setup. The build itself can already succeed before this step.
+
 ## 1. Connect GitHub (recommended)
 
 1. [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages** → **Create**
@@ -19,7 +39,9 @@ The build outputs to `.output/` (gitignored). Nitro generates `.output/server/wr
 
 Cloudflare’s free plan is enough for testing (100k Worker requests/day, 500 builds/month).
 
-After the first deploy you get a URL like `https://adumke-star-gt-slider-studio.<account>.workers.dev`.
+After the first deploy you get a URL like `https://gt-slider-studio.<your-subdomain>.workers.dev`.
+
+Cloudflare may auto-detect `bun run build` and `npx wrangler deploy` — that is fine. Our scripts (`npm run build`, `npm run deploy:cf`) do the same.
 
 ## 2. Environment variables
 
@@ -44,9 +66,9 @@ Do **not** add `SUPABASE_SERVICE_ROLE_KEY` to Cloudflare (only needed locally fo
 
 Supabase Dashboard → **Authentication** → **URL Configuration**:
 
-- **Site URL:** `https://adumke-star-gt-slider-studio.<account>.workers.dev` (your Workers URL)
+- **Site URL:** `https://gt-slider-studio.<your-subdomain>.workers.dev` (your Workers URL)
 - **Redirect URLs:**
-  - `https://adumke-star-gt-slider-studio.<account>.workers.dev/**`
+  - `https://gt-slider-studio.<your-subdomain>.workers.dev/**`
   - `http://localhost:8080/**` (local dev)
 
 Add preview URLs later if you enable non-production branch deploys.
