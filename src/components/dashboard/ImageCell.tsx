@@ -561,13 +561,21 @@ function TypeCombobox({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const skipBlurCommit = useRef(false);
-  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [rect, setRect] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(
+    null,
+  );
 
   const updateRect = () => {
     const el = inputRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setRect({ top: r.bottom + 2, left: r.left, width: r.width });
+    // max-h-40 (160px) + margin; open upwards when the list would leave the viewport.
+    const spaceBelow = window.innerHeight - r.bottom;
+    if (spaceBelow < 170) {
+      setRect({ bottom: window.innerHeight - r.top + 2, left: r.left, width: r.width });
+    } else {
+      setRect({ top: r.bottom + 2, left: r.left, width: r.width });
+    }
   };
 
   useEffect(() => {
@@ -615,7 +623,13 @@ function TypeCombobox({
       {rect && filtered.length > 0 &&
         createPortal(
           <div
-            style={{ position: "fixed", top: rect.top, left: rect.left, minWidth: rect.width }}
+            style={{
+              position: "fixed",
+              top: rect.top,
+              bottom: rect.bottom,
+              left: rect.left,
+              minWidth: rect.width,
+            }}
             className="z-50 max-h-40 w-max overflow-auto rounded border border-border bg-popover py-0.5 shadow-md"
           >
             {filtered.map((s) => (
@@ -631,7 +645,7 @@ function TypeCombobox({
                   skipBlurCommit.current = true;
                   inputRef.current?.blur();
                 }}
-                className="block w-full px-2 py-1 text-left text-[10px] text-foreground hover:bg-accent"
+                className="block w-full px-2 py-1 text-left text-[10px] text-foreground hover:bg-accent hover:text-accent-foreground"
               >
                 {s}
               </button>
