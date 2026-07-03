@@ -23,6 +23,26 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Validate secrets
+        run: |
+          missing=0
+          for key in VITE_SUPABASE_URL VITE_SUPABASE_PUBLISHABLE_KEY VITE_SUPABASE_PROJECT_ID CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing GitHub Actions secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Add secrets under GitHub → Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Build
         run: bun run build
         env:
@@ -32,6 +52,19 @@ jobs:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
+
+      - name: Verify bundle contains Supabase config
+        run: |
+          if rg -q "Missing Supabase" .output/public/assets/index-*.js; then
+            echo "::error::Build output is missing VITE_SUPABASE_* — check GitHub Actions secrets"
+            exit 1
+          fi
+          if ! rg -q "${VITE_SUPABASE_PROJECT_ID}" .output/public/assets/index-*.js; then
+            echo "::error::Project ID not found in client bundle"
+            exit 1
+          fi
+        env:
+          VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
 
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
