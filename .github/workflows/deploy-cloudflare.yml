@@ -55,11 +55,12 @@ jobs:
 
       - name: Verify bundle contains Supabase config
         run: |
-          if rg -q "Missing Supabase" .output/public/assets/index-*.js; then
+          bundle=$(ls .output/public/assets/index-*.js | head -1)
+          if grep -q "Missing Supabase" "$bundle"; then
             echo "::error::Build output is missing VITE_SUPABASE_* — check GitHub Actions secrets"
             exit 1
           fi
-          if ! rg -q "${VITE_SUPABASE_PROJECT_ID}" .output/public/assets/index-*.js; then
+          if ! grep -q "${VITE_SUPABASE_PROJECT_ID}" "$bundle"; then
             echo "::error::Project ID not found in client bundle"
             exit 1
           fi
