@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare, ChevronDown, Wand2, Crop } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -84,7 +85,6 @@ export function ImageCell({
   const [name, setName] = useState(image.title ?? "");
   const [seasonDraft, setSeasonDraft] = useState(image.season?.toString() ?? "");
   const [typeDraft, setTypeDraft] = useState(imageTypeLabel(image.image_type));
-  const [typeFocused, setTypeFocused] = useState(false);
   const [dropSide, setDropSide] = useState<"left" | "right" | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
@@ -415,60 +415,13 @@ export function ImageCell({
         )}
         <div className="flex items-center gap-1">
           {canEdit ? (
-            (() => {
-              const allSuggestions = Array.from(
-                new Set([...(typeSuggestions ?? []), ...IMAGE_TYPE_SUGGESTIONS]),
-              );
-              const query = typeDraft.trim().toLowerCase();
-              const filtered = allSuggestions.filter(
-                (s) => s.toLowerCase().includes(query) && s.toLowerCase() !== query,
-              );
-              return (
-                <div className="relative min-w-0 flex-1">
-                  <input
-                    type="text"
-                    value={typeDraft}
-                    onChange={(e) => setTypeDraft(e.target.value)}
-                    onFocus={() => setTypeFocused(true)}
-                    onBlur={() => {
-                      setTypeFocused(false);
-                      saveImageType(typeDraft);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                      if (e.key === "Escape") {
-                        setTypeDraft(imageTypeLabel(image.image_type));
-                        (e.target as HTMLInputElement).blur();
-                      }
-                    }}
-                    placeholder="Type…"
-                    title="Image type — Compositing / Race action / Fan atmosphere drive the rule checks, any other text is allowed"
-                    className="w-full rounded border border-border bg-background/50 px-1.5 py-0.5 text-[10px] text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-                  />
-                  {typeFocused && filtered.length > 0 && (
-                    <div className="absolute left-0 top-full z-40 mt-0.5 max-h-36 w-max min-w-full overflow-auto rounded border border-border bg-popover py-0.5 shadow-md">
-                      {filtered.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          // onMouseDown so the click wins over the input blur
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            setTypeDraft(s);
-                            setTypeFocused(false);
-                            saveImageType(s);
-                            (document.activeElement as HTMLElement | null)?.blur();
-                          }}
-                          className="block w-full px-2 py-1 text-left text-[10px] text-foreground hover:bg-accent"
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()
+            <TypeCombobox
+              value={typeDraft}
+              onChange={setTypeDraft}
+              onCommit={saveImageType}
+              onCancel={() => setTypeDraft(imageTypeLabel(image.image_type))}
+              suggestions={Array.from(new Set([...(typeSuggestions ?? []), ...IMAGE_TYPE_SUGGESTIONS]))}
+            />
           ) : (
             image.image_type && (
               <span className="truncate rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
@@ -587,6 +540,107 @@ export function ImageCell({
           onSaved={onChanged}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Free-text input with a suggestion list. The list renders in a portal with
+ * fixed positioning, so it is never clipped by the scrolling slot container.
+ */
+function TypeCombobox({
+  value,
+  onChange,
+  onCommit,
+  onCancel,
+  suggestions,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onCommit: (v: string) => void;
+  onCancel: () => void;
+  suggestions: string[];
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const skipBlurCommit = useRef(false);
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  const updateRect = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setRect({ top: r.bottom + 2, left: r.left, width: r.width });
+  };
+
+  useEffect(() => {
+    if (!rect) return;
+    window.addEventListener("scroll", updateRect, true);
+    window.addEventListener("resize", updateRect);
+    return () => {
+      window.removeEventListener("scroll", updateRect, true);
+      window.removeEventListener("resize", updateRect);
+    };
+  }, [rect !== null]);
+
+  const query = value.trim().toLowerCase();
+  const filtered = suggestions.filter(
+    (s) => s.toLowerCase().includes(query) && s.toLowerCase() !== query,
+  );
+
+  return (
+    <div className="min-w-0 flex-1">
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={updateRect}
+        onBlur={() => {
+          setRect(null);
+          if (skipBlurCommit.current) {
+            skipBlurCommit.current = false;
+            return;
+          }
+          onCommit(value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") {
+            onCancel();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        placeholder="Type…"
+        title="Image type — Compositing / Race action / Fan atmosphere drive the rule checks, any other text is allowed"
+        className="w-full rounded border border-border bg-background/50 px-1.5 py-0.5 text-[10px] text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+      />
+      {rect && filtered.length > 0 &&
+        createPortal(
+          <div
+            style={{ position: "fixed", top: rect.top, left: rect.left, minWidth: rect.width }}
+            className="z-50 max-h-40 w-max overflow-auto rounded border border-border bg-popover py-0.5 shadow-md"
+          >
+            {filtered.map((s) => (
+              <button
+                key={s}
+                type="button"
+                // onMouseDown so the click wins over the input blur
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setRect(null);
+                  onChange(s);
+                  onCommit(s);
+                  skipBlurCommit.current = true;
+                  inputRef.current?.blur();
+                }}
+                className="block w-full px-2 py-1 text-left text-[10px] text-foreground hover:bg-accent"
+              >
+                {s}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
