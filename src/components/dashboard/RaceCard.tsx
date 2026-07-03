@@ -980,17 +980,19 @@ function SlideCountBadge({
   canEdit: boolean;
   onReload: () => void;
 }) {
-  const maxSlides = section.max_slides ?? MIN_SLIDES;
+  const maxSlides = section.max_slides ?? null;
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(String(maxSlides));
+  const [draft, setDraft] = useState(maxSlides != null ? String(maxSlides) : "");
 
   const under = count < MIN_SLIDES;
-  const over = count > maxSlides;
+  const over = maxSlides != null && count > maxSlides;
 
   async function commit() {
     setEditing(false);
-    const parsed = Number(draft.trim());
-    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 30 || parsed === maxSlides) return;
+    const trimmed = draft.trim();
+    const parsed = trimmed === "" ? null : Number(trimmed);
+    if (parsed !== null && (!Number.isInteger(parsed) || parsed < 1 || parsed > 30)) return;
+    if (parsed === maxSlides) return;
     await supabase.from("slider_sections").update({ max_slides: parsed }).eq("id", section.id);
     onReload();
   }
@@ -1008,20 +1010,28 @@ function SlideCountBadge({
           onBlur={commit}
           onKeyDown={(e) => {
             if (e.key === "Enter") commit();
-            if (e.key === "Escape") { setEditing(false); setDraft(String(maxSlides)); }
+            if (e.key === "Escape") { setEditing(false); setDraft(maxSlides != null ? String(maxSlides) : ""); }
           }}
+          placeholder="—"
+          title="Optional maximum — leave empty for no limit"
           className="w-9 rounded border border-border bg-background px-1 py-0.5 text-[10px] focus:border-primary focus:outline-none"
         />
       </span>
     );
   }
 
+  const label = maxSlides != null ? `${count}/${maxSlides}` : `${count}`;
+  const baseTitle =
+    maxSlides != null
+      ? `Slides: ${count} of max ${maxSlides} (min ${MIN_SLIDES})`
+      : `Slides: ${count} (min ${MIN_SLIDES}, no maximum)`;
+
   return (
     <button
       type="button"
       disabled={!canEdit}
-      onClick={() => { setDraft(String(maxSlides)); setEditing(true); }}
-      title={canEdit ? `Slides: ${count} of max ${maxSlides} (min ${MIN_SLIDES}) — click to change max` : `Slides: ${count} of max ${maxSlides}`}
+      onClick={() => { setDraft(maxSlides != null ? String(maxSlides) : ""); setEditing(true); }}
+      title={canEdit ? `${baseTitle} — click to set an optional max` : baseTitle}
       className={cn(
         "shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
         under
@@ -1032,7 +1042,7 @@ function SlideCountBadge({
         canEdit && "hover:border-primary hover:text-primary",
       )}
     >
-      {count}/{maxSlides}
+      {label}
     </button>
   );
 }

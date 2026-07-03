@@ -330,7 +330,7 @@ export type Database = {
           external_url: string | null
           id: string
           kind: string
-          max_slides: number
+          max_slides: number | null
           name: string
           race_id: string
           sort_order: number
@@ -342,7 +342,7 @@ export type Database = {
           external_url?: string | null
           id?: string
           kind: string
-          max_slides?: number
+          max_slides?: number | null
           name?: string
           race_id: string
           sort_order?: number
@@ -354,7 +354,7 @@ export type Database = {
           external_url?: string | null
           id?: string
           kind?: string
-          max_slides?: number
+          max_slides?: number | null
           name?: string
           race_id?: string
           sort_order?: number

@@ -148,15 +148,14 @@ export function evaluateRaceRules({
       });
     }
 
-    // Rule 2: no more slides than configured maximum.
-    const maxSlides = section.max_slides ?? MIN_SLIDES;
-    if (imgs.length > maxSlides) {
+    // Rule 2: only enforced when a maximum was explicitly set for the section.
+    if (section.max_slides != null && imgs.length > section.max_slides) {
       violations.push({
         rule: 2,
         key: `max-slides-${section.id}`,
         severity: "warning",
         sectionId: section.id,
-        message: `${label}: ${imgs.length} images exceed the maximum of ${maxSlides} (rule 2).`,
+        message: `${label}: ${imgs.length} images exceed the configured maximum of ${section.max_slides} (rule 2).`,
       });
     }
 
