@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { ArrowLeft, Trash2, UserPlus, HardDriveDownload, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, Trash2, UserPlus, HardDriveDownload, HardDriveUpload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createBackupZip } from "@/lib/backupClient";
+import { raceExists, readRaceBackup, restoreRaceBackup, type RaceBackupArchive } from "@/lib/raceBackup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -48,6 +49,11 @@ function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [backupRunning, setBackupRunning] = useState(false);
   const [backupMsg, setBackupMsg] = useState<string | null>(null);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+  const [restoreArchive, setRestoreArchive] = useState<RaceBackupArchive | null>(null);
+  const [restoreExists, setRestoreExists] = useState(false);
+  const [restoreRunning, setRestoreRunning] = useState(false);
+  const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
 
   async function load() {
     const { data } = await supabase.from("allowed_emails").select("*").order("created_at", { ascending: false });
@@ -114,6 +120,47 @@ function AdminPage() {
     } finally {
       setBackupRunning(false);
       setBackupMsg(null);
+    }
+  }
+
+  async function pickRestoreFile(file: File) {
+    setRestoreArchive(null);
+    try {
+      const archive = await readRaceBackup(file);
+      setRestoreExists(await raceExists(archive.manifest.race.id));
+      setRestoreArchive(archive);
+    } catch (e) {
+      toast.error(`Could not read backup: ${(e as Error).message ?? e}`, { duration: 8000 });
+    } finally {
+      if (restoreInputRef.current) restoreInputRef.current.value = "";
+    }
+  }
+
+  async function runRestore() {
+    if (!restoreArchive) return;
+    if (restoreExists) {
+      const name = restoreArchive.manifest.race.name;
+      if (!confirm(`Race "${name}" already exists. Replace it with the backup? The current state (including images) will be deleted.`)) {
+        return;
+      }
+    }
+    setRestoreRunning(true);
+    setRestoreMsg("Starting…");
+    try {
+      const result = await restoreRaceBackup(restoreArchive, { replace: restoreExists }, setRestoreMsg);
+      toast.success(
+        `Race "${restoreArchive.manifest.race.name}" restored: ${result.sections} sections, ${result.images} slots, ` +
+        `${result.files_uploaded} files${result.files_failed ? ` (${result.files_failed} failed)` : ""}` +
+        `${result.comments_skipped ? ` — ${result.comments_skipped} comments skipped` : ""}`,
+        { duration: 8000 },
+      );
+      setRestoreArchive(null);
+    } catch (e) {
+      console.error("restore failed", e);
+      toast.error(`Restore failed: ${(e as Error).message ?? e}`, { duration: 10000 });
+    } finally {
+      setRestoreRunning(false);
+      setRestoreMsg(null);
     }
   }
 
@@ -201,6 +248,55 @@ function AdminPage() {
           <p className="mt-2 text-xs text-muted-foreground">
             Downloads all races, sections, slots and comments as JSON plus every compressed image,
             organised by series / race / section. Keep the file somewhere safe (e.g. Drive).
+          </p>
+        </section>
+
+        <section className="rounded-lg border border-border bg-surface-2 p-4">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted-foreground">Restore race from backup</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              ref={restoreInputRef}
+              type="file"
+              accept=".zip,application/zip"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && pickRestoreFile(e.target.files[0])}
+            />
+            <Button
+              variant="outline"
+              onClick={() => restoreInputRef.current?.click()}
+              disabled={restoreRunning}
+              className="gap-1.5"
+            >
+              <HardDriveUpload className="h-4 w-4" /> Choose backup ZIP
+            </Button>
+            {restoreArchive && !restoreRunning && (
+              <Button onClick={runRestore} className="gap-1.5">
+                {restoreExists ? "Replace existing race" : "Restore race"}
+              </Button>
+            )}
+            {restoreRunning && (
+              <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> {restoreMsg}
+              </span>
+            )}
+          </div>
+          {restoreArchive && (
+            <div className="mt-3 rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
+              <span className="text-foreground">{restoreArchive.manifest.race.name}</span>
+              {" "}({restoreArchive.manifest.race.series.toUpperCase()})
+              {" "}· backup from {new Date(restoreArchive.manifest.created_at).toLocaleString()}
+              {" "}· {restoreArchive.manifest.counts.sections} sections, {restoreArchive.manifest.counts.images} slots,
+              {" "}{restoreArchive.files.length} files
+              {restoreExists && (
+                <div className="mt-1 font-bold text-[var(--status-todo)]">
+                  This race still exists — restoring will replace its current state.
+                </div>
+              )}
+            </div>
+          )}
+          <p className="mt-2 text-xs text-muted-foreground">
+            Upload a per-race backup ZIP (created via the archive button on a race) to bring the race back
+            exactly as it was — sections, slots, statuses and images included.
           </p>
         </section>
 

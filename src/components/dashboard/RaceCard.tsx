@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2 } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2, Archive, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 import { isCompressEligible } from "@/lib/compressImage";
 import { MIN_SLIDES, type SeriesSeasonInfo } from "@/lib/rules";
+import { backupFileName, createRaceBackupZip } from "@/lib/raceBackup";
 import { RuleCheckPanel } from "./RuleCheckPanel";
 
 type Race = {
@@ -65,6 +66,7 @@ export function RaceCard({
   const [hasOpenComments, setHasOpenComments] = useState(false);
   const [editingRaceName, setEditingRaceName] = useState(false);
   const [raceNameDraft, setRaceNameDraft] = useState(race.name);
+  const [backupRunning, setBackupRunning] = useState(false);
 
   const hasChanges = useMemo(() => images.some((i) => i.status === "changes"), [images]);
   const hasSolved = useMemo(() => images.some((i) => i.status === "solved"), [images]);
@@ -72,6 +74,34 @@ export function RaceCard({
   useEffect(() => {
     if (!editingRaceName) setRaceNameDraft(race.name);
   }, [race.name, editingRaceName]);
+
+  async function downloadBackup() {
+    setBackupRunning(true);
+    const toastId = toast.loading(`Creating backup of "${race.name}"…`);
+    try {
+      const { blob, manifest } = await createRaceBackupZip(race.id, (msg) =>
+        toast.loading(`Backup "${race.name}": ${msg}`, { id: toastId }),
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = backupFileName(race.name);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      const { files_saved, files_failed } = manifest.counts;
+      toast.success(
+        `Backup ready: ${manifest.counts.images} slots, ${files_saved} files${files_failed ? ` (${files_failed} failed)` : ""}`,
+        { id: toastId },
+      );
+    } catch (e) {
+      console.error("race backup failed", e);
+      toast.error(`Backup failed: ${(e as Error).message ?? e}`, { id: toastId });
+    } finally {
+      setBackupRunning(false);
+    }
+  }
 
   async function renameRace(name: string) {
     const trimmed = name.trim();
@@ -351,6 +381,14 @@ export function RaceCard({
               <Button size="sm" variant="ghost" onClick={() => addSection("pdp")} className="h-7 gap-1 text-xs">
                 <Plus className="h-3.5 w-3.5" /> PDP
               </Button>
+              <button
+                onClick={downloadBackup}
+                disabled={backupRunning}
+                className="rounded p-2 text-muted-foreground hover:bg-background hover:text-primary disabled:opacity-40"
+                title="Download race backup (ZIP) — can be restored on the admin page"
+              >
+                {backupRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
+              </button>
               <button
                 onClick={() => onRequestDeleteRace(race)}
                 className="rounded p-2 text-muted-foreground hover:bg-background hover:text-destructive"
