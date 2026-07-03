@@ -7,7 +7,7 @@ import { ImageCell, type SliderImage } from "./ImageCell";
 import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 import { isCompressEligible } from "@/lib/compressImage";
-import { MIN_SLIDES, imageTypeLabel, type SeriesSeasonInfo } from "@/lib/rules";
+import { MIN_SLIDES, type SeriesSeasonInfo } from "@/lib/rules";
 import { RuleCheckPanel } from "./RuleCheckPanel";
 
 type Race = {
@@ -138,16 +138,6 @@ export function RaceCard({
     }
     for (const arr of m.values()) arr.sort((a, b) => a.position - b.position);
     return m;
-  }, [images]);
-
-  // Type values already used in this race, offered as suggestions in the type field.
-  const typeSuggestions = useMemo(() => {
-    const set = new Set<string>();
-    for (const i of images) {
-      const label = imageTypeLabel(i.image_type);
-      if (label) set.add(label);
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [images]);
 
   async function addSection(kind: "plp" | "pdp") {
@@ -414,7 +404,6 @@ export function RaceCard({
                 onBatchUpload={(files, onProgress) => batchUploadToSection(s, files, onProgress)}
                 onExport={onExport}
                 onCompress={onCompress}
-                typeSuggestions={typeSuggestions}
               />
             );
           })}
@@ -444,7 +433,6 @@ function SectionBlock({
   onBatchUpload,
   onExport,
   onCompress,
-  typeSuggestions,
 }: {
   section: SliderSection;
   images: SliderImage[];
@@ -465,7 +453,6 @@ function SectionBlock({
   onBatchUpload: (files: File[], onProgress?: (items: BatchItem[]) => void) => Promise<void> | void;
   onExport: (images: SliderImage[]) => void;
   onCompress: (images: SliderImage[]) => void;
-  typeSuggestions?: string[];
 }) {
   const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const [editingName, setEditingName] = useState(false);
@@ -836,7 +823,6 @@ function SectionBlock({
               onDropAfter={() => onDropOn(img.id, "after")}
               onCompress={() => onCompress([img])}
               onFileDropHandled={clearFileHover}
-              typeSuggestions={typeSuggestions}
               onMultiFileDrop={async (files) => {
                 clearFileHover();
                 setUploading(true);

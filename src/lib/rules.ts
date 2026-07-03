@@ -2,28 +2,28 @@
 // Pure functions: given a race's sections + images, return violations.
 // Rule numbers refer to the team's Rule Setup sheet.
 
-export type ImageType = "compositing" | "race_action" | "fan_atmosphere" | "generic" | "glamping" | "camping";
+export type ImageType = "compositing" | "race_action" | "fan_atmosphere";
 
-export const IMAGE_TYPES: ImageType[] = [
-  "compositing",
-  "race_action",
-  "fan_atmosphere",
-  "generic",
-  "glamping",
-  "camping",
-];
+export const IMAGE_TYPES: ImageType[] = ["compositing", "race_action", "fan_atmosphere"];
 
 export const IMAGE_TYPE_LABELS: Record<ImageType, string> = {
   compositing: "Compositing",
   race_action: "Race action",
   fan_atmosphere: "Fan atmosphere",
-  generic: "Generic",
-  glamping: "Glamping",
-  camping: "Camping",
 };
 
-/** Suggested values for the free-text type field (display labels). */
-export const IMAGE_TYPE_SUGGESTIONS: string[] = IMAGE_TYPES.map((t) => IMAGE_TYPE_LABELS[t]);
+/**
+ * Fixed suggestion list for the free-text type field. Deliberately not fed
+ * from existing data so it stays short; anything else has to be typed out.
+ */
+export const IMAGE_TYPE_SUGGESTIONS: string[] = [
+  "Compositing",
+  "Race action",
+  "Fan atmosphere",
+  "Glamping/Camping",
+  "VIP",
+  "VIP Generic",
+];
 
 /**
  * The type field is free text; only these three types drive automatic rules.

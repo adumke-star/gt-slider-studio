@@ -64,7 +64,6 @@ export function ImageCell({
   onMultiFileDrop,
   onFileDropHandled,
   onCompress,
-  typeSuggestions,
 }: {
   image: SliderImage;
   selected: boolean;
@@ -77,7 +76,6 @@ export function ImageCell({
   onMultiFileDrop?: (files: File[]) => void;
   onFileDropHandled?: () => void;
   onCompress?: () => void;
-  typeSuggestions?: string[];
 }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [croppedPreview, setCroppedPreview] = useState<string | null>(null);
@@ -420,7 +418,7 @@ export function ImageCell({
               onChange={setTypeDraft}
               onCommit={saveImageType}
               onCancel={() => setTypeDraft(imageTypeLabel(image.image_type))}
-              suggestions={Array.from(new Set([...(typeSuggestions ?? []), ...IMAGE_TYPE_SUGGESTIONS]))}
+              suggestions={IMAGE_TYPE_SUGGESTIONS}
             />
           ) : (
             image.image_type && (
