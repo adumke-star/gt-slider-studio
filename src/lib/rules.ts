@@ -23,6 +23,7 @@ export const IMAGE_TYPE_SUGGESTIONS: string[] = [
   "Glamping/Camping",
   "VIP",
   "VIP Generic",
+  "Travel",
 ];
 
 /**
