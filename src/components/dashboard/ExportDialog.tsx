@@ -31,12 +31,15 @@ export function ExportDialog({
   images,
   races = [],
   onDone,
+  onExported,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   images: SliderImage[];
   races?: RaceLite[];
   onDone: () => void;
+  /** Called with the exported image ids after a successful export. */
+  onExported?: (ids: string[]) => void;
 }) {
   const [asZip, setAsZip] = useState(true);
   const [progress, setProgress] = useState(0);
@@ -147,6 +150,7 @@ export function ExportDialog({
 
       toast.success(`${results.length} image${results.length === 1 ? "" : "s"} saved`);
       setRunning(false);
+      onExported?.(results.map((r) => r.id));
       onDone();
       onOpenChange(false);
       return;

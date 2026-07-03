@@ -501,6 +501,13 @@ function Dashboard() {
         onOpenChange={(v) => { setExportOpen(v); if (!v) setExportImages(null); }}
         images={exportImages ?? selectedImgs.filter((i) => i.compressed_path)}
         races={races}
+        onExported={(ids) => {
+          setSelected((prev) => {
+            const n = new Set(prev);
+            for (const id of ids) n.delete(id);
+            return n;
+          });
+        }}
         onDone={async () => {
           await loadFlags();
           if (selection.kind === "race") await loadRace(selection.raceId);
