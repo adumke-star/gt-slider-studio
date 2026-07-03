@@ -9,7 +9,7 @@ import { transformImage, extForFormat, type ExportFormat } from "@/lib/imageProc
 import { parseCropArea, resolveFocal } from "@/lib/cropUtils";
 import { uploadFile, removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchCompressSource, isCompressEligible } from "@/lib/compressImage";
+import { acceptWithoutCompression, fetchCompressSource, isCompressEligible } from "@/lib/compressImage";
 import type { SliderImage } from "./ImageCell";
 
 function imageLabel(img: SliderImage): string {
@@ -29,12 +29,67 @@ export function CompressDialog({
 }) {
   const [targetKB, setTargetKB] = useState(120);
   const [format, setFormat] = useState<ExportFormat>("webp");
+  const [passthrough, setPassthrough] = useState(false);
   const [progress, setProgress] = useState(0);
   const [running, setRunning] = useState(false);
 
   const eligible = images.filter(isCompressEligible);
+  // Passthrough copies the uploaded file 1:1, so it needs an original to copy from.
+  const passthroughEligible = images.filter((i) => i.original_path);
+  const activeCount = passthrough ? passthroughEligible.length : eligible.length;
+
+  async function runPassthrough() {
+    setRunning(true);
+    setProgress(0);
+    let done = 0;
+    let ok = 0;
+    let failed = 0;
+
+    for (const img of passthroughEligible) {
+      const label = imageLabel(img);
+      const result = await acceptWithoutCompression(img);
+      switch (result.outcome) {
+        case "ok":
+          ok++;
+          break;
+        case "already-final":
+          break;
+        case "missing":
+          toast.error(`${label}: image file not found in storage. Try re-uploading.`, { duration: 7000 });
+          failed++;
+          break;
+        case "unsupported":
+          toast.error(`${label}: format "${result.mime}" is not supported for export. Use Compress instead.`, {
+            duration: 7000,
+          });
+          failed++;
+          break;
+        case "failed":
+          toast.error(`${label}: could not save — ${result.message}`, { duration: 7000 });
+          failed++;
+          break;
+      }
+      done++;
+      setProgress(done);
+    }
+
+    if (ok > 0) toast.success(`${ok} image${ok === 1 ? "" : "s"} accepted without re-compression`);
+    if (failed > 0) {
+      toast.error(`${failed} image${failed === 1 ? "" : "s"} failed.`, { duration: 7000 });
+    }
+
+    setRunning(false);
+    if (ok > 0) {
+      onDone();
+      onOpenChange(false);
+    }
+  }
 
   async function run() {
+    if (passthrough) {
+      await runPassthrough();
+      return;
+    }
     setRunning(true);
     setProgress(0);
     const ext = extForFormat(format);
@@ -157,55 +212,79 @@ export function CompressDialog({
       <DialogContent className="bg-surface-2 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
-            Compress {eligible.length} image{eligible.length === 1 ? "" : "s"}
+            Compress {activeCount} image{activeCount === 1 ? "" : "s"}
           </DialogTitle>
           <DialogDescription>
-            Crop to 633×382 and compress. Uses the original when available; otherwise re-compresses the existing web image.
-            The original is deleted after a successful run.
+            {passthrough
+              ? "Takes the uploaded files as-is for export — nothing is re-encoded. The original is moved, not copied."
+              : "Crop to 633×382 and compress. Uses the original when available; otherwise re-compresses the existing web image. The original is deleted after a successful run."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-2">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-bold uppercase tracking-wider text-muted-foreground">Target size</span>
-              <span className="font-display text-lg text-primary">{targetKB} KB</span>
-            </div>
-            <Slider value={[targetKB]} min={10} max={500} step={1}
-              onValueChange={([v]) => setTargetKB(v)} disabled={running} />
-            <div className="flex justify-between text-[10px] text-muted-foreground">
-              <span>10 KB</span><span>500 KB</span>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Format</div>
-            <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)} disabled={running}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="webp">WebP (recommended)</SelectItem>
-                <SelectItem value="avif">AVIF</SelectItem>
-                <SelectItem value="jpeg">JPG</SelectItem>
-                <SelectItem value="png">PNG (lossless)</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex items-center justify-between rounded border border-border bg-background/50 p-3">
+            <label htmlFor="passthrough" className="pr-3 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              Already compressed — accept without re-compression
+            </label>
+            <input
+              id="passthrough"
+              type="checkbox"
+              checked={passthrough}
+              onChange={(e) => setPassthrough(e.target.checked)}
+              disabled={running}
+              className="h-4 w-4 shrink-0 accent-primary"
+            />
           </div>
 
-          <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
-            Output: <span className="text-foreground">633 × 382 px</span> · cover fill, center crop.
-            Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
-          </div>
+          {passthrough ? (
+            <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
+              The uploaded file is made available for export unchanged — no cropping, no re-encoding
+              (633 × 382 px recommended). Eligible: <span className="text-foreground">{passthroughEligible.length}</span> of {images.length} selected.
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-bold uppercase tracking-wider text-muted-foreground">Target size</span>
+                  <span className="font-display text-lg text-primary">{targetKB} KB</span>
+                </div>
+                <Slider value={[targetKB]} min={10} max={500} step={1}
+                  onValueChange={([v]) => setTargetKB(v)} disabled={running} />
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>10 KB</span><span>500 KB</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Format</div>
+                <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)} disabled={running}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="webp">WebP (recommended)</SelectItem>
+                    <SelectItem value="avif">AVIF</SelectItem>
+                    <SelectItem value="jpeg">JPG</SelectItem>
+                    <SelectItem value="png">PNG (lossless)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
+                Output: <span className="text-foreground">633 × 382 px</span> · cover fill, center crop.
+                Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
+              </div>
+            </>
+          )}
           {running && (
             <div className="text-sm text-primary">
-              Processing {progress} / {eligible.length}…
+              Processing {progress} / {activeCount}…
             </div>
           )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={running}>Cancel</Button>
-          <Button onClick={run} disabled={running || eligible.length === 0}
+          <Button onClick={run} disabled={running || activeCount === 0}
             className="bg-primary text-primary-foreground hover:bg-primary/90">
             {running
-              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Compressing</>
-              : "Compress now"}
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {passthrough ? "Accepting" : "Compressing"}</>
+              : passthrough ? "Accept as final" : "Compress now"}
           </Button>
         </DialogFooter>
       </DialogContent>

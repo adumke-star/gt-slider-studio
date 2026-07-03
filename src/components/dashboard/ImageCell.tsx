@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare, ChevronDown, Wand2, Crop } from "lucide-react";
+import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare, ChevronDown, Wand2, Crop, FileCheck2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ import { CommentsSheet } from "./CommentsSheet";
 import { CropDialog } from "./CropDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { hasCustomCrop, hasCustomCropArea, parseCropArea, renderCroppedPreviewUrl } from "@/lib/cropUtils";
-import { isCompressEligible } from "@/lib/compressImage";
+import { acceptWithoutCompression, isCompressEligible } from "@/lib/compressImage";
 import { IMAGE_TYPE_SUGGESTIONS, imageTypeLabel, normalizeImageType } from "@/lib/rules";
 
 export type SliderImage = {
@@ -198,6 +198,33 @@ export function ImageCell({
     if (status === image.status) return;
     await supabase.from("slider_images").update({ status }).eq("id", image.id);
     onChanged();
+  }
+
+  async function acceptAsFinal() {
+    setBusy(true);
+    try {
+      const result = await acceptWithoutCompression(image);
+      switch (result.outcome) {
+        case "ok":
+          toast.success("Image accepted without re-compression — ready to export.");
+          onChanged();
+          break;
+        case "already-final":
+          toast.info("Image is already exportable.");
+          break;
+        case "missing":
+          toast.error("Image file not found in storage. Try re-uploading.");
+          break;
+        case "unsupported":
+          toast.error(`Format "${result.mime}" is not supported for export. Use Compress instead.`);
+          break;
+        case "failed":
+          toast.error(`Could not save: ${result.message}`);
+          break;
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveImageType(raw: string) {
@@ -477,6 +504,16 @@ export function ImageCell({
               className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
             >
               <Wand2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {canEdit && image.original_path && (
+            <button
+              onClick={acceptAsFinal}
+              disabled={busy}
+              title="Already compressed — accept as final without re-compression"
+              className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary disabled:opacity-40"
+            >
+              <FileCheck2 className="h-3.5 w-3.5" />
             </button>
           )}
           {image.compressed_path && (
