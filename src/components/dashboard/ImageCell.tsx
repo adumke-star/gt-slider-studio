@@ -9,6 +9,7 @@ import { CropDialog } from "./CropDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { hasCustomCrop, hasCustomCropArea, parseCropArea, renderCroppedPreviewUrl } from "@/lib/cropUtils";
 import { isCompressEligible } from "@/lib/compressImage";
+import { IMAGE_TYPES, IMAGE_TYPE_LABELS, type ImageType } from "@/lib/rules";
 
 export type SliderImage = {
   id: string;
@@ -27,6 +28,9 @@ export type SliderImage = {
   crop_area?: unknown;
   crop_x?: number | null;
   crop_y?: number | null;
+  image_type?: string | null;
+  season?: number | null;
+  created_at?: string;
 };
 
 const STATUS_ORDER: SliderImage["status"][] = ["todo", "changes", "solved", "image_done", "exported", "live"];
@@ -75,6 +79,7 @@ export function ImageCell({
   const [croppedPreview, setCroppedPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState(image.title ?? "");
+  const [seasonDraft, setSeasonDraft] = useState(image.season?.toString() ?? "");
   const [dropSide, setDropSide] = useState<"left" | "right" | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
@@ -110,6 +115,10 @@ export function ImageCell({
     })();
     return () => { alive = false; };
   }, [preview, showCropPreview, image.crop_area]);
+
+  useEffect(() => {
+    setSeasonDraft(image.season?.toString() ?? "");
+  }, [image.season]);
 
   useEffect(() => {
     let alive = true;
@@ -181,6 +190,20 @@ export function ImageCell({
   async function setStatus(status: SliderImage["status"]) {
     if (status === image.status) return;
     await supabase.from("slider_images").update({ status }).eq("id", image.id);
+    onChanged();
+  }
+
+  async function setImageType(imageType: ImageType | null) {
+    if (imageType === (image.image_type ?? null)) return;
+    await supabase.from("slider_images").update({ image_type: imageType }).eq("id", image.id);
+    onChanged();
+  }
+
+  async function saveSeason(raw: string) {
+    const parsed = raw.trim() === "" ? null : Number(raw.trim());
+    if (parsed !== null && (!Number.isInteger(parsed) || parsed < 2000 || parsed > 2100)) return;
+    if (parsed === (image.season ?? null)) return;
+    await supabase.from("slider_images").update({ season: parsed }).eq("id", image.id);
     onChanged();
   }
 
@@ -369,6 +392,67 @@ export function ImageCell({
             {meta.label}
           </span>
         )}
+        <div className="flex items-center gap-1">
+          {canEdit ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  title="Image type (rule checks)"
+                  className={cn(
+                    "flex min-w-0 flex-1 items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] transition",
+                    image.image_type
+                      ? "border-border text-foreground"
+                      : "border-dashed border-border text-muted-foreground",
+                  )}
+                >
+                  <span className="truncate">
+                    {image.image_type ? IMAGE_TYPE_LABELS[image.image_type as ImageType] ?? image.image_type : "Type?"}
+                  </span>
+                  <ChevronDown className="ml-auto h-3 w-3 shrink-0 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[9rem]">
+                {IMAGE_TYPES.map((t) => (
+                  <DropdownMenuItem
+                    key={t}
+                    onClick={() => setImageType(t)}
+                    className={cn("cursor-pointer text-xs", t === image.image_type && "font-semibold")}
+                  >
+                    {IMAGE_TYPE_LABELS[t]}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuItem onClick={() => setImageType(null)} className="cursor-pointer text-xs text-muted-foreground">
+                  No type
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            image.image_type && (
+              <span className="truncate rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                {IMAGE_TYPE_LABELS[image.image_type as ImageType] ?? image.image_type}
+              </span>
+            )
+          )}
+          {canEdit ? (
+            <input
+              type="text"
+              inputMode="numeric"
+              value={seasonDraft}
+              onChange={(e) => setSeasonDraft(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+              onBlur={() => saveSeason(seasonDraft)}
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+              placeholder="Season"
+              title="Season shown in the image (rules 3/4)"
+              className="w-14 shrink-0 rounded border border-border bg-background/50 px-1.5 py-0.5 text-[10px] text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            />
+          ) : (
+            image.season && (
+              <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                {image.season}
+              </span>
+            )
+          )}
+        </div>
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setCommentsOpen(true)}

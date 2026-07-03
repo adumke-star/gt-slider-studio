@@ -174,6 +174,38 @@ export type Database = {
         }
         Relationships: []
       }
+      race_rule_checks: {
+        Row: {
+          checked_at: string
+          checked_by: string | null
+          id: string
+          race_id: string
+          rule_key: string
+        }
+        Insert: {
+          checked_at?: string
+          checked_by?: string | null
+          id?: string
+          race_id: string
+          rule_key: string
+        }
+        Update: {
+          checked_at?: string
+          checked_by?: string | null
+          id?: string
+          race_id?: string
+          rule_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "race_rule_checks_race_id_fkey"
+            columns: ["race_id"]
+            isOneToOne: false
+            referencedRelation: "races"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       races: {
         Row: {
           created_at: string
@@ -216,11 +248,13 @@ export type Database = {
           crop_y: number | null
           format: string | null
           id: string
+          image_type: string | null
           original_path: string | null
           original_size_kb: number | null
           original_url: string | null
           position: number
           race_id: string
+          season: number | null
           section_id: string | null
           status: Database["public"]["Enums"]["image_status"]
           title: string | null
@@ -237,11 +271,13 @@ export type Database = {
           crop_y?: number | null
           format?: string | null
           id?: string
+          image_type?: string | null
           original_path?: string | null
           original_size_kb?: number | null
           original_url?: string | null
           position?: number
           race_id: string
+          season?: number | null
           section_id?: string | null
           status?: Database["public"]["Enums"]["image_status"]
           title?: string | null
@@ -258,11 +294,13 @@ export type Database = {
           crop_y?: number | null
           format?: string | null
           id?: string
+          image_type?: string | null
           original_path?: string | null
           original_size_kb?: number | null
           original_url?: string | null
           position?: number
           race_id?: string
+          season?: number | null
           section_id?: string | null
           status?: Database["public"]["Enums"]["image_status"]
           title?: string | null
@@ -292,6 +330,7 @@ export type Database = {
           external_url: string | null
           id: string
           kind: string
+          max_slides: number
           name: string
           race_id: string
           sort_order: number
@@ -303,6 +342,7 @@ export type Database = {
           external_url?: string | null
           id?: string
           kind: string
+          max_slides?: number
           name?: string
           race_id: string
           sort_order?: number
@@ -314,6 +354,7 @@ export type Database = {
           external_url?: string | null
           id?: string
           kind?: string
+          max_slides?: number
           name?: string
           race_id?: string
           sort_order?: number

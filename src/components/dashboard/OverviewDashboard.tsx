@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Search, AlertCircle, MessageSquare, Flag, CheckCircle2, Trash2 } from "lucide-react";
-import { SERIES, type Series, type RaceFlags } from "./RaceNav";
+import { Search, AlertCircle, MessageSquare, Flag, CheckCircle2, Trash2, ShieldAlert } from "lucide-react";
+import { SERIES, EMPTY_FLAGS, type Series, type RaceFlags } from "./RaceNav";
 
 export type OverviewRace = {
   id: string;
@@ -28,8 +28,7 @@ export function OverviewDashboard({
 }) {
   const [query, setQuery] = useState("");
 
-  const flags = (id: string): RaceFlags =>
-    flagsByRace.get(id) ?? { hasChanges: false, hasOpenComments: false, hasSolved: false };
+  const flags = (id: string): RaceFlags => flagsByRace.get(id) ?? EMPTY_FLAGS;
 
   const changesCount = useMemo(
     () => races.filter((r) => flags(r.id).hasChanges).length,
@@ -43,9 +42,16 @@ export function OverviewDashboard({
     () => races.filter((r) => flags(r.id).hasSolved).length,
     [races, flagsByRace],
   );
+  const ruleViolationCount = useMemo(
+    () => races.filter((r) => flags(r.id).hasRuleViolations).length,
+    [races, flagsByRace],
+  );
 
   const attention = useMemo(
-    () => races.filter((r) => flags(r.id).hasChanges || flags(r.id).hasOpenComments),
+    () =>
+      races.filter(
+        (r) => flags(r.id).hasChanges || flags(r.id).hasOpenComments || flags(r.id).hasRuleViolations,
+      ),
     [races, flagsByRace],
   );
 
@@ -70,7 +76,7 @@ export function OverviewDashboard({
 
   return (
     <div className="space-y-8">
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard
           icon={<Flag className="h-4 w-4" />}
           label="Total races"
@@ -96,6 +102,12 @@ export function OverviewDashboard({
           label="Solved"
           value={solvedCount}
           hint={solvedCount === 0 ? "No solved slots" : "Races with solved comment threads"}
+        />
+        <KpiCard
+          icon={<ShieldAlert className="h-4 w-4 text-destructive" />}
+          label="Rule violations"
+          value={ruleViolationCount}
+          hint={ruleViolationCount === 0 ? "All rules passed" : "Races violating slider rules"}
         />
       </section>
 
@@ -211,6 +223,7 @@ function RaceTile({
             {flags.hasChanges && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#CB4F10]" />}
             {flags.hasOpenComments && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FACC15]" />}
             {flags.hasSolved && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--status-solved)]" />}
+            {flags.hasRuleViolations && <span title="Rule violations" className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />}
           </div>
           <div className="mt-0.5 text-[11px] uppercase tracking-widest text-muted-foreground">
             {SERIES_LABEL.get(race.series) ?? race.series} {race.race_date ? `· ${race.race_date}` : ""}

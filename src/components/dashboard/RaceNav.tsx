@@ -17,7 +17,19 @@ export type NavRace = {
   series: Series;
 };
 
-export type RaceFlags = { hasChanges: boolean; hasOpenComments: boolean; hasSolved: boolean };
+export type RaceFlags = {
+  hasChanges: boolean;
+  hasOpenComments: boolean;
+  hasSolved: boolean;
+  hasRuleViolations?: boolean;
+};
+
+export const EMPTY_FLAGS: RaceFlags = {
+  hasChanges: false,
+  hasOpenComments: false,
+  hasSolved: false,
+  hasRuleViolations: false,
+};
 
 export type NavSelection =
   | { kind: "overview" }
@@ -31,13 +43,19 @@ export const SERIES: { key: Series; label: string }[] = [
   { key: "wsbk", label: "WSBK" },
 ];
 
-function NavStatusDot({ kind }: { kind: "changes" | "comments" | "solved" }) {
+function NavStatusDot({ kind }: { kind: "changes" | "comments" | "solved" | "rules" }) {
   return (
     <span
       aria-hidden
       className={cn(
         "inline-block h-1.5 w-1.5 shrink-0 rounded-full ring-1 ring-background",
-        kind === "changes" ? "bg-status-changes" : kind === "solved" ? "bg-status-solved" : "bg-status-done",
+        kind === "changes"
+          ? "bg-status-changes"
+          : kind === "solved"
+            ? "bg-status-solved"
+            : kind === "rules"
+              ? "bg-destructive"
+              : "bg-status-done",
       )}
     />
   );
@@ -64,7 +82,7 @@ export function RaceNav({
   }, [races]);
 
   function raceFlags(raceId: string): RaceFlags {
-    return flagsByRace.get(raceId) ?? { hasChanges: false, hasOpenComments: false, hasSolved: false };
+    return flagsByRace.get(raceId) ?? EMPTY_FLAGS;
   }
 
   function seriesFlags(series: Series): RaceFlags {
@@ -72,14 +90,16 @@ export function RaceNav({
     let hasChanges = false;
     let hasOpenComments = false;
     let hasSolved = false;
+    let hasRuleViolations = false;
     for (const r of list) {
       const f = raceFlags(r.id);
       if (f.hasChanges) hasChanges = true;
       if (f.hasOpenComments) hasOpenComments = true;
       if (f.hasSolved) hasSolved = true;
-      if (hasChanges && hasOpenComments && hasSolved) break;
+      if (f.hasRuleViolations) hasRuleViolations = true;
+      if (hasChanges && hasOpenComments && hasSolved && hasRuleViolations) break;
     }
-    return { hasChanges, hasOpenComments, hasSolved };
+    return { hasChanges, hasOpenComments, hasSolved, hasRuleViolations };
   }
 
   const selectedRace =
@@ -126,6 +146,7 @@ export function RaceNav({
               {flags.hasChanges && <NavStatusDot kind="changes" />}
               {flags.hasOpenComments && <NavStatusDot kind="comments" />}
               {flags.hasSolved && <NavStatusDot kind="solved" />}
+              {flags.hasRuleViolations && <NavStatusDot kind="rules" />}
               <ChevronDown className="h-3 w-3 opacity-70" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[12rem]">
@@ -149,6 +170,7 @@ export function RaceNav({
                         {f.hasChanges && <NavStatusDot kind="changes" />}
                         {f.hasOpenComments && <NavStatusDot kind="comments" />}
                         {f.hasSolved && <NavStatusDot kind="solved" />}
+                        {f.hasRuleViolations && <NavStatusDot kind="rules" />}
                       </span>
                     </DropdownMenuItem>
                   );

@@ -7,6 +7,8 @@ import { ImageCell, type SliderImage } from "./ImageCell";
 import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 import { isCompressEligible } from "@/lib/compressImage";
+import { MIN_SLIDES, type SeriesSeasonInfo } from "@/lib/rules";
+import { RuleCheckPanel } from "./RuleCheckPanel";
 
 type Race = {
   id: string;
@@ -27,6 +29,7 @@ export type SliderSection = {
   sort_order: number;
   external_url: string | null;
   external_links: SectionLink[] | null;
+  max_slides?: number | null;
 };
 
 export function RaceCard({
@@ -41,6 +44,7 @@ export function RaceCard({
   onCompress,
   onRequestDeleteRace,
   onRaceRenamed,
+  seasonInfo,
 }: {
   race: Race;
   sections: SliderSection[];
@@ -53,6 +57,7 @@ export function RaceCard({
   onCompress: (images: SliderImage[]) => void;
   onRequestDeleteRace: (race: Race) => void;
   onRaceRenamed?: () => void;
+  seasonInfo?: SeriesSeasonInfo;
 }) {
   const [open, setOpen] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -360,6 +365,13 @@ export function RaceCard({
 
       {open && (
         <div className="space-y-3 p-4">
+          <RuleCheckPanel
+            raceId={race.id}
+            sections={sorted}
+            images={images}
+            seasonInfo={seasonInfo}
+            canEdit={canEdit}
+          />
           {sorted.length === 0 && (
             <div className="grid h-[80px] place-items-center rounded border border-dashed border-border text-xs text-muted-foreground">
               No sections yet — add a PLP or PDP section above.
@@ -734,6 +746,7 @@ function SectionBlock({
               {section.name}
             </span>
           )}
+          <SlideCountBadge section={section} count={images.length} canEdit={canEdit} onReload={onReload} />
         </div>
         <div className="flex items-center gap-1">
           {links.map((l, idx) => (
@@ -942,4 +955,71 @@ function SectionBlock({
   );
 }
 
+function SlideCountBadge({
+  section,
+  count,
+  canEdit,
+  onReload,
+}: {
+  section: SliderSection;
+  count: number;
+  canEdit: boolean;
+  onReload: () => void;
+}) {
+  const maxSlides = section.max_slides ?? MIN_SLIDES;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(maxSlides));
+
+  const under = count < MIN_SLIDES;
+  const over = count > maxSlides;
+
+  async function commit() {
+    setEditing(false);
+    const parsed = Number(draft.trim());
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 30 || parsed === maxSlides) return;
+    await supabase.from("slider_sections").update({ max_slides: parsed }).eq("id", section.id);
+    onReload();
+  }
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+        max
+        <input
+          autoFocus
+          type="text"
+          inputMode="numeric"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") { setEditing(false); setDraft(String(maxSlides)); }
+          }}
+          className="w-9 rounded border border-border bg-background px-1 py-0.5 text-[10px] focus:border-primary focus:outline-none"
+        />
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={!canEdit}
+      onClick={() => { setDraft(String(maxSlides)); setEditing(true); }}
+      title={canEdit ? `Slides: ${count} of max ${maxSlides} (min ${MIN_SLIDES}) — click to change max` : `Slides: ${count} of max ${maxSlides}`}
+      className={cn(
+        "shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
+        under
+          ? "border-destructive/50 bg-destructive/10 text-destructive"
+          : over
+            ? "border-[#FACC15]/50 bg-[#FACC15]/10 text-[#8a6d00]"
+            : "border-border text-muted-foreground",
+        canEdit && "hover:border-primary hover:text-primary",
+      )}
+    >
+      {count}/{maxSlides}
+    </button>
+  );
+}
 

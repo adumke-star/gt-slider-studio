@@ -29,6 +29,7 @@ import { OverviewDashboard } from "@/components/dashboard/OverviewDashboard";
 import logoUrl from "@/assets/global-tickets-logo.png";
 import { useAppRole } from "@/hooks/useAppRole";
 import { ROLE_LABELS } from "@/lib/roles";
+import { computeSeriesSeasonInfo, evaluateRaceRules, hasRuleViolations } from "@/lib/rules";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -52,7 +53,8 @@ type RaceBundle = { sections: SliderSection[]; images: SliderImage[] };
 
 function Dashboard() {
   const [races, setRaces] = useState<Race[]>([]);
-  const [flagsByRace, setFlagsByRace] = useState<Map<string, RaceFlags>>(new Map());
+  const [statusFlagsByRace, setStatusFlagsByRace] = useState<Map<string, RaceFlags>>(new Map());
+  const [ruleFlagsByRace, setRuleFlagsByRace] = useState<Map<string, boolean>>(new Map());
   const [bundleByRace, setBundleByRace] = useState<Map<string, RaceBundle>>(new Map());
   const [loadingRaceIds, setLoadingRaceIds] = useState<Set<string>>(new Set());
 
@@ -89,8 +91,50 @@ function Dashboard() {
         hasSolved: !!r.has_solved,
       });
     }
-    setFlagsByRace(m);
+    setStatusFlagsByRace(m);
   }, []);
+
+  // Rule flags for all races: lightweight query, evaluated client-side.
+  const loadRuleFlags = useCallback(async () => {
+    const [{ data: raceRows }, { data: sectionRows }, { data: imageRows }] = await Promise.all([
+      supabase.from("races").select("id, series, race_date"),
+      supabase.from("slider_sections").select("id, race_id, kind, name, max_slides"),
+      supabase.from("slider_images").select("id, race_id, section_id, image_type, season, created_at"),
+    ]);
+    const seasonBySeries = computeSeriesSeasonInfo(raceRows ?? []);
+    const sectionsByRace = new Map<string, NonNullable<typeof sectionRows>>();
+    for (const s of sectionRows ?? []) {
+      if (!sectionsByRace.has(s.race_id)) sectionsByRace.set(s.race_id, []);
+      sectionsByRace.get(s.race_id)!.push(s);
+    }
+    const imagesByRace = new Map<string, NonNullable<typeof imageRows>>();
+    for (const i of imageRows ?? []) {
+      if (!imagesByRace.has(i.race_id)) imagesByRace.set(i.race_id, []);
+      imagesByRace.get(i.race_id)!.push(i);
+    }
+    const m = new Map<string, boolean>();
+    for (const r of raceRows ?? []) {
+      const violations = evaluateRaceRules({
+        sections: (sectionsByRace.get(r.id) ?? []) as { id: string; kind: "plp" | "pdp"; name: string; max_slides?: number | null }[],
+        images: imagesByRace.get(r.id) ?? [],
+        seasonInfo: seasonBySeries.get(r.series),
+      });
+      m.set(r.id, hasRuleViolations(violations));
+    }
+    setRuleFlagsByRace(m);
+  }, []);
+
+  const flagsByRace = useMemo(() => {
+    const m = new Map<string, RaceFlags>();
+    const ids = new Set([...statusFlagsByRace.keys(), ...ruleFlagsByRace.keys()]);
+    for (const id of ids) {
+      const base = statusFlagsByRace.get(id) ?? { hasChanges: false, hasOpenComments: false, hasSolved: false };
+      m.set(id, { ...base, hasRuleViolations: ruleFlagsByRace.get(id) ?? false });
+    }
+    return m;
+  }, [statusFlagsByRace, ruleFlagsByRace]);
+
+  const seasonInfoBySeries = useMemo(() => computeSeriesSeasonInfo(races), [races]);
 
   const loadRace = useCallback(async (raceId: string) => {
     setLoadingRaceIds((s) => {
@@ -119,10 +163,10 @@ function Dashboard() {
 
   useEffect(() => {
     (async () => {
-      await Promise.all([loadRaces(), loadFlags()]);
+      await Promise.all([loadRaces(), loadFlags(), loadRuleFlags()]);
       setLoading(false);
     })();
-  }, [loadRaces, loadFlags]);
+  }, [loadRaces, loadFlags, loadRuleFlags]);
 
   useEffect(() => {
     const prevent = (e: DragEvent) => {
@@ -164,10 +208,12 @@ function Dashboard() {
       .channel("dashboard-sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "slider_images" }, (payload) => {
         loadFlags();
+        loadRuleFlags();
         const row = (payload.new ?? payload.old) as { race_id?: string } | null;
         if (row?.race_id) refetchRace(row.race_id);
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "slider_sections" }, (payload) => {
+        loadRuleFlags();
         const row = (payload.new ?? payload.old) as { race_id?: string } | null;
         if (row?.race_id) refetchRace(row.race_id);
       })
@@ -180,7 +226,7 @@ function Dashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [loading, loadFlags, loadRace]);
+  }, [loading, loadFlags, loadRuleFlags, loadRace]);
 
   function toggle(id: string) {
     setSelected((s) => {
@@ -416,10 +462,12 @@ function Dashboard() {
                 images={bundle.images}
                 selected={selected}
                 canEdit={showEditUI}
+                seasonInfo={seasonInfoBySeries.get(race.series)}
                 onToggleSelect={toggle}
                 onReload={() => {
                   loadRace(race.id);
                   loadFlags();
+                  loadRuleFlags();
                 }}
                 onRaceRenamed={loadRaces}
                 onExport={(imgs) => { setExportImages(imgs); setExportOpen(true); }}

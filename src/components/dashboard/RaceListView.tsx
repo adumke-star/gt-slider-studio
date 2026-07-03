@@ -1,4 +1,4 @@
-import type { Series, RaceFlags } from "./RaceNav";
+import { EMPTY_FLAGS, type Series, type RaceFlags } from "./RaceNav";
 
 export type ListRace = {
   id: string;
@@ -20,7 +20,7 @@ export function RaceListView({
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
       {races.map((r) => {
-        const f = flagsByRace.get(r.id) ?? { hasChanges: false, hasOpenComments: false, hasSolved: false };
+        const f = flagsByRace.get(r.id) ?? EMPTY_FLAGS;
         return (
           <button
             key={r.id}
@@ -33,6 +33,7 @@ export function RaceListView({
                 {f.hasChanges && <span className="h-1.5 w-1.5 rounded-full bg-[#CB4F10]" />}
                 {f.hasOpenComments && <span className="h-1.5 w-1.5 rounded-full bg-[#FACC15]" />}
                 {f.hasSolved && <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-solved)]" />}
+                {f.hasRuleViolations && <span title="Rule violations" className="h-1.5 w-1.5 rounded-full bg-destructive" />}
               </div>
               <div className="mt-0.5 text-[11px] uppercase tracking-widest text-muted-foreground">
                 {r.series} {r.race_date ? `· ${r.race_date}` : ""}

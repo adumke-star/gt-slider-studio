@@ -22,7 +22,9 @@
     "standalone:test-auth": "node scripts/test-auth-setup.mjs",
     "backup": "node scripts/backup.mjs",
     "restore": "node scripts/restore.mjs",
-    "verify:live": "node scripts/verify-live-deploy.mjs"
+    "verify:live": "node scripts/verify-live-deploy.mjs",
+    "verify:staging": "LIVE_URL=https://adumke-star-gt-slider-studio-staging.gt-sliderstudio.workers.dev node scripts/verify-live-deploy.mjs",
+    "deploy:staging": "bash scripts/deploy-staging.sh"
   },
   "dependencies": {
     "@fontsource/lato": "^5.2.7",

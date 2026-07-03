@@ -184,6 +184,23 @@ If no build starts after push: **Builds → Create deployment**, or reconnect Gi
 
 Almost always: `VITE_*` missing during **build** → bundle contains `Missing Supabase` → run `npm run verify:live` to confirm, then fix secrets / build variables and redeploy.
 
+## 7. Staging environment
+
+Staging = second Worker + second Supabase project, so new features can be tested without touching production.
+
+| | Production | Staging |
+|---|---|---|
+| Worker | `adumke-star-gt-slider-studio` | `adumke-star-gt-slider-studio-staging` |
+| URL | `…gt-slider-studio.gt-sliderstudio.workers.dev` | `…gt-slider-studio-staging.gt-sliderstudio.workers.dev` |
+| Supabase | `qtqzgkksvztdosyaakoi` | `clnyeesqvxgepknwtnbz` (gt-slider-studio-staging) |
+| Deploy | push to `main` (GitHub Actions) | push to `staging` (GitHub Actions) or `npm run deploy:staging` |
+
+- **Local deploy:** `npm run deploy:staging` — builds with the values from `.env.staging.local` (gitignored) and deploys to the staging Worker. Verify with `npm run verify:staging`.
+- **CI deploy:** `.github/workflows/deploy-staging.yml` runs on pushes to the `staging` branch. It needs three extra GitHub secrets: `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_PUBLISHABLE_KEY`, `STAGING_SUPABASE_PROJECT_ID` (the existing `CLOUDFLARE_*` secrets are reused).
+- **Migrations to staging:** `npx supabase db push --db-url "postgresql://postgres.clnyeesqvxgepknwtnbz:<DB_PASSWORD>@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"` — the CLI link stays on production, so a plain `db push` never hits staging by accident.
+- Staging auth has email autoconfirm enabled (no confirmation emails) and its redirect URLs point at the staging Worker.
+- Flow: develop on `staging` → test on the staging URL → merge to `main` → apply new migrations to production → GitHub Actions deploys production.
+
 ## Notes
 
 - `vite.config.ts` sets `nitro: true` so Nitro builds a Cloudflare Worker bundle outside the Lovable sandbox.
