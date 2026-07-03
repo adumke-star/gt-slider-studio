@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare, ChevronDown, Wand2, Crop } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
@@ -195,7 +196,11 @@ export function ImageCell({
 
   async function setImageType(imageType: ImageType | null) {
     if (imageType === (image.image_type ?? null)) return;
-    await supabase.from("slider_images").update({ image_type: imageType }).eq("id", image.id);
+    const { error } = await supabase.from("slider_images").update({ image_type: imageType }).eq("id", image.id);
+    if (error) {
+      toast.error(`Could not save image type: ${error.message}`);
+      return;
+    }
     onChanged();
   }
 
@@ -203,7 +208,11 @@ export function ImageCell({
     const parsed = raw.trim() === "" ? null : Number(raw.trim());
     if (parsed !== null && (!Number.isInteger(parsed) || parsed < 2000 || parsed > 2100)) return;
     if (parsed === (image.season ?? null)) return;
-    await supabase.from("slider_images").update({ season: parsed }).eq("id", image.id);
+    const { error } = await supabase.from("slider_images").update({ season: parsed }).eq("id", image.id);
+    if (error) {
+      toast.error(`Could not save season: ${error.message}`);
+      return;
+    }
     onChanged();
   }
 

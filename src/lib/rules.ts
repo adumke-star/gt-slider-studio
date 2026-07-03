@@ -2,15 +2,24 @@
 // Pure functions: given a race's sections + images, return violations.
 // Rule numbers refer to the team's Rule Setup sheet.
 
-export type ImageType = "compositing" | "race_action" | "fan_atmosphere" | "generic";
+export type ImageType = "compositing" | "race_action" | "fan_atmosphere" | "generic" | "glamping" | "camping";
 
-export const IMAGE_TYPES: ImageType[] = ["compositing", "race_action", "fan_atmosphere", "generic"];
+export const IMAGE_TYPES: ImageType[] = [
+  "compositing",
+  "race_action",
+  "fan_atmosphere",
+  "generic",
+  "glamping",
+  "camping",
+];
 
 export const IMAGE_TYPE_LABELS: Record<ImageType, string> = {
   compositing: "Compositing",
   race_action: "Race action",
   fan_atmosphere: "Fan atmosphere",
   generic: "Generic",
+  glamping: "Glamping",
+  camping: "Camping",
 };
 
 export type RuleSeverity = "error" | "warning" | "info";
