@@ -22,6 +22,31 @@ export const IMAGE_TYPE_LABELS: Record<ImageType, string> = {
   camping: "Camping",
 };
 
+/** Suggested values for the free-text type field (display labels). */
+export const IMAGE_TYPE_SUGGESTIONS: string[] = IMAGE_TYPES.map((t) => IMAGE_TYPE_LABELS[t]);
+
+/**
+ * The type field is free text; only these three types drive automatic rules.
+ * Matches keys ("race_action") and labels ("Race action") case-insensitively,
+ * ignoring spaces/underscores/hyphens.
+ */
+export function normalizeImageType(text: string | null | undefined): ImageType | null {
+  if (!text) return null;
+  const compact = text.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  for (const key of IMAGE_TYPES) {
+    if (compact === key.replace(/_/g, "")) return key;
+    if (compact === IMAGE_TYPE_LABELS[key].toLowerCase().replace(/[\s_-]+/g, "")) return key;
+  }
+  return null;
+}
+
+/** Display text for a stored type value: known keys get their label, free text stays as-is. */
+export function imageTypeLabel(text: string | null | undefined): string {
+  if (!text) return "";
+  const known = normalizeImageType(text);
+  return known ? IMAGE_TYPE_LABELS[known] : text;
+}
+
 export type RuleSeverity = "error" | "warning" | "info";
 
 export type RuleViolation = {
@@ -140,7 +165,7 @@ export function evaluateRaceRules({
     staleCutoff.setFullYear(staleCutoff.getFullYear() - FAN_ATMOSPHERE_MAX_AGE_YEARS);
     const staleFan = imgs.filter(
       (img) =>
-        img.image_type === "fan_atmosphere" &&
+        normalizeImageType(img.image_type) === "fan_atmosphere" &&
         img.created_at &&
         new Date(img.created_at) < staleCutoff,
     );
@@ -157,12 +182,14 @@ export function evaluateRaceRules({
     // Rules 3 + 4: compositing / race action must show the current season
     // once the grace period (first race + 4 weeks) is over.
     if (seasonInfo?.deadline && now > seasonInfo.deadline) {
-      const outdated = imgs.filter(
-        (img) =>
-          (img.image_type === "compositing" || img.image_type === "race_action") &&
+      const outdated = imgs.filter((img) => {
+        const type = normalizeImageType(img.image_type);
+        return (
+          (type === "compositing" || type === "race_action") &&
           img.season != null &&
-          img.season < seasonInfo.season,
-      );
+          img.season < seasonInfo.season
+        );
+      });
       if (outdated.length > 0) {
         violations.push({
           rule: 3,
@@ -176,13 +203,13 @@ export function evaluateRaceRules({
   }
 
   // Coverage hint: untyped images cannot be checked against rules 3/4/6.
-  const untyped = images.filter((img) => img.section_id && !img.image_type);
+  const untyped = images.filter((img) => img.section_id && !img.image_type?.trim());
   if (untyped.length > 0) {
     violations.push({
       rule: 0,
       key: "untyped",
       severity: "info",
-      message: `${untyped.length} image${untyped.length === 1 ? "" : "s"} without a type — set Compositing / Race action / Fan atmosphere / Generic so rules 3, 4 and 6 can be checked.`,
+      message: `${untyped.length} image${untyped.length === 1 ? "" : "s"} without a type — use Compositing / Race action / Fan atmosphere so rules 3, 4 and 6 can be checked (any other text is fine too).`,
     });
   }
 
