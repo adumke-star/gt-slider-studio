@@ -394,12 +394,8 @@ function Dashboard() {
             )}
             <Button
               onClick={() => {
-                const imgs = selectedImgs.filter((i) => i.compressed_path);
-                if (imgs.length === 0) {
-                  toast.error("No compressed images selected. Please compress first.");
-                  return;
-                }
-                setExportImages(imgs);
+                if (selectedImgs.length === 0) return;
+                setExportImages(selectedImgs);
                 setExportOpen(true);
               }}
               disabled={selected.size === 0}
@@ -516,9 +512,10 @@ function Dashboard() {
       <ExportDialog
         open={exportOpen}
         onOpenChange={(v) => { setExportOpen(v); if (!v) setExportImages(null); }}
-        images={exportImages ?? selectedImgs.filter((i) => i.compressed_path)}
+        images={exportImages ?? selectedImgs}
         races={races}
         slideNumbers={slideNumbers}
+        canEdit={showEditUI}
         onExported={(ids) => {
           setSelected((prev) => {
             const n = new Set(prev);

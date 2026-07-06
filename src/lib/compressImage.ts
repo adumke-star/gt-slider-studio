@@ -49,7 +49,7 @@ export type PassthroughImage = CompressibleImage & {
 };
 
 export type PassthroughResult =
-  | { outcome: "ok" }
+  | { outcome: "ok"; path: string; format: string }
   | { outcome: "already-final" }
   | { outcome: "missing" }
   | { outcome: "unsupported"; mime: string }
@@ -131,5 +131,5 @@ export async function acceptWithoutCompression(img: PassthroughImage): Promise<P
     }
   }
 
-  return { outcome: "ok" };
+  return { outcome: "ok", path: outPath, format: known.format };
 }
