@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2, Archive, Loader2 } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2, Archive, Loader2, BookOpenText, Info } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { isCompressEligible } from "@/lib/compressImage";
 import { MIN_SLIDES, type SeriesSeasonInfo } from "@/lib/rules";
 import { backupFileName, createRaceBackupZip } from "@/lib/raceBackup";
 import { RuleCheckPanel } from "./RuleCheckPanel";
+import { findGuideCategory, guessCategory } from "@/lib/sliderGuide";
+import { GuideCategoryPicker, SlideGuideDialog } from "./SlideGuideDialog";
 
 type Race = {
   id: string;
@@ -31,6 +33,7 @@ export type SliderSection = {
   external_url: string | null;
   external_links: SectionLink[] | null;
   max_slides?: number | null;
+  guide_category?: string | null;
 };
 
 export function RaceCard({
@@ -67,6 +70,7 @@ export function RaceCard({
   const [editingRaceName, setEditingRaceName] = useState(false);
   const [raceNameDraft, setRaceNameDraft] = useState(race.name);
   const [backupRunning, setBackupRunning] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const hasChanges = useMemo(() => images.some((i) => i.status === "changes"), [images]);
   const hasSolved = useMemo(() => images.some((i) => i.status === "solved"), [images]);
@@ -173,11 +177,24 @@ export function RaceCard({
   async function addSection(kind: "plp" | "pdp") {
     const max = sorted.length ? Math.max(...sorted.map((s) => s.sort_order)) : -1;
     const count = sorted.filter((s) => s.kind === kind).length + 1;
+    const name = `${kind.toUpperCase()} Slider ${count}`;
     await supabase.from("slider_sections").insert({
-      race_id: race.id, kind,
-      name: `${kind.toUpperCase()} Slider ${count}`,
+      race_id: race.id, kind, name,
       sort_order: max + 1,
+      guide_category: guessCategory(name, kind),
     });
+    onReload();
+  }
+
+  async function setSectionGuideCategory(s: SliderSection, value: string | null) {
+    const { error } = await supabase
+      .from("slider_sections")
+      .update({ guide_category: value })
+      .eq("id", s.id);
+    if (error) {
+      toast.error(`Could not save category: ${error.message}`);
+      return;
+    }
     onReload();
   }
 
@@ -373,6 +390,13 @@ export function RaceCard({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={() => setGuideOpen(true)}
+            className="rounded p-2 text-muted-foreground hover:bg-background hover:text-primary"
+            title="Slider content guide — what belongs in each slide"
+          >
+            <BookOpenText className="h-4 w-4" />
+          </button>
           {canEdit && (
             <>
               <Button size="sm" variant="ghost" onClick={() => addSection("plp")} className="h-7 gap-1 text-xs">
@@ -400,6 +424,7 @@ export function RaceCard({
           )}
         </div>
       </header>
+      <SlideGuideDialog open={guideOpen} onOpenChange={setGuideOpen} />
 
       {open && (
         <div className="space-y-3 p-4">
@@ -427,6 +452,7 @@ export function RaceCard({
                 onToggleSelect={onToggleSelect}
                 onReload={onReload}
                 onRename={(n) => renameSection(s, n)}
+                onSetGuideCategory={(v) => setSectionGuideCategory(s, v)}
                 onSetLinks={(links) => setSectionLinks(s, links)}
                 onDelete={() => deleteSection(s)}
                 onAddSlot={() => addSlot(s)}
@@ -459,6 +485,7 @@ function SectionBlock({
   onToggleSelect,
   onReload,
   onRename,
+  onSetGuideCategory,
   onSetLinks,
   onDelete,
   onAddSlot,
@@ -479,6 +506,7 @@ function SectionBlock({
   onToggleSelect: (id: string) => void;
   onReload: () => void;
   onRename: (name: string) => void;
+  onSetGuideCategory: (value: string | null) => void;
   onSetLinks: (links: SectionLink[]) => void;
   onDelete: () => void;
   onAddSlot: () => void;
@@ -495,6 +523,10 @@ function SectionBlock({
   const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(section.name);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const guideCategory =
+    findGuideCategory(section.guide_category) ??
+    (section.guide_category ? null : findGuideCategory(guessCategory(section.name, section.kind)));
   const [editingLinks, setEditingLinks] = useState(false);
   const [linksDraft, setLinksDraft] = useState<SectionLink[]>(links);
   const [sectionDropSide, setSectionDropSide] = useState<"before" | "after" | null>(null);
@@ -785,6 +817,22 @@ function SectionBlock({
             </span>
           )}
           <SlideCountBadge section={section} count={images.length} canEdit={canEdit} onReload={onReload} />
+          <GuideCategoryPicker
+            value={section.guide_category ?? null}
+            kind={section.kind}
+            canEdit={canEdit}
+            onSave={onSetGuideCategory}
+          />
+          <button
+            onClick={() => setGuideOpen(true)}
+            className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
+            title={guideCategory
+              ? `Content guide for ${guideCategory.title}`
+              : "Content guide — no category matched, shows the full table"}
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+          <SlideGuideDialog open={guideOpen} onOpenChange={setGuideOpen} category={guideCategory} />
         </div>
         <div className="flex items-center gap-1">
           {links.map((l, idx) => (

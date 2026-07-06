@@ -328,6 +328,7 @@ export type Database = {
           created_at: string
           external_links: Json
           external_url: string | null
+          guide_category: string | null
           id: string
           kind: string
           max_slides: number | null
@@ -340,6 +341,7 @@ export type Database = {
           created_at?: string
           external_links?: Json
           external_url?: string | null
+          guide_category?: string | null
           id?: string
           kind: string
           max_slides?: number | null
@@ -352,6 +354,7 @@ export type Database = {
           created_at?: string
           external_links?: Json
           external_url?: string | null
+          guide_category?: string | null
           id?: string
           kind?: string
           max_slides?: number | null
