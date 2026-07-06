@@ -10,9 +10,14 @@ export type GuideCategory = {
   kind: SectionKind;
   /** Heading shown in the guide dialog, e.g. "PLP — Main Page". */
   title: string;
-  /** MUST-HAVE content per slide, index 0 = Slide 1. */
+  /** Content per slide, index 0 = Slide 1. Slides 1-6 are MUST HAVE, 7+ NICE TO HAVE. */
   slides: string[];
+  /** Extra remark shown under the guide row. */
+  note?: string;
 };
+
+/** Slides 1-6 are MUST HAVE; everything after is NICE TO HAVE. */
+export const MUST_HAVE_SLIDES = 6;
 
 const COMPOSITING_OR_ACTION =
   "Compositing (European F1 + GP) or Race action car/bike (other events)";
@@ -29,6 +34,18 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
       "Business Unit Travel: Hotel element",
       "Business Unit Travel: Transfer element",
       "Business Unit Travel: Travel guide element",
+      "Business Unit VIP: VIP (mavericks-club if possible)",
+      "Business Unit VIP: VIP (mavericks-club if possible)",
+      "Business Unit VIP: VIP (mavericks-club if possible)",
+      "Business Unit VIP: VIP atmosphere",
+      "Business Unit VIP: VIP atmosphere",
+      "Business Unit VIP: VIP atmosphere",
+      "Business Unit Glamping & Camping: Fan atmosphere glamping ground",
+      "Business Unit Glamping & Camping: Fan atmosphere glamping ground",
+      "Business Unit Glamping & Camping: Fan atmosphere glamping ground",
+      "Fan Atmosphere",
+      "Fan Atmosphere",
+      "Fan Atmosphere",
     ],
   },
   {
@@ -39,9 +56,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
       COMPOSITING_OR_ACTION,
       "Fan Atmosphere",
       "Race action Car / Bike",
-      "Fan Atmosphere (Grandstand view, atmosphere)",
-      "Fan Atmosphere (Grandstand view, atmosphere)",
-      "Fan Atmosphere (Grandstand view, atmosphere)",
+      ...Array(9).fill("Fan Atmosphere (Grandstand view, atmosphere)"),
     ],
   },
   {
@@ -50,12 +65,11 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
     title: "PDP — VIP",
     slides: [
       "Product Video Mavericks-Club F1 / GP (if applicable)",
-      "Mavericks-Club (if applicable)",
-      "Mavericks-Club (if applicable)",
-      "Mavericks-Club (if applicable)",
-      "Mavericks-Club (if applicable)",
-      "Mavericks-Club (if applicable)",
+      ...Array(5).fill("Mavericks-Club (if applicable)"),
+      ...Array(6).fill("Snipers (if applicable)"),
+      ...Array(6).fill("Attribut 1 USP (supplier or generic) — view, food, lounge, atmosphere, etc."),
     ],
+    note: "Attribut 2–10 follow the same pattern: 6 USP slides each (supplier or generic — view, food, lounge, atmosphere, etc.).",
   },
   {
     label: "Travel",
@@ -67,7 +81,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
       "Hotel element",
       "Transfer element",
       "Travel Guide element",
-      "Fan Atmosphere",
+      ...Array(7).fill("Fan Atmosphere"),
     ],
   },
   {
@@ -79,35 +93,21 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
       COMPOSITING_OR_ACTION,
       "Glamping area atmosphere (aerial shot)",
       "Glamping Tent element",
-      "Glamping area atmosphere (facilities, bar, tent, etc)",
-      "Glamping area atmosphere (facilities, bar, tent, etc)",
+      ...Array(5).fill("Glamping area atmosphere (facilities, bar, tent, etc)"),
+      ...Array(3).fill("Fan Atmosphere"),
     ],
   },
   {
     label: "F1 Experiences",
     kind: "pdp",
     title: "PDP — F1® Experiences Experience Tickets",
-    slides: [
-      COMPOSITING_OR_ACTION,
-      "Product USP",
-      "Product USP",
-      "Product USP",
-      "Product USP",
-      "Product USP",
-    ],
+    slides: [COMPOSITING_OR_ACTION, ...Array(11).fill("Product USP")],
   },
   {
     label: "MotoGP Premier",
     kind: "pdp",
     title: "PDP — MotoGP Premier Experience Tickets",
-    slides: [
-      COMPOSITING_OR_ACTION,
-      "Product USP",
-      "Product USP",
-      "Product USP",
-      "Product USP",
-      "Product USP",
-    ],
+    slides: [COMPOSITING_OR_ACTION, ...Array(11).fill("Product USP")],
   },
   {
     label: "Camping Resell",
@@ -115,11 +115,7 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
     title: "PDP — Camping Resell",
     slides: [
       COMPOSITING_OR_ACTION,
-      "Generic Camping atmosphere (supplier or generic)",
-      "Generic Camping atmosphere (supplier or generic)",
-      "Generic Camping atmosphere (supplier or generic)",
-      "Generic Camping atmosphere (supplier or generic)",
-      "Generic Camping atmosphere (supplier or generic)",
+      ...Array(5).fill("Generic Camping atmosphere (supplier or generic)"),
     ],
   },
   {

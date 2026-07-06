@@ -3,13 +3,14 @@ import { createPortal } from "react-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   GUIDE_CATEGORIES,
+  MUST_HAVE_SLIDES,
   guideCategorySuggestions,
   type GuideCategory,
   type SectionKind,
 } from "@/lib/sliderGuide";
 import { cn } from "@/lib/utils";
 
-const MAX_SLIDES = 6;
+const TOTAL_SLIDES = Math.max(...GUIDE_CATEGORIES.map((c) => c.slides.length));
 
 export function SlideGuideDialog({
   open,
@@ -23,13 +24,19 @@ export function SlideGuideDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("bg-surface-2", category ? "sm:max-w-lg" : "max-w-[min(96vw,1100px)]")}>
+      <DialogContent
+        className={cn(
+          "bg-surface-2",
+          category ? "max-h-[85vh] overflow-y-auto sm:max-w-lg" : "max-w-[min(96vw,1800px)]",
+        )}
+      >
         <DialogHeader>
           <DialogTitle className="font-display uppercase tracking-wide">
             {category ? category.title : "Slider content guide"}
           </DialogTitle>
           <DialogDescription>
-            Must-have content per slide{category ? " for this section" : " — per PLP/PDP category"}.
+            Slides 1–{MUST_HAVE_SLIDES} are must-have, slides {MUST_HAVE_SLIDES + 1}+ are nice-to-have
+            {category ? "." : " — per PLP/PDP category."}
           </DialogDescription>
         </DialogHeader>
         {category ? <SingleCategoryView category={category} /> : <FullGuideTable />}
@@ -39,45 +46,80 @@ export function SlideGuideDialog({
 }
 
 function SingleCategoryView({ category }: { category: GuideCategory }) {
+  const mustHave = category.slides.slice(0, MUST_HAVE_SLIDES);
+  const niceToHave = category.slides.slice(MUST_HAVE_SLIDES);
   return (
     <div className="space-y-2">
-      {category.slides.map((content, idx) => (
-        <div key={idx} className="flex items-start gap-3 rounded border border-border bg-background/50 p-3">
-          <span className="shrink-0 rounded bg-primary px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-primary-foreground">
-            Slide {idx + 1}
-          </span>
-          <span className="text-sm text-foreground">{content}</span>
-        </div>
+      <h3 className="rounded bg-destructive px-2 py-1 text-center text-[10px] font-black uppercase tracking-widest text-destructive-foreground">
+        Must have
+      </h3>
+      {mustHave.map((content, idx) => (
+        <SlideRow key={idx} index={idx} content={content} />
       ))}
-      {category.slides.length < MAX_SLIDES && (
+      {mustHave.length < MUST_HAVE_SLIDES && (
         <p className="px-1 text-xs text-muted-foreground">
-          No must-have content defined for slides {category.slides.length + 1}–{MAX_SLIDES}.
+          No must-have content defined for slides {mustHave.length + 1}–{MUST_HAVE_SLIDES}.
         </p>
       )}
+      {niceToHave.length > 0 && (
+        <>
+          <h3 className="rounded bg-primary/20 px-2 py-1 text-center text-[10px] font-black uppercase tracking-widest text-primary">
+            Nice to have
+          </h3>
+          {niceToHave.map((content, idx) => (
+            <SlideRow key={idx} index={MUST_HAVE_SLIDES + idx} content={content} />
+          ))}
+        </>
+      )}
+      {category.note && (
+        <p className="px-1 text-xs text-muted-foreground">{category.note}</p>
+      )}
+    </div>
+  );
+}
+
+function SlideRow({ index, content }: { index: number; content: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded border border-border bg-background/50 p-3">
+      <span className="w-16 shrink-0 rounded bg-primary px-2 py-0.5 text-center text-[10px] font-black uppercase tracking-widest text-primary-foreground">
+        Slide {index + 1}
+      </span>
+      <span className="text-sm text-foreground">{content}</span>
     </div>
   );
 }
 
 function FullGuideTable() {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[900px] border-collapse text-left">
+    <div className="max-h-[70vh] overflow-auto">
+      <table className="w-full min-w-[2200px] border-collapse text-left">
         <thead>
           <tr>
-            <th className="border border-border bg-background/60 p-2" />
+            <th className="sticky left-0 z-10 border border-border bg-surface-2 p-2" />
             <th
-              colSpan={MAX_SLIDES}
+              colSpan={MUST_HAVE_SLIDES}
               className="border border-border bg-destructive p-1.5 text-center text-[11px] font-black uppercase tracking-widest text-destructive-foreground"
             >
               Must have
             </th>
+            <th
+              colSpan={TOTAL_SLIDES - MUST_HAVE_SLIDES}
+              className="border border-border bg-primary/25 p-1.5 text-center text-[11px] font-black uppercase tracking-widest text-primary"
+            >
+              Nice to have
+            </th>
           </tr>
           <tr>
-            <th className="border border-border bg-background/60 p-2" />
-            {Array.from({ length: MAX_SLIDES }, (_, i) => (
+            <th className="sticky left-0 z-10 border border-border bg-surface-2 p-2" />
+            {Array.from({ length: TOTAL_SLIDES }, (_, i) => (
               <th
                 key={i}
-                className="border border-border bg-primary p-1.5 text-center text-[11px] font-black uppercase tracking-widest text-primary-foreground"
+                className={cn(
+                  "border border-border p-1.5 text-center text-[11px] font-black uppercase tracking-widest",
+                  i < MUST_HAVE_SLIDES
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-primary/60 text-primary-foreground/90",
+                )}
               >
                 Slide {i + 1}
               </th>
@@ -87,14 +129,18 @@ function FullGuideTable() {
         <tbody>
           {GUIDE_CATEGORIES.map((c) => (
             <tr key={c.label}>
-              <th className="w-28 border border-border bg-primary p-2 text-center align-middle text-[11px] font-black uppercase leading-tight tracking-wider text-primary-foreground">
+              <th className="sticky left-0 z-10 w-28 min-w-28 border border-border bg-primary p-2 text-center align-middle text-[11px] font-black uppercase leading-tight tracking-wider text-primary-foreground">
                 <div>{c.kind.toUpperCase()}</div>
                 <div className="mt-0.5 font-bold normal-case tracking-normal">{c.label}</div>
               </th>
-              {Array.from({ length: MAX_SLIDES }, (_, i) => (
+              {Array.from({ length: TOTAL_SLIDES }, (_, i) => (
                 <td
                   key={i}
-                  className="border border-border bg-background/40 p-2 text-center align-middle text-[11px] leading-snug text-foreground/90"
+                  className={cn(
+                    "min-w-28 border border-border p-2 text-center align-middle text-[11px] leading-snug text-foreground/90",
+                    i < MUST_HAVE_SLIDES ? "bg-background/40" : "bg-background/20",
+                  )}
+                  title={c.slides[i] && i >= MUST_HAVE_SLIDES ? "Nice to have" : undefined}
                 >
                   {c.slides[i] ?? <span className="text-muted-foreground/50">—</span>}
                 </td>
@@ -103,6 +149,10 @@ function FullGuideTable() {
           ))}
         </tbody>
       </table>
+      <p className="mt-2 text-xs text-muted-foreground">
+        PDP VIP: Attribut 2–10 follow the same pattern — 6 USP slides each (supplier or generic;
+        view, food, lounge, atmosphere, etc.).
+      </p>
     </div>
   );
 }
