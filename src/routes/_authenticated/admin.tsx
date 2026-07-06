@@ -3,8 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Trash2, UserPlus, HardDriveDownload, HardDriveUpload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { createBackupZip } from "@/lib/backupClient";
-import { raceExists, readRaceBackup, restoreRaceBackup, type RaceBackupArchive } from "@/lib/raceBackup";
+import {
+  createFullBackupZip,
+  existingRaceIds,
+  fullBackupFileName,
+  raceExists,
+  readBackup,
+  restoreFullBackup,
+  restoreRaceBackup,
+  type BackupArchive,
+} from "@/lib/raceBackup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -50,8 +58,10 @@ function AdminPage() {
   const [backupRunning, setBackupRunning] = useState(false);
   const [backupMsg, setBackupMsg] = useState<string | null>(null);
   const restoreInputRef = useRef<HTMLInputElement>(null);
-  const [restoreArchive, setRestoreArchive] = useState<RaceBackupArchive | null>(null);
+  const [restoreArchive, setRestoreArchive] = useState<BackupArchive | null>(null);
+  // For race backups: whether the race still exists. For full backups: how many still exist.
   const [restoreExists, setRestoreExists] = useState(false);
+  const [restoreExistingCount, setRestoreExistingCount] = useState(0);
   const [restoreRunning, setRestoreRunning] = useState(false);
   const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
 
@@ -99,20 +109,18 @@ function AdminPage() {
     setBackupRunning(true);
     setBackupMsg("Starting…");
     try {
-      const { blob, counts } = await createBackupZip((msg) => setBackupMsg(msg));
-      const d = new Date();
-      const p = (n: number) => String(n).padStart(2, "0");
-      const stamp = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
+      const { blob, manifest } = await createFullBackupZip((msg) => setBackupMsg(msg));
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `gt-slider-backup-${stamp}.zip`;
+      a.download = fullBackupFileName();
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
+      const { races, images, files_saved, files_failed } = manifest.counts;
       toast.success(
-        `Backup ready: ${counts.images_saved} images${counts.images_failed ? `, ${counts.images_failed} failed` : ""}`,
+        `Backup ready: ${races} races, ${images} slots, ${files_saved} files${files_failed ? ` (${files_failed} failed)` : ""}`,
       );
     } catch (e) {
       console.error(e);
@@ -126,8 +134,15 @@ function AdminPage() {
   async function pickRestoreFile(file: File) {
     setRestoreArchive(null);
     try {
-      const archive = await readRaceBackup(file);
-      setRestoreExists(await raceExists(archive.manifest.race.id));
+      const archive = await readBackup(file);
+      if (archive.kind === "race") {
+        setRestoreExists(await raceExists(archive.manifest.race.id));
+        setRestoreExistingCount(0);
+      } else {
+        const existing = await existingRaceIds(archive.manifest.races.map((r) => r.id));
+        setRestoreExists(existing.size > 0);
+        setRestoreExistingCount(existing.size);
+      }
       setRestoreArchive(archive);
     } catch (e) {
       toast.error(`Could not read backup: ${(e as Error).message ?? e}`, { duration: 8000 });
@@ -138,22 +153,46 @@ function AdminPage() {
 
   async function runRestore() {
     if (!restoreArchive) return;
-    if (restoreExists) {
-      const name = restoreArchive.manifest.race.name;
-      if (!confirm(`Race "${name}" already exists. Replace it with the backup? The current state (including images) will be deleted.`)) {
+
+    if (restoreArchive.kind === "race") {
+      if (restoreExists) {
+        const name = restoreArchive.manifest.race.name;
+        if (!confirm(`Race "${name}" already exists. Replace it with the backup? The current state (including images) will be deleted.`)) {
+          return;
+        }
+      }
+    } else {
+      const total = restoreArchive.manifest.races.length;
+      const created = total - restoreExistingCount;
+      if (!confirm(
+        `Restore full backup: ${restoreExistingCount} race${restoreExistingCount === 1 ? "" : "s"} will be replaced with the backup state` +
+        `${created > 0 ? ` and ${created} deleted race${created === 1 ? "" : "s"} recreated` : ""}. ` +
+        `Races that are not in the backup stay untouched. Continue?`,
+      )) {
         return;
       }
     }
+
     setRestoreRunning(true);
     setRestoreMsg("Starting…");
     try {
-      const result = await restoreRaceBackup(restoreArchive, { replace: restoreExists }, setRestoreMsg);
-      toast.success(
-        `Race "${restoreArchive.manifest.race.name}" restored: ${result.sections} sections, ${result.images} slots, ` +
-        `${result.files_uploaded} files${result.files_failed ? ` (${result.files_failed} failed)` : ""}` +
-        `${result.comments_skipped ? ` — ${result.comments_skipped} comments skipped` : ""}`,
-        { duration: 8000 },
-      );
+      if (restoreArchive.kind === "race") {
+        const result = await restoreRaceBackup(restoreArchive, { replace: restoreExists }, setRestoreMsg);
+        toast.success(
+          `Race "${restoreArchive.manifest.race.name}" restored: ${result.sections} sections, ${result.images} slots, ` +
+          `${result.files_uploaded} files${result.files_failed ? ` (${result.files_failed} failed)` : ""}` +
+          `${result.comments_skipped ? ` — ${result.comments_skipped} comments skipped` : ""}`,
+          { duration: 8000 },
+        );
+      } else {
+        const result = await restoreFullBackup(restoreArchive, setRestoreMsg);
+        toast.success(
+          `Full backup restored: ${result.races_replaced} races replaced, ${result.races_created} recreated, ` +
+          `${result.images} slots, ${result.files_uploaded} files${result.files_failed ? ` (${result.files_failed} failed)` : ""}` +
+          `${result.comments_skipped ? ` — ${result.comments_skipped} comments skipped` : ""}`,
+          { duration: 10000 },
+        );
+      }
       setRestoreArchive(null);
     } catch (e) {
       console.error("restore failed", e);
@@ -246,8 +285,8 @@ function AdminPage() {
             )}
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Downloads all races, sections, slots and comments as JSON plus every compressed image,
-            organised by series / race / section. Keep the file somewhere safe (e.g. Drive).
+            Downloads every race — sections, slots, statuses, comments, allowlist and all image files —
+            as one restorable ZIP. Upload it below to bring everything back. Keep the file somewhere safe (e.g. Drive).
           </p>
         </section>
 
@@ -271,7 +310,9 @@ function AdminPage() {
             </Button>
             {restoreArchive && !restoreRunning && (
               <Button onClick={runRestore} className="gap-1.5">
-                {restoreExists ? "Replace existing race" : "Restore race"}
+                {restoreArchive.kind === "full"
+                  ? "Restore full backup"
+                  : restoreExists ? "Replace existing race" : "Restore race"}
               </Button>
             )}
             {restoreRunning && (
@@ -280,7 +321,7 @@ function AdminPage() {
               </span>
             )}
           </div>
-          {restoreArchive && (
+          {restoreArchive?.kind === "race" && (
             <div className="mt-3 rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
               <span className="text-foreground">{restoreArchive.manifest.race.name}</span>
               {" "}({restoreArchive.manifest.race.series.toUpperCase()})
@@ -294,9 +335,31 @@ function AdminPage() {
               )}
             </div>
           )}
+          {restoreArchive?.kind === "full" && (
+            <div className="mt-3 rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
+              <span className="text-foreground">Full backup</span>
+              {" "}· from {new Date(restoreArchive.manifest.created_at).toLocaleString()}
+              {" "}· {restoreArchive.manifest.counts.races} races, {restoreArchive.manifest.counts.sections} sections,
+              {" "}{restoreArchive.manifest.counts.images} slots, {restoreArchive.files.length} files
+              <div className="mt-1">
+                {restoreExistingCount > 0 && (
+                  <span className="font-bold text-[var(--status-todo)]">
+                    {restoreExistingCount} of {restoreArchive.manifest.races.length} races still exist and will be replaced with the backup state.{" "}
+                  </span>
+                )}
+                {restoreArchive.manifest.races.length - restoreExistingCount > 0 && (
+                  <span>
+                    {restoreArchive.manifest.races.length - restoreExistingCount} deleted race
+                    {restoreArchive.manifest.races.length - restoreExistingCount === 1 ? "" : "s"} will be recreated.
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           <p className="mt-2 text-xs text-muted-foreground">
-            Upload a per-race backup ZIP (created via the archive button on a race) to bring the race back
-            exactly as it was — sections, slots, statuses and images included.
+            Upload a backup ZIP — either a per-race backup (archive button on a race) or the full backup from above.
+            Everything comes back exactly as it was: sections, slots, statuses and images included.
+            Races that are not in the backup are never touched.
           </p>
         </section>
 

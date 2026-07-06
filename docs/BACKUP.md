@@ -1,10 +1,31 @@
 # Backup
 
-Local backup for GT Slider Studio: saves all compressed images in a readable folder
-structure plus the database as JSON, so the app can be restored after a Supabase outage
-or accidental data loss.
+## In-app backups (recommended)
 
-## Prerequisite: service-role key
+Both backup kinds are created and restored directly in the app — no keys, no CLI.
+They share one restorable ZIP format: `database/*.json` (rows with original IDs)
+plus `files/<bucket>/<storage path>` (all image files, compressed and originals).
+
+- **Per race:** archive button in a race card header → `race-backup-<name>-<date>.zip`.
+- **Everything:** admin page → "Download backup (ZIP)" → `full-backup-<date>.zip`.
+  Contains all races, sections, slots, comments, the allowlist and every image file.
+
+**Restore:** admin page → "Restore race from backup" accepts both ZIP kinds.
+
+- Per-race ZIP: recreates the race if it was deleted; asks before replacing an existing one.
+- Full ZIP: shows how many races will be replaced/recreated and asks once. Races that are
+  not in the backup are never touched.
+- Comments and allowlist entries are restored best-effort (skipped if the referenced
+  user account no longer exists or the entry already exists).
+- Restores also work across environments (e.g. staging backup into production), since
+  IDs and storage paths are kept verbatim.
+
+## CLI backup (service-role, optional)
+
+The scripts below predate the in-app backups and remain available for scripted/offsite
+use. They produce a different, human-readable layout.
+
+### Prerequisite: service-role key
 
 The storage buckets (`originals`, `compressed`) are private, so the backup needs the
 **service-role** key. Add it to your `.env` (which is gitignored):
@@ -17,7 +38,7 @@ Get the key from: Supabase Dashboard → Project Settings → API → `service_r
 
 > Keep this key secret — it bypasses all row-level security. Never commit it.
 
-## Run
+### Run
 
 ```bash
 npm run backup
@@ -25,7 +46,7 @@ npm run backup
 
 This creates a timestamped folder under `backups/` (gitignored).
 
-## What gets backed up
+### What gets backed up
 
 ```
 backups/2026-06-24_11-30-00/
@@ -54,9 +75,9 @@ backups/2026-06-24_11-30-00/
 - **Database:** every public table is exported as JSON, including section names, Drive
   links, statuses, comments and user roles.
 
-## Restore
+### Restore (CLI)
 
-`npm run restore` re-imports a backup. It restores the core content and access:
+`npm run restore` re-imports a CLI backup. It restores the core content and access:
 
 - `races` -> `slider_sections` -> `slider_images` (foreign-key-safe order)
 - `allowed_emails` (with `invited_by` nulled)
@@ -67,12 +88,12 @@ and `user_roles` because they reference `auth.users`, which won't exist on a fre
 project. Team members simply sign in again at `/auth`; their roles are recreated from
 `allowed_emails` via the `handle_new_user` trigger.
 
-### Prerequisites
+#### Prerequisites
 
 1. Schema must exist on the target project: `npx supabase db push`
 2. `SUPABASE_SERVICE_ROLE_KEY` available (in `.env` or inline)
 
-### Steps
+#### Steps
 
 ```bash
 # 1. Preview (dry-run, writes nothing) — uses the latest backup folder
