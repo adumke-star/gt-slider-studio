@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   GUIDE_CATEGORIES,
-  findGuideCategory,
   guideCategorySuggestions,
   type GuideCategory,
   type SectionKind,
@@ -109,90 +108,26 @@ function FullGuideTable() {
 }
 
 /**
- * Click-to-edit guide category for a section header: shows the current
- * category as a small chip; editors can pick from fixed suggestions or type
- * anything (like the image type combobox).
+ * Combobox for the section name: fixed guide-category suggestions per kind,
+ * free text allowed (like the image type combobox). The full list opens
+ * immediately; filtering only kicks in while typing.
  */
-export function GuideCategoryPicker({
-  value,
-  kind,
-  canEdit,
-  onSave,
-}: {
-  value: string | null;
-  kind: SectionKind;
-  canEdit: boolean;
-  onSave: (value: string | null) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value ?? "");
-  const matched = findGuideCategory(value);
-
-  function commit(v: string) {
-    setEditing(false);
-    const trimmed = v.trim();
-    if ((trimmed || null) === (value ?? null)) return;
-    onSave(trimmed || null);
-  }
-
-  if (editing && canEdit) {
-    return (
-      <CategoryCombobox
-        value={draft}
-        onChange={setDraft}
-        onCommit={commit}
-        onCancel={() => setEditing(false)}
-        suggestions={guideCategorySuggestions(kind)}
-      />
-    );
-  }
-
-  const label = value ? value : "Category?";
-  const chip = (
-    <span
-      className={cn(
-        "shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
-        matched
-          ? "border-border bg-background/60 text-muted-foreground"
-          : value
-            ? "border-border bg-background/60 text-muted-foreground/70"
-            : "border-dashed border-border text-muted-foreground/60",
-      )}
-    >
-      {label}
-    </span>
-  );
-
-  if (!canEdit) return value ? chip : null;
-
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        setDraft(value ?? "");
-        setEditing(true);
-      }}
-      title="Guide category — links this section to a row of the slider content guide"
-      className="hover:opacity-80"
-    >
-      {chip}
-    </button>
-  );
-}
-
-function CategoryCombobox({
+export function SectionNameCombobox({
   value,
   onChange,
   onCommit,
   onCancel,
-  suggestions,
+  kind,
+  className,
 }: {
   value: string;
   onChange: (v: string) => void;
   onCommit: (v: string) => void;
   onCancel: () => void;
-  suggestions: string[];
+  kind: SectionKind;
+  className?: string;
 }) {
+  const suggestions = guideCategorySuggestions(kind);
   const inputRef = useRef<HTMLInputElement>(null);
   const skipBlurCommit = useRef(false);
   // Show the full list until the user actually types; only then filter.
@@ -236,7 +171,7 @@ function CategoryCombobox({
     : suggestions;
 
   return (
-    <div className="w-40">
+    <div className="w-44 min-w-0">
       <input
         ref={inputRef}
         autoFocus
@@ -263,8 +198,11 @@ function CategoryCombobox({
             (e.target as HTMLInputElement).blur();
           }
         }}
-        placeholder="Category…"
-        className="w-full rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+        placeholder="Section name…"
+        className={cn(
+          "w-full rounded border border-border bg-background px-1.5 py-0.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none",
+          className,
+        )}
       />
       {rect && filtered.length > 0 &&
         createPortal(
@@ -292,7 +230,7 @@ function CategoryCombobox({
                   inputRef.current?.blur();
                 }}
                 className={cn(
-                  "block w-full px-2 py-1 text-left text-[10px] hover:bg-accent hover:text-accent-foreground",
+                  "block w-full px-2 py-1 text-left text-xs hover:bg-accent hover:text-accent-foreground",
                   s.toLowerCase() === current.toLowerCase()
                     ? "font-bold text-primary"
                     : "text-foreground",

@@ -11,7 +11,7 @@ import { MIN_SLIDES, type SeriesSeasonInfo } from "@/lib/rules";
 import { backupFileName, createRaceBackupZip } from "@/lib/raceBackup";
 import { RuleCheckPanel } from "./RuleCheckPanel";
 import { findGuideCategory, guessCategory } from "@/lib/sliderGuide";
-import { GuideCategoryPicker, SlideGuideDialog } from "./SlideGuideDialog";
+import { SectionNameCombobox, SlideGuideDialog } from "./SlideGuideDialog";
 
 type Race = {
   id: string;
@@ -186,17 +186,6 @@ export function RaceCard({
     onReload();
   }
 
-  async function setSectionGuideCategory(s: SliderSection, value: string | null) {
-    const { error } = await supabase
-      .from("slider_sections")
-      .update({ guide_category: value })
-      .eq("id", s.id);
-    if (error) {
-      toast.error(`Could not save category: ${error.message}`);
-      return;
-    }
-    onReload();
-  }
 
   async function deleteSection(s: SliderSection) {
     if (!confirm(`Delete section "${s.name}"? All images inside will be removed.`)) return;
@@ -207,7 +196,12 @@ export function RaceCard({
   async function renameSection(s: SliderSection, name: string) {
     const trimmed = name.trim();
     if (!trimmed || trimmed === s.name) return;
-    await supabase.from("slider_sections").update({ name: trimmed }).eq("id", s.id);
+    // The name doubles as the guide category: exact match wins, keyword match as fallback.
+    const category = findGuideCategory(trimmed)?.label ?? guessCategory(trimmed, s.kind);
+    await supabase
+      .from("slider_sections")
+      .update({ name: trimmed, guide_category: category })
+      .eq("id", s.id);
     onReload();
   }
 
@@ -452,7 +446,6 @@ export function RaceCard({
                 onToggleSelect={onToggleSelect}
                 onReload={onReload}
                 onRename={(n) => renameSection(s, n)}
-                onSetGuideCategory={(v) => setSectionGuideCategory(s, v)}
                 onSetLinks={(links) => setSectionLinks(s, links)}
                 onDelete={() => deleteSection(s)}
                 onAddSlot={() => addSlot(s)}
@@ -485,7 +478,6 @@ function SectionBlock({
   onToggleSelect,
   onReload,
   onRename,
-  onSetGuideCategory,
   onSetLinks,
   onDelete,
   onAddSlot,
@@ -506,7 +498,6 @@ function SectionBlock({
   onToggleSelect: (id: string) => void;
   onReload: () => void;
   onRename: (name: string) => void;
-  onSetGuideCategory: (value: string | null) => void;
   onSetLinks: (links: SectionLink[]) => void;
   onDelete: () => void;
   onAddSlot: () => void;
@@ -593,10 +584,6 @@ function SectionBlock({
   const [hasOpenComments, setHasOpenComments] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  function commitName() {
-    setEditingName(false);
-    onRename(nameDraft);
-  }
   function openLinksEditor() {
     setLinksDraft(links.length ? links : [{ label: "Originals", url: "" }]);
     setEditingLinks(true);
@@ -790,19 +777,13 @@ function SectionBlock({
             />
           )}
           {canEdit && editingName ? (
-            <div className="flex items-center gap-1">
-              <input
-                autoFocus
-                value={nameDraft}
-                onChange={(e) => setNameDraft(e.target.value)}
-                onBlur={commitName}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitName();
-                  if (e.key === "Escape") { setEditingName(false); setNameDraft(section.name); }
-                }}
-                className="rounded border border-border bg-background px-1.5 py-0.5 text-xs text-foreground focus:border-primary focus:outline-none"
-              />
-            </div>
+            <SectionNameCombobox
+              value={nameDraft}
+              onChange={setNameDraft}
+              onCommit={(v) => { setEditingName(false); onRename(v); }}
+              onCancel={() => { setEditingName(false); setNameDraft(section.name); }}
+              kind={section.kind}
+            />
           ) : canEdit ? (
             <button
               onClick={() => { setNameDraft(section.name); setEditingName(true); }}
@@ -817,12 +798,6 @@ function SectionBlock({
             </span>
           )}
           <SlideCountBadge section={section} count={images.length} canEdit={canEdit} onReload={onReload} />
-          <GuideCategoryPicker
-            value={section.guide_category ?? null}
-            kind={section.kind}
-            canEdit={canEdit}
-            onSave={onSetGuideCategory}
-          />
           <button
             onClick={() => setGuideOpen(true)}
             className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
