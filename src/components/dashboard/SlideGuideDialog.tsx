@@ -195,6 +195,8 @@ function CategoryCombobox({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const skipBlurCommit = useRef(false);
+  // Show the full list until the user actually types; only then filter.
+  const [touched, setTouched] = useState(false);
   const [rect, setRect] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(
     null,
   );
@@ -222,10 +224,16 @@ function CategoryCombobox({
     };
   }, [rect !== null]);
 
+  // Open the list right away (autoFocus alone doesn't reliably fire onFocus).
+  useEffect(() => {
+    updateRect();
+  }, []);
+
   const query = value.trim().toLowerCase();
-  const filtered = suggestions.filter(
-    (s) => s.toLowerCase().includes(query) && s.toLowerCase() !== query,
-  );
+  const current = value.trim();
+  const filtered = touched
+    ? suggestions.filter((s) => s.toLowerCase().includes(query) && s.toLowerCase() !== query)
+    : suggestions;
 
   return (
     <div className="w-40">
@@ -234,7 +242,10 @@ function CategoryCombobox({
         autoFocus
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          setTouched(true);
+          onChange(e.target.value);
+        }}
         onFocus={updateRect}
         onBlur={() => {
           setRect(null);
@@ -280,7 +291,12 @@ function CategoryCombobox({
                   skipBlurCommit.current = true;
                   inputRef.current?.blur();
                 }}
-                className="block w-full px-2 py-1 text-left text-[10px] text-foreground hover:bg-accent hover:text-accent-foreground"
+                className={cn(
+                  "block w-full px-2 py-1 text-left text-[10px] hover:bg-accent hover:text-accent-foreground",
+                  s.toLowerCase() === current.toLowerCase()
+                    ? "font-bold text-primary"
+                    : "text-foreground",
+                )}
               >
                 {s}
               </button>
