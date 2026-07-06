@@ -7,10 +7,11 @@ They share one restorable ZIP format: `database/*.json` (rows with original IDs)
 plus `files/<bucket>/<storage path>` (all image files, compressed and originals).
 
 - **Per race:** archive button in a race card header → `race-backup-<name>-<date>.zip`.
-- **Everything:** admin page → "Download backup (ZIP)" → `full-backup-<date>.zip`.
+- **Everything:** Backup page (`/backup`, user menu → "Backup & restore") →
+  "Download backup (ZIP)" → `full-backup-<date>.zip`.
   Contains all races, sections, slots, comments, the allowlist and every image file.
 
-**Restore:** admin page → "Restore race from backup" accepts both ZIP kinds.
+**Restore:** Backup page → "Restore from backup" accepts both ZIP kinds.
 
 - Per-race ZIP: recreates the race if it was deleted; asks before replacing an existing one.
 - Full ZIP: shows how many races will be replaced/recreated and asks once. Races that are

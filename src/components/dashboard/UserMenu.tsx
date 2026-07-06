@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { KeyRound, LogOut, Settings, User as UserIcon } from "lucide-react";
+import { HardDriveDownload, KeyRound, LogOut, Settings, User as UserIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
@@ -59,6 +59,11 @@ export function UserMenu() {
             <DropdownMenuItem asChild>
               <Link to="/admin" className="flex w-full items-center gap-2">
                 <Settings className="h-4 w-4" /> Manage allowlist
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/backup" className="flex w-full items-center gap-2">
+                <HardDriveDownload className="h-4 w-4" /> Backup &amp; restore
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
