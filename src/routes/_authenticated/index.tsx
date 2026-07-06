@@ -243,6 +243,23 @@ function Dashboard() {
     return arr;
   }, [bundleByRace]);
 
+  // 1-based slide number per image (rank within its section, sorted by position)
+  // — matches the visible slot order even when positions have gaps.
+  const slideNumbers = useMemo(() => {
+    const bySection = new Map<string, SliderImage[]>();
+    for (const img of loadedImages) {
+      if (!img.section_id) continue;
+      if (!bySection.has(img.section_id)) bySection.set(img.section_id, []);
+      bySection.get(img.section_id)!.push(img);
+    }
+    const map: Record<string, number> = {};
+    for (const list of bySection.values()) {
+      list.sort((a, b) => a.position - b.position);
+      list.forEach((img, idx) => { map[img.id] = idx + 1; });
+    }
+    return map;
+  }, [loadedImages]);
+
   const selectedImgs = loadedImages.filter((i) => selected.has(i.id));
 
   async function performDelete() {
@@ -501,6 +518,7 @@ function Dashboard() {
         onOpenChange={(v) => { setExportOpen(v); if (!v) setExportImages(null); }}
         images={exportImages ?? selectedImgs.filter((i) => i.compressed_path)}
         races={races}
+        slideNumbers={slideNumbers}
         onExported={(ids) => {
           setSelected((prev) => {
             const n = new Set(prev);

@@ -30,6 +30,7 @@ export function ExportDialog({
   onOpenChange,
   images,
   races = [],
+  slideNumbers = {},
   onDone,
   onExported,
 }: {
@@ -37,15 +38,25 @@ export function ExportDialog({
   onOpenChange: (v: boolean) => void;
   images: SliderImage[];
   races?: RaceLite[];
+  /** 1-based slide number per image id (slider order within its section). */
+  slideNumbers?: Record<string, number>;
   onDone: () => void;
   /** Called with the exported image ids after a successful export. */
   onExported?: (ids: string[]) => void;
 }) {
   const [asZip, setAsZip] = useState(true);
+  const [numbered, setNumbered] = useState(true);
   const [progress, setProgress] = useState(0);
   const [running, setRunning] = useState(false);
 
-  const eligible = images.filter((i) => i.compressed_path);
+  const slideNo = (img: SliderImage) => slideNumbers[img.id] ?? img.position + 1;
+  // Slider order: by section, then slide number — so ZIP entries and
+  // sequential downloads follow the visible slot order.
+  const eligible = images
+    .filter((i) => i.compressed_path)
+    .sort((a, b) =>
+      (a.section_id ?? "").localeCompare(b.section_id ?? "") || slideNo(a) - slideNo(b),
+    );
   const notCompressed = images.length - eligible.length;
   const raceMap = new Map(races.map((r) => [r.id, r]));
 
@@ -55,7 +66,8 @@ export function ExportDialog({
     const slugTitle = img.title ? slugify(img.title) : "";
     const base = slugTitle
       || `${race ? slugify(race.name) : img.race_id.slice(0, 8)}_${img.area}_${String(img.position).padStart(2, "0")}`;
-    return `${base}.${ext}`;
+    const prefix = numbered ? `${String(slideNo(img)).padStart(2, "0")}_` : "";
+    return `${prefix}${base}.${ext}`;
   }
 
   async function run() {
@@ -190,6 +202,20 @@ export function ExportDialog({
               />
             </div>
           )}
+
+          <div className="flex items-center justify-between rounded border border-border bg-background/50 p-3">
+            <label htmlFor="numbered" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              Number files by slide order (01_, 02_, …)
+            </label>
+            <input
+              id="numbered"
+              type="checkbox"
+              checked={numbered}
+              onChange={(e) => setNumbered(e.target.checked)}
+              disabled={running}
+              className="h-4 w-4 accent-primary"
+            />
+          </div>
 
           {eligible.length > 1 && !asZip && (
             <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
