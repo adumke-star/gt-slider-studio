@@ -26,6 +26,7 @@ export const IMAGE_TYPE_SUGGESTIONS: string[] = [
   "VIP",
   "VIP Generic",
   "Travel",
+  "Product Video",
 ];
 
 /**
