@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export function AddRaceDialog({
   open, onOpenChange, onCreated,
-}: { open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void }) {
+}: { open: boolean; onOpenChange: (v: boolean) => void; onCreated: (raceId: string) => void }) {
   const [name, setName] = useState("");
   const [series, setSeries] = useState<"f1" | "motogp" | "dtm" | "wsbk">("f1");
   const [date, setDate] = useState("");
@@ -27,8 +27,8 @@ export function AddRaceDialog({
           { race_id: race.id, kind: "plp", name: "PLP Slider", sort_order: 0 },
           { race_id: race.id, kind: "pdp", name: "PDP Slider", sort_order: 1 },
         ]);
+        onCreated(race.id);
       }
-      onCreated();
       onOpenChange(false);
     } finally { setBusy(false); }
   }

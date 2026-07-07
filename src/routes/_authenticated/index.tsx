@@ -495,8 +495,9 @@ function Dashboard() {
       <AddRaceDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        onCreated={async () => {
+        onCreated={async (raceId) => {
           await Promise.all([loadRaces(), loadFlags()]);
+          onSelectNav({ kind: "race", raceId });
         }}
       />
       <CompressDialog
