@@ -252,9 +252,11 @@ export type Database = {
           format: string | null
           id: string
           image_type: string | null
+          is_placeholder: boolean
           original_path: string | null
           original_size_kb: number | null
           original_url: string | null
+          placeholder_label: string | null
           position: number
           race_id: string
           season: number | null
@@ -275,9 +277,11 @@ export type Database = {
           format?: string | null
           id?: string
           image_type?: string | null
+          is_placeholder?: boolean
           original_path?: string | null
           original_size_kb?: number | null
           original_url?: string | null
+          placeholder_label?: string | null
           position?: number
           race_id: string
           season?: number | null
@@ -298,9 +302,11 @@ export type Database = {
           format?: string | null
           id?: string
           image_type?: string | null
+          is_placeholder?: boolean
           original_path?: string | null
           original_size_kb?: number | null
           original_url?: string | null
+          placeholder_label?: string | null
           position?: number
           race_id?: string
           season?: number | null

@@ -34,6 +34,8 @@ export type SliderImage = {
   image_type?: string | null;
   season?: number | null;
   created_at?: string;
+  is_placeholder?: boolean;
+  placeholder_label?: string | null;
 };
 
 const STATUS_ORDER: SliderImage["status"][] = ["todo", "changes", "solved", "image_done", "exported", "live"];

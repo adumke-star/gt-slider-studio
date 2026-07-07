@@ -95,6 +95,7 @@ type RuleImage = {
   image_type?: string | null;
   season?: number | null;
   created_at?: string | null;
+  is_placeholder?: boolean | null;
 };
 
 type RaceLike = {
@@ -143,7 +144,7 @@ export function evaluateRaceRules({
 
   const bySection = new Map<string, RuleImage[]>();
   for (const img of images) {
-    if (!img.section_id) continue;
+    if (!img.section_id || img.is_placeholder) continue;
     if (!bySection.has(img.section_id)) bySection.set(img.section_id, []);
     bySection.get(img.section_id)!.push(img);
   }
@@ -219,7 +220,7 @@ export function evaluateRaceRules({
   }
 
   // Coverage hint: untyped images cannot be checked against rules 3/4/6.
-  const untyped = images.filter((img) => img.section_id && !img.image_type?.trim());
+  const untyped = images.filter((img) => img.section_id && !img.is_placeholder && !img.image_type?.trim());
   if (untyped.length > 0) {
     violations.push({
       rule: 0,

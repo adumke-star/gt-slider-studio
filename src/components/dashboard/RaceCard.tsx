@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ImageCell, type SliderImage } from "./ImageCell";
+import { PlaceholderSlotCell } from "./PlaceholderSlotCell";
+import { isRealImageSlot, PLACEHOLDER_SLOT_TYPES } from "@/lib/placeholderSlots";
 import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 import { isCompressEligible } from "@/lib/compressImage";
@@ -218,6 +220,34 @@ export function RaceCard({
       position: nextPos,
       status: "todo",
     });
+    onReload();
+  }
+
+  async function addPlaceholderSlot(s: SliderSection, label: string) {
+    const list = imagesBySection.get(s.id) ?? [];
+    const nextPos = (list[list.length - 1]?.position ?? -1) + 1;
+    const { error } = await supabase.from("slider_images").insert({
+      race_id: race.id,
+      area: s.kind,
+      section_id: s.id,
+      position: nextPos,
+      status: "blank",
+      is_placeholder: true,
+      placeholder_label: label,
+    });
+    if (error) {
+      toast.error(`Could not add placeholder: ${error.message}`);
+      return;
+    }
+    onReload();
+  }
+
+  async function deletePlaceholder(id: string) {
+    const { error } = await supabase.from("slider_images").delete().eq("id", id);
+    if (error) {
+      toast.error("Could not remove placeholder");
+      return;
+    }
     onReload();
   }
 
@@ -480,6 +510,8 @@ export function RaceCard({
                 onSetLinks={(links) => setSectionLinks(s, links)}
                 onDelete={() => deleteSection(s)}
                 onAddSlot={() => addSlot(s)}
+                onAddPlaceholder={(label) => addPlaceholderSlot(s, label)}
+                onDeletePlaceholder={deletePlaceholder}
                 onDragStart={(id) => setDragId(id)}
                 onDropOn={(targetId, side) => {
                   if (!dragId) return;
@@ -511,6 +543,8 @@ function SectionBlock({
   onSetLinks,
   onDelete,
   onAddSlot,
+  onAddPlaceholder,
+  onDeletePlaceholder,
   onDragStart,
   onDropOn,
   isSectionDragging,
@@ -531,6 +565,8 @@ function SectionBlock({
   onSetLinks: (links: SectionLink[]) => void;
   onDelete: () => void;
   onAddSlot: () => void;
+  onAddPlaceholder: (label: string) => void;
+  onDeletePlaceholder: (id: string) => void;
   onDragStart: (id: string) => void;
   onDropOn: (targetId: string, side: "before" | "after") => void;
   isSectionDragging: boolean;
@@ -542,6 +578,7 @@ function SectionBlock({
   onCompress: (images: SliderImage[]) => void;
 }) {
   const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
+  const realImages = images.filter(isRealImageSlot);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(section.name);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -788,7 +825,7 @@ function SectionBlock({
           )}>
             {section.kind}
           </span>
-          {images.some((i) => i.status === "changes") && (
+          {realImages.some((i) => i.status === "changes") && (
             <span
               title="Changes pending"
               className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#CB4F10]"
@@ -800,7 +837,7 @@ function SectionBlock({
               className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#FACC15]"
             />
           )}
-          {images.some((i) => i.status === "solved") && (
+          {realImages.some((i) => i.status === "solved") && (
             <span
               title="Comments solved"
               className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--status-solved)]"
@@ -827,7 +864,7 @@ function SectionBlock({
               {section.name}
             </span>
           )}
-          <SlideCountBadge section={section} count={images.length} canEdit={canEdit} onReload={onReload} />
+          <SlideCountBadge section={section} count={realImages.length} canEdit={canEdit} onReload={onReload} />
           <button
             onClick={() => setGuideOpen(true)}
             className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
@@ -863,33 +900,51 @@ function SectionBlock({
           )}
           {canEdit && (
             <Button size="sm" variant="ghost"
-              disabled={images.filter(isCompressEligible).length === 0}
-              onClick={() => onCompress(images.filter(isCompressEligible))}
+              disabled={realImages.filter(isCompressEligible).length === 0}
+              onClick={() => onCompress(realImages.filter(isCompressEligible))}
               className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-40"
               title={`Compress ${section.kind.toUpperCase()} images`}>
               <Wand2 className="h-3.5 w-3.5" /> Compress
             </Button>
           )}
           <Button size="sm" variant="ghost"
-            disabled={images.filter((i) => i.compressed_path || i.original_path).length === 0}
-            onClick={() => onExport(images.filter((i) => i.compressed_path || i.original_path))}
+            disabled={realImages.filter((i) => i.compressed_path || i.original_path).length === 0}
+            onClick={() => onExport(realImages.filter((i) => i.compressed_path || i.original_path))}
             className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-40"
             title={`Export ${section.kind.toUpperCase()} images`}>
             <Download className="h-3.5 w-3.5" /> Export
           </Button>
           {canEdit && (
             <BulkStatusMenu
-              images={images}
+              images={realImages}
               scopeLabel={`${section.kind.toUpperCase()} ${section.name}`}
               onDone={onReload}
             />
           )}
           {canEdit && (
             <>
-              <Button size="sm" variant="ghost" onClick={onAddSlot}
-                className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary">
-                <Plus className="h-3.5 w-3.5" /> Slot
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary">
+                    <Plus className="h-3.5 w-3.5" /> Slot
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => onAddSlot()}>
+                    Image slot
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {PLACEHOLDER_SLOT_TYPES.map((t) => {
+                    const Icon = t.icon;
+                    return (
+                      <DropdownMenuItem key={t.label} onSelect={() => onAddPlaceholder(t.label)}>
+                        <Icon className="mr-2 h-3.5 w-3.5 shrink-0 opacity-70" />
+                        {t.label}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <button
                 onClick={onDelete}
                 className="rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive"
@@ -911,32 +966,44 @@ function SectionBlock({
               {canEdit ? "Drop images here via drag & drop" : "No images in this section yet"}
             </div>
           )}
-          {images.map((img) => (
-            <ImageCell
-              key={img.id}
-              image={img}
-              canEdit={canEdit}
-              selected={selected.has(img.id)}
-              onToggleSelect={() => onToggleSelect(img.id)}
-              onChanged={onReload}
-              onDragStart={() => onDragStart(img.id)}
-              onDropBefore={() => onDropOn(img.id, "before")}
-              onDropAfter={() => onDropOn(img.id, "after")}
-              onCompress={() => onCompress([img])}
-              onFileDropHandled={clearFileHover}
-              onMultiFileDrop={async (files) => {
-                clearFileHover();
-                setUploading(true);
-                setBatchItems(files.map((f) => ({ name: f.name, status: "pending" as const })));
-                try {
-                  await onBatchUpload(files, (items) => setBatchItems(items));
-                } finally {
-                  setUploading(false);
-                  setTimeout(() => setBatchItems([]), 4000);
-                }
-              }}
-            />
-          ))}
+          {images.map((img) =>
+            img.is_placeholder ? (
+              <PlaceholderSlotCell
+                key={img.id}
+                image={img}
+                canEdit={canEdit}
+                onDelete={() => onDeletePlaceholder(img.id)}
+                onDragStart={() => onDragStart(img.id)}
+                onDropBefore={() => onDropOn(img.id, "before")}
+                onDropAfter={() => onDropOn(img.id, "after")}
+              />
+            ) : (
+              <ImageCell
+                key={img.id}
+                image={img}
+                canEdit={canEdit}
+                selected={selected.has(img.id)}
+                onToggleSelect={() => onToggleSelect(img.id)}
+                onChanged={onReload}
+                onDragStart={() => onDragStart(img.id)}
+                onDropBefore={() => onDropOn(img.id, "before")}
+                onDropAfter={() => onDropOn(img.id, "after")}
+                onCompress={() => onCompress([img])}
+                onFileDropHandled={clearFileHover}
+                onMultiFileDrop={async (files) => {
+                  clearFileHover();
+                  setUploading(true);
+                  setBatchItems(files.map((f) => ({ name: f.name, status: "pending" as const })));
+                  try {
+                    await onBatchUpload(files, (items) => setBatchItems(items));
+                  } finally {
+                    setUploading(false);
+                    setTimeout(() => setBatchItems([]), 4000);
+                  }
+                }}
+              />
+            ),
+          )}
         </div>
         {canScrollLeft && (
           <>

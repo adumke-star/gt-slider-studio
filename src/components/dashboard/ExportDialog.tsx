@@ -7,6 +7,7 @@ import { signedUrl } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { acceptWithoutCompression } from "@/lib/compressImage";
 import type { SliderImage } from "./ImageCell";
+import { isRealImageSlot } from "@/lib/placeholderSlots";
 
 type RaceLite = { id: string; name: string; series: string };
 
@@ -61,15 +62,16 @@ export function ExportDialog({
     if (open) setIncludePending(false);
   }, [open]);
 
+  const realImages = images.filter(isRealImageSlot);
   const slideNo = (img: SliderImage) => slideNumbers[img.id] ?? img.position + 1;
   // Slider order: by section, then slide number — so ZIP entries and
   // sequential downloads follow the visible slot order.
   const bySliderOrder = (a: SliderImage, b: SliderImage) =>
     (a.section_id ?? "").localeCompare(b.section_id ?? "") || slideNo(a) - slideNo(b);
-  const eligible = images.filter((i) => i.compressed_path).sort(bySliderOrder);
+  const eligible = realImages.filter((i) => i.compressed_path).sort(bySliderOrder);
   // Uncompressed but with an original — can be accepted as final on the fly.
-  const pending = images.filter((i) => !i.compressed_path && i.original_path);
-  const skipped = images.length - eligible.length - pending.length;
+  const pending = realImages.filter((i) => !i.compressed_path && i.original_path);
+  const skipped = realImages.length - eligible.length - pending.length;
   const exportCount = eligible.length + (includePending ? pending.length : 0);
   const raceMap = new Map(races.map((r) => [r.id, r]));
 

@@ -104,7 +104,7 @@ function Dashboard() {
     const [{ data: raceRows }, { data: sectionRows }, { data: imageRows }] = await Promise.all([
       supabase.from("races").select("id, series, race_date"),
       supabase.from("slider_sections").select("id, race_id, kind, name, max_slides, guide_category"),
-      supabase.from("slider_images").select("id, race_id, section_id, image_type, season, created_at"),
+      supabase.from("slider_images").select("id, race_id, section_id, image_type, season, created_at, is_placeholder"),
     ]);
     const seasonBySeries = computeSeriesSeasonInfo(raceRows ?? []);
     const sectionsByRace = new Map<string, NonNullable<typeof sectionRows>>();
@@ -260,7 +260,12 @@ function Dashboard() {
     const map: Record<string, number> = {};
     for (const list of bySection.values()) {
       list.sort((a, b) => a.position - b.position);
-      list.forEach((img, idx) => { map[img.id] = idx + 1; });
+      let n = 0;
+      for (const img of list) {
+        if (img.is_placeholder) continue;
+        n += 1;
+        map[img.id] = n;
+      }
     }
     return map;
   }, [loadedImages]);
