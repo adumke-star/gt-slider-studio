@@ -211,6 +211,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          owner: string | null
           race_date: string | null
           series: Database["public"]["Enums"]["race_series"]
           sort_order: number
@@ -220,6 +221,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          owner?: string | null
           race_date?: string | null
           series: Database["public"]["Enums"]["race_series"]
           sort_order?: number
@@ -229,6 +231,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          owner?: string | null
           race_date?: string | null
           series?: Database["public"]["Enums"]["race_series"]
           sort_order?: number

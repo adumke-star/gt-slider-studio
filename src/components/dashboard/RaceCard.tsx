@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, ChevronLeft, ChevronRight, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2, Archive, Loader2, BookOpenText, Info } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2, Archive, Loader2, BookOpenText, Info, User } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ type Race = {
   series: "f1" | "motogp" | "dtm" | "wsbk";
   race_date: string | null;
   sort_order: number;
+  owner?: string | null;
 };
 
 export type SectionLink = { label: string; url: string };
@@ -65,6 +66,7 @@ export function RaceCard({
 }) {
   const [editingRaceName, setEditingRaceName] = useState(false);
   const [raceNameDraft, setRaceNameDraft] = useState(race.name);
+  const [ownerDraft, setOwnerDraft] = useState(race.owner ?? "");
   const [backupRunning, setBackupRunning] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -73,6 +75,10 @@ export function RaceCard({
   useEffect(() => {
     if (!editingRaceName) setRaceNameDraft(race.name);
   }, [race.name, editingRaceName]);
+
+  useEffect(() => {
+    setOwnerDraft(race.owner ?? "");
+  }, [race.owner]);
 
   async function downloadBackup() {
     setBackupRunning(true);
@@ -100,6 +106,23 @@ export function RaceCard({
     } finally {
       setBackupRunning(false);
     }
+  }
+
+  async function saveOwner() {
+    const trimmed = ownerDraft.trim();
+    const current = race.owner?.trim() ?? "";
+    if (trimmed === current) return;
+    const { error } = await supabase
+      .from("races")
+      .update({ owner: trimmed || null })
+      .eq("id", race.id);
+    if (error) {
+      toast.error("Could not save owner");
+      setOwnerDraft(race.owner ?? "");
+      return;
+    }
+    toast.success(trimmed ? "Owner saved" : "Owner cleared");
+    onRaceRenamed?.();
   }
 
   async function renameRace(name: string) {
@@ -335,6 +358,32 @@ export function RaceCard({
           {race.race_date && (
             <span className="hidden text-xs text-muted-foreground sm:inline">{race.race_date}</span>
           )}
+          {canEdit ? (
+            <label className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-xs text-muted-foreground">
+              <User className="h-3.5 w-3.5 shrink-0" />
+              <span className="shrink-0">Owner</span>
+              <input
+                value={ownerDraft}
+                onChange={(e) => setOwnerDraft(e.target.value)}
+                onBlur={() => void saveOwner()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") {
+                    setOwnerDraft(race.owner ?? "");
+                    e.currentTarget.blur();
+                  }
+                }}
+                placeholder="Team contact"
+                title="Person responsible for this race"
+                className="min-w-0 max-w-[12rem] truncate rounded border border-border bg-background px-2 py-0.5 text-xs text-foreground focus:border-primary focus:outline-none"
+              />
+            </label>
+          ) : race.owner ? (
+            <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" title="Race owner">
+              <User className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Owner: {race.owner}</span>
+            </span>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
