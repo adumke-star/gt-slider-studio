@@ -45,7 +45,7 @@ export function PlaceholderSlotCell({
         else onDropAfter();
       }}
       className={cn(
-        "group relative w-[180px] shrink-0 overflow-hidden rounded-md border-2 border-dashed transition",
+        "group relative flex w-[180px] shrink-0 flex-col overflow-hidden rounded-md border-2 border-dashed transition",
         type?.accent ?? "border-border bg-muted/50",
       )}
     >
@@ -89,8 +89,9 @@ export function PlaceholderSlotCell({
         </button>
       )}
 
-      <div className="relative aspect-[633/382] w-full">
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center text-white">
+      {/* Match ImageCell height (preview + footer fields) so slots align in the row. */}
+      <div className="grid min-h-[220px] w-full flex-1 place-items-center px-3 py-8 text-center text-white">
+        <div className="flex flex-col items-center justify-center gap-2">
           {Icon && <Icon className="h-9 w-9 shrink-0" strokeWidth={1.5} />}
           <p className="font-display text-[11px] font-black uppercase leading-tight tracking-wide">
             {label}
