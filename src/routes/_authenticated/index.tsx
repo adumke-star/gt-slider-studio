@@ -5,6 +5,7 @@ import { Download, Plus, X, Trash2, Wand2 } from "lucide-react";
 import { removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,6 +69,10 @@ function Dashboard() {
   const [deleting, setDeleting] = useState(false);
   const [raceToDelete, setRaceToDelete] = useState<{ id: string; name: string } | null>(null);
   const [deletingRace, setDeletingRace] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const deleteNameMatches =
+    raceToDelete != null &&
+    deleteConfirmName.trim().toLowerCase() === raceToDelete.name.trim().toLowerCase();
   const [selection, setSelection] = useState<NavSelection>({ kind: "overview" });
   const [loading, setLoading] = useState(true);
   const { canEdit, role: appRole, loading: roleLoading } = useAppRole();
@@ -318,6 +323,7 @@ function Dashboard() {
       await Promise.all([loadRaces(), loadFlags()]);
       toast.success(`Race "${name}" deleted`);
       setRaceToDelete(null);
+      setDeleteConfirmName("");
     } catch (e) {
       console.error(e);
       toast.error("Could not delete race");
@@ -551,7 +557,15 @@ function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <AlertDialog open={raceToDelete != null} onOpenChange={(v) => { if (!deletingRace && !v) setRaceToDelete(null); }}>
+      <AlertDialog
+        open={raceToDelete != null}
+        onOpenChange={(v) => {
+          if (!deletingRace && !v) {
+            setRaceToDelete(null);
+            setDeleteConfirmName("");
+          }
+        }}
+      >
         <AlertDialogContent className="bg-surface-2">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display text-xl">
@@ -561,12 +575,27 @@ function Dashboard() {
               The race will be permanently removed along with all sections, image slots, and stored files. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-1.5 py-1">
+            <label className="text-xs text-muted-foreground">
+              Type <span className="font-bold text-foreground">{raceToDelete?.name}</span> to confirm:
+            </label>
+            <Input
+              autoFocus
+              value={deleteConfirmName}
+              onChange={(e) => setDeleteConfirmName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && deleteNameMatches && !deletingRace) performDeleteRace();
+              }}
+              placeholder={raceToDelete?.name}
+              disabled={deletingRace}
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deletingRace}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); performDeleteRace(); }}
-              disabled={deletingRace}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deletingRace || !deleteNameMatches}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-40"
             >
               {deletingRace ? "Deleting…" : "Delete race"}
             </AlertDialogAction>
