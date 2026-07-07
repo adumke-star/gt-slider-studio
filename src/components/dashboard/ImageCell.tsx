@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { hasCustomCrop, hasCustomCropArea, parseCropArea, renderCroppedPreviewUrl } from "@/lib/cropUtils";
 import { acceptWithoutCompression, isCompressEligible } from "@/lib/compressImage";
 import { IMAGE_TYPE_SUGGESTIONS, imageTypeLabel, normalizeImageType } from "@/lib/rules";
+import { STATUS_META } from "@/lib/bulkImageStatus";
 
 export type SliderImage = {
   id: string;
@@ -36,16 +37,6 @@ export type SliderImage = {
 };
 
 const STATUS_ORDER: SliderImage["status"][] = ["todo", "changes", "solved", "image_done", "exported", "live"];
-
-const STATUS_META: Record<SliderImage["status"], { label: string; cls: string }> = {
-  live: { label: "Live", cls: "bg-[var(--status-live)]/15 text-[var(--status-live)] border-[var(--status-live)]/40" },
-  image_done: { label: "Compressed", cls: "bg-primary/15 text-primary border-primary/40" },
-  changes: { label: "Changes", cls: "bg-[var(--status-changes)]/15 text-[var(--status-changes)] border-[var(--status-changes)]/40" },
-  solved: { label: "Solved", cls: "bg-[var(--status-solved)]/15 text-[var(--status-solved)] border-[var(--status-solved)]/40" },
-  exported: { label: "Exported", cls: "bg-[var(--status-exported)]/15 text-[var(--status-exported)] border-[var(--status-exported)]/40" },
-  todo: { label: "To do", cls: "bg-[var(--status-todo)]/15 text-[var(--status-todo)] border-[var(--status-todo)]/40" },
-  blank: { label: "To do", cls: "bg-[var(--status-todo)]/15 text-[var(--status-todo)] border-[var(--status-todo)]/40" },
-};
 
 export function slugifyName(s: string) {
   return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")

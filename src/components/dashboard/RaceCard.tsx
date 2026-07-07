@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, ChevronLeft, ChevronRight, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2, Archive, Loader2, BookOpenText, Info, User } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2, BookOpenText, Info, User, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,14 @@ import { backupFileName, createRaceBackupZip } from "@/lib/raceBackup";
 import { RuleCheckPanel } from "./RuleCheckPanel";
 import { findGuideCategory, guessCategory } from "@/lib/sliderGuide";
 import { SectionNameCombobox, SlideGuideDialog } from "./SlideGuideDialog";
+import { BulkStatusMenu } from "./BulkStatusMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type Race = {
   id: string;
@@ -401,21 +409,43 @@ export function RaceCard({
               <Button size="sm" variant="ghost" onClick={() => addSection("pdp")} className="h-7 gap-1 text-xs">
                 <Plus className="h-3.5 w-3.5" /> PDP
               </Button>
-              <button
-                onClick={downloadBackup}
-                disabled={backupRunning}
-                className="rounded p-2 text-muted-foreground hover:bg-background hover:text-primary disabled:opacity-40"
-                title="Download race backup (ZIP) — can be restored on the admin page"
-              >
-                {backupRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
-              </button>
-              <button
-                onClick={() => onRequestDeleteRace(race)}
-                className="rounded p-2 text-muted-foreground hover:bg-background hover:text-destructive"
-                title="Delete race"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="rounded p-2 text-muted-foreground hover:bg-background hover:text-primary"
+                    title="More actions"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    disabled={backupRunning}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      void downloadBackup();
+                    }}
+                  >
+                    {backupRunning ? "Creating backup…" : "Download backup"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      onRequestDeleteRace(race);
+                    }}
+                  >
+                    Delete race
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <BulkStatusMenu
+                    nested
+                    images={images}
+                    scopeLabel={race.name}
+                    onDone={onReload}
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
         </div>
@@ -847,6 +877,13 @@ function SectionBlock({
             title={`Export ${section.kind.toUpperCase()} images`}>
             <Download className="h-3.5 w-3.5" /> Export
           </Button>
+          {canEdit && (
+            <BulkStatusMenu
+              images={images}
+              scopeLabel={`${section.kind.toUpperCase()} ${section.name}`}
+              onDone={onReload}
+            />
+          )}
           {canEdit && (
             <>
               <Button size="sm" variant="ghost" onClick={onAddSlot}
