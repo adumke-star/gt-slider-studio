@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2, Archive, Loader2, BookOpenText, Info } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2, Archive, Loader2, BookOpenText, Info } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -63,17 +63,12 @@ export function RaceCard({
   onRaceRenamed?: () => void;
   seasonInfo?: SeriesSeasonInfo;
 }) {
-  const [open, setOpen] = useState(true);
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [sectionDragId, setSectionDragId] = useState<string | null>(null);
-  const [hasOpenComments, setHasOpenComments] = useState(false);
   const [editingRaceName, setEditingRaceName] = useState(false);
   const [raceNameDraft, setRaceNameDraft] = useState(race.name);
   const [backupRunning, setBackupRunning] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
-
-  const hasChanges = useMemo(() => images.some((i) => i.status === "changes"), [images]);
-  const hasSolved = useMemo(() => images.some((i) => i.status === "solved"), [images]);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [sectionDragId, setSectionDragId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!editingRaceName) setRaceNameDraft(race.name);
@@ -124,36 +119,6 @@ export function RaceCard({
     setEditingRaceName(false);
     void renameRace(raceNameDraft);
   }
-
-  useEffect(() => {
-    if (images.length === 0) {
-      setHasOpenComments(false);
-      return;
-    }
-    let alive = true;
-    const ids = images.map((i) => i.id);
-    const refetch = async () => {
-      const { count } = await supabase
-        .from("comments")
-        .select("id", { count: "exact", head: true })
-        .in("image_id", ids)
-        .is("resolved_at", null);
-      if (alive) setHasOpenComments((count ?? 0) > 0);
-    };
-    refetch();
-    const channel = supabase
-      .channel(`race-comments-${race.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, (payload) => {
-        const row = (payload.new ?? payload.old) as { image_id?: string } | null;
-        if (row?.image_id && ids.includes(row.image_id)) refetch();
-      })
-      .subscribe();
-    return () => {
-      alive = false;
-      supabase.removeChannel(channel);
-    };
-  }, [images, race.id]);
-
 
   // PLP always first, then PDP. Inside each kind: sort_order, then name.
   const sorted = useMemo(() => {
@@ -328,9 +293,6 @@ export function RaceCard({
     <section className="overflow-hidden rounded-lg border border-border bg-surface-2">
       <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-background/40 px-4 py-3 sm:flex sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <button onClick={() => setOpen((o) => !o)} className="text-muted-foreground hover:text-primary">
-            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </button>
           <span className={cn(
             "shrink-0 rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-widest",
             race.series === "f1" ? "bg-primary text-primary-foreground" :
@@ -369,15 +331,6 @@ export function RaceCard({
             </button>
           ) : (
             <h2 className="truncate font-display text-lg font-black uppercase tracking-tight">{race.name}</h2>
-          )}
-          {!open && hasChanges && (
-            <span title="Changes pending" className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#CB4F10]" />
-          )}
-          {!open && hasOpenComments && (
-            <span title="Open comments" className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#FACC15]" />
-          )}
-          {!open && hasSolved && (
-            <span title="Comments solved" className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--status-solved)]" />
           )}
           {race.race_date && (
             <span className="hidden text-xs text-muted-foreground sm:inline">{race.race_date}</span>
@@ -420,8 +373,7 @@ export function RaceCard({
       </header>
       <SlideGuideDialog open={guideOpen} onOpenChange={setGuideOpen} />
 
-      {open && (
-        <div className="space-y-3 p-4">
+      <div className="space-y-3 p-4">
           <RuleCheckPanel
             raceId={race.id}
             sections={sorted}
@@ -465,7 +417,6 @@ export function RaceCard({
             );
           })}
         </div>
-      )}
     </section>
   );
 }
@@ -864,8 +815,11 @@ function SectionBlock({
           )}
         </div>
       </div>
-      <div className="relative">
-        <div ref={scrollRef} className="flex gap-3 overflow-x-auto scroll-smooth p-3">
+      <div className="group/slots relative">
+        <div
+          ref={scrollRef}
+          className="flex gap-3 overflow-x-auto scroll-smooth p-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        >
           {images.length === 0 && (
             <div className="grid h-[120px] w-full place-items-center text-xs text-muted-foreground">
               {canEdit ? "Drop images here via drag & drop" : "No images in this section yet"}
@@ -900,12 +854,12 @@ function SectionBlock({
         </div>
         {canScrollLeft && (
           <>
-            <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-surface-2 to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-surface-2 to-transparent opacity-0 transition-opacity group-hover/slots:opacity-100" />
             <button
               type="button"
               onClick={() => scrollBy(-1)}
               aria-label="Scroll left"
-              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full border border-border bg-background/90 text-foreground shadow-md backdrop-blur transition hover:bg-background hover:text-primary"
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full border border-border bg-background/90 text-foreground opacity-0 shadow-md backdrop-blur transition hover:bg-background hover:text-primary group-hover/slots:opacity-100"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -913,12 +867,12 @@ function SectionBlock({
         )}
         {canScrollRight && (
           <>
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-surface-2 to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-surface-2 to-transparent opacity-0 transition-opacity group-hover/slots:opacity-100" />
             <button
               type="button"
               onClick={() => scrollBy(1)}
               aria-label="Scroll right"
-              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full border border-border bg-background/90 text-foreground shadow-md backdrop-blur transition hover:bg-background hover:text-primary"
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full border border-border bg-background/90 text-foreground opacity-0 shadow-md backdrop-blur transition hover:bg-background hover:text-primary group-hover/slots:opacity-100"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
