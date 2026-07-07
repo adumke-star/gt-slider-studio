@@ -7,7 +7,7 @@ import { ImageCell, type SliderImage } from "./ImageCell";
 import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 import { isCompressEligible } from "@/lib/compressImage";
-import { MIN_SLIDES, type SeriesSeasonInfo } from "@/lib/rules";
+import { sectionMinSlides, type SeriesSeasonInfo } from "@/lib/rules";
 import { backupFileName, createRaceBackupZip } from "@/lib/raceBackup";
 import { RuleCheckPanel } from "./RuleCheckPanel";
 import { findGuideCategory, guessCategory } from "@/lib/sliderGuide";
@@ -982,10 +982,11 @@ function SlideCountBadge({
   onReload: () => void;
 }) {
   const maxSlides = section.max_slides ?? null;
+  const minSlides = sectionMinSlides(section);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(maxSlides != null ? String(maxSlides) : "");
 
-  const under = count < MIN_SLIDES;
+  const under = count < minSlides;
   const over = maxSlides != null && count > maxSlides;
 
   async function commit() {
@@ -1024,8 +1025,8 @@ function SlideCountBadge({
   const label = maxSlides != null ? `${count}/${maxSlides}` : `${count}`;
   const baseTitle =
     maxSlides != null
-      ? `Slides: ${count} of max ${maxSlides} (min ${MIN_SLIDES})`
-      : `Slides: ${count} (min ${MIN_SLIDES}, no maximum)`;
+      ? `Slides: ${count} of max ${maxSlides} (min ${minSlides})`
+      : `Slides: ${count} (min ${minSlides}, no maximum)`;
 
   return (
     <button

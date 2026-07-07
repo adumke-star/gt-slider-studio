@@ -2,6 +2,8 @@
 // Pure functions: given a race's sections + images, return violations.
 // Rule numbers refer to the team's Rule Setup sheet.
 
+import { findGuideCategory } from "./sliderGuide";
+
 export type ImageType = "compositing" | "race_action" | "fan_atmosphere";
 
 export const IMAGE_TYPES: ImageType[] = ["compositing", "race_action", "fan_atmosphere"];
@@ -73,7 +75,18 @@ type RuleSection = {
   kind: "plp" | "pdp";
   name: string;
   max_slides?: number | null;
+  guide_category?: string | null;
 };
+
+/**
+ * Minimum slides for a section (rule 1/5). Guide categories that define fewer
+ * than 6 slides lower the minimum — e.g. "Parking" only requires 1 image.
+ */
+export function sectionMinSlides(section: { guide_category?: string | null }): number {
+  const category = findGuideCategory(section.guide_category);
+  if (category && category.slides.length < MIN_SLIDES) return category.slides.length;
+  return MIN_SLIDES;
+}
 
 type RuleImage = {
   id: string;
@@ -138,14 +151,16 @@ export function evaluateRaceRules({
     const imgs = bySection.get(section.id) ?? [];
     const label = `${section.kind.toUpperCase()} „${section.name}“`;
 
-    // Rule 1 + 5: at least 6 images per slider.
-    if (imgs.length < MIN_SLIDES) {
+    // Rule 1 + 5: at least 6 images per slider (less when the guide category
+    // defines fewer slides, e.g. Parking with 1).
+    const minSlides = sectionMinSlides(section);
+    if (imgs.length < minSlides) {
       violations.push({
         rule: 1,
         key: `min-slides-${section.id}`,
         severity: "error",
         sectionId: section.id,
-        message: `${label}: only ${imgs.length}/${MIN_SLIDES} images — fill remaining slides (rule 1/5).`,
+        message: `${label}: only ${imgs.length}/${minSlides} images — fill remaining slides (rule 1/5).`,
       });
     }
 

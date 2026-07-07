@@ -98,7 +98,7 @@ function Dashboard() {
   const loadRuleFlags = useCallback(async () => {
     const [{ data: raceRows }, { data: sectionRows }, { data: imageRows }] = await Promise.all([
       supabase.from("races").select("id, series, race_date"),
-      supabase.from("slider_sections").select("id, race_id, kind, name, max_slides"),
+      supabase.from("slider_sections").select("id, race_id, kind, name, max_slides, guide_category"),
       supabase.from("slider_images").select("id, race_id, section_id, image_type, season, created_at"),
     ]);
     const seasonBySeries = computeSeriesSeasonInfo(raceRows ?? []);
@@ -115,7 +115,7 @@ function Dashboard() {
     const m = new Map<string, boolean>();
     for (const r of raceRows ?? []) {
       const violations = evaluateRaceRules({
-        sections: (sectionsByRace.get(r.id) ?? []) as { id: string; kind: "plp" | "pdp"; name: string; max_slides?: number | null }[],
+        sections: (sectionsByRace.get(r.id) ?? []) as { id: string; kind: "plp" | "pdp"; name: string; max_slides?: number | null; guide_category?: string | null }[],
         images: imagesByRace.get(r.id) ?? [],
         seasonInfo: seasonBySeries.get(r.series),
       });
