@@ -118,15 +118,36 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+// Captured at bundle load, before the lazy Supabase client can consume
+// (and strip) the recovery hash from the URL.
+const ARRIVED_WITH_RECOVERY_LINK =
+  typeof window !== "undefined" && window.location.hash.includes("type=recovery");
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
+
+  // Recovery links log the user in via a one-time token. Wherever the
+  // redirect lands, force the "set new password" page so the user cannot
+  // end up in the app without choosing a new password.
+  useEffect(() => {
+    if (ARRIVED_WITH_RECOVERY_LINK && window.location.pathname !== "/reset-password") {
+      // Keep any remaining hash so the Supabase client can consume the token there.
+      window.location.replace(`/reset-password${window.location.hash}`);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     import("@/integrations/supabase/client").then(({ supabase }) => {
       if (cancelled) return;
       const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+        if (event === "PASSWORD_RECOVERY") {
+          if (window.location.pathname !== "/reset-password") {
+            router.navigate({ to: "/reset-password" });
+          }
+          return;
+        }
         if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
         router.invalidate();
         if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
