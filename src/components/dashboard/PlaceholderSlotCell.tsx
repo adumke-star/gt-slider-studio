@@ -45,8 +45,8 @@ export function PlaceholderSlotCell({
         else onDropAfter();
       }}
       className={cn(
-        "group relative flex w-[180px] shrink-0 flex-col overflow-hidden rounded-md border-2 border-dashed transition",
-        type?.accent ?? "border-border bg-muted/30 text-muted-foreground",
+        "group relative w-[180px] shrink-0 overflow-hidden rounded-md border-2 border-dashed transition",
+        type?.accent ?? "border-border bg-muted/50",
       )}
     >
       {dropSide && (
@@ -89,12 +89,14 @@ export function PlaceholderSlotCell({
         </button>
       )}
 
-      <div className="flex aspect-[633/382] w-full flex-col items-center justify-center gap-2 px-3 text-center">
-        {Icon && <Icon className="h-8 w-8 opacity-80" strokeWidth={1.5} />}
-        <p className="font-display text-[11px] font-black uppercase leading-tight tracking-wide">
-          {label}
-        </p>
-        <p className="text-[10px] opacity-70">Visual slot only</p>
+      <div className="relative aspect-[633/382] w-full">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center text-white">
+          {Icon && <Icon className="h-9 w-9 shrink-0" strokeWidth={1.5} />}
+          <p className="font-display text-[11px] font-black uppercase leading-tight tracking-wide">
+            {label}
+          </p>
+          <p className="text-[10px] text-white/75">Visual slot only</p>
+        </div>
       </div>
     </div>
   );
