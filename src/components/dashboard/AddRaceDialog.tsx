@@ -9,10 +9,9 @@ export function AddRaceDialog({
 }: { open: boolean; onOpenChange: (v: boolean) => void; onCreated: (raceId: string) => void }) {
   const [name, setName] = useState("");
   const [series, setSeries] = useState<"f1" | "motogp" | "dtm" | "wsbk">("f1");
-  const [date, setDate] = useState("");
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { if (!open) { setName(""); setDate(""); setSeries("f1"); } }, [open]);
+  useEffect(() => { if (!open) { setName(""); setSeries("f1"); } }, [open]);
 
   async function submit() {
     if (!name.trim()) return;
@@ -20,7 +19,7 @@ export function AddRaceDialog({
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: race } = await supabase.from("races").insert({
-        name: name.trim(), series, race_date: date || null,
+        name: name.trim(), series, race_date: null,
       }).select().single();
       if (race) {
         await supabase.from("slider_sections").insert([
@@ -39,7 +38,13 @@ export function AddRaceDialog({
         <DialogHeader>
           <DialogTitle className="font-display text-xl uppercase tracking-tight">New race</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-2">
+        <form
+          className="space-y-4 py-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+        >
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Series</label>
             <Select value={series} onValueChange={(v) => setSeries(v as "f1" | "motogp" | "dtm" | "wsbk")}>
@@ -56,18 +61,14 @@ export function AddRaceDialog({
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Race name</label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Monaco Grand Prix" autoFocus />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Date (optional)</label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={submit} disabled={busy || !name.trim()}
-            className="bg-primary text-primary-foreground hover:bg-primary/90">
-            Create
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="px-0 pb-0 pt-2">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+            <Button type="submit" disabled={busy || !name.trim()}
+              className="bg-primary text-primary-foreground hover:bg-primary/90">
+              Create
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
