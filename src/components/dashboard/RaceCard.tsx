@@ -992,7 +992,7 @@ function SectionBlock({
             <Button size="sm" variant="ghost"
               disabled={realImages.filter(isCompressEligible).length === 0}
               onClick={() => onCompress(realImages.filter(isCompressEligible))}
-              className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-40"
+              className="h-7 gap-1 text-xs text-muted-foreground hover:text-accent-foreground disabled:opacity-40"
               title={`Compress ${section.kind.toUpperCase()} images`}>
               <Wand2 className="h-3.5 w-3.5" /> Compress
             </Button>
@@ -1000,7 +1000,7 @@ function SectionBlock({
           <Button size="sm" variant="ghost"
             disabled={realImages.filter((i) => i.compressed_path || i.original_path).length === 0}
             onClick={() => onExport(realImages.filter((i) => i.compressed_path || i.original_path))}
-            className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-40"
+            className="h-7 gap-1 text-xs text-muted-foreground hover:text-accent-foreground disabled:opacity-40"
             title={`Export ${section.kind.toUpperCase()} images`}>
             <Download className="h-3.5 w-3.5" /> Export
           </Button>
@@ -1016,7 +1016,7 @@ function SectionBlock({
               size="sm"
               variant="ghost"
               onClick={() => onLinkPlaceholders(selectedPlaceholderIds)}
-              className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary"
+              className="h-7 gap-1 text-xs text-muted-foreground hover:text-accent-foreground"
               title="Link selected placeholders so they move together"
             >
               <Link2 className="h-3.5 w-3.5" /> Link ({selectedPlaceholderIds.length})
@@ -1026,7 +1026,7 @@ function SectionBlock({
             <>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary">
+                  <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs text-muted-foreground hover:text-accent-foreground">
                     <Plus className="h-3.5 w-3.5" /> Slot
                   </Button>
                 </DropdownMenuTrigger>
@@ -1365,7 +1365,7 @@ function SlideCountBadge({
           : over
             ? "border-[#FACC15]/50 bg-[#FACC15]/10 text-[#8a6d00]"
             : "border-border text-muted-foreground",
-        canEdit && "hover:border-primary hover:text-primary",
+        canEdit && "hover:border-primary hover:text-foreground",
       )}
     >
       {label}
