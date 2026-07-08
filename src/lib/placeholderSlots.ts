@@ -8,9 +8,12 @@ export type PlaceholderSlotType = {
   accent: string;
 };
 
+/** Placeholder that occupies a slider slot (video) — lowers the real-image minimum by one. */
+export const PRODUCT_VIDEO_PLACEHOLDER_LABEL = "Product Video";
+
 export const PLACEHOLDER_SLOT_TYPES: PlaceholderSlotType[] = [
   {
-    label: "Product Video",
+    label: PRODUCT_VIDEO_PLACEHOLDER_LABEL,
     icon: Clapperboard,
     accent: "border-violet-400/50 bg-violet-600/85",
   },
@@ -36,6 +39,10 @@ const byLabel = new Map(PLACEHOLDER_SLOT_TYPES.map((t) => [t.label.toLowerCase()
 export function findPlaceholderType(label: string | null | undefined): PlaceholderSlotType | null {
   if (!label) return null;
   return byLabel.get(label.trim().toLowerCase()) ?? null;
+}
+
+export function isProductVideoPlaceholder(label: string | null | undefined): boolean {
+  return label?.trim().toLowerCase() === PRODUCT_VIDEO_PLACEHOLDER_LABEL.toLowerCase();
 }
 
 export function isRealImageSlot(img: { is_placeholder?: boolean | null }): boolean {

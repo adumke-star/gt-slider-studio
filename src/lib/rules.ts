@@ -3,6 +3,7 @@
 // Rule numbers refer to the team's Rule Setup sheet.
 
 import { findGuideCategory } from "./sliderGuide";
+import { isProductVideoPlaceholder } from "./placeholderSlots";
 
 export type ImageType = "compositing" | "race_action" | "fan_atmosphere";
 
@@ -89,6 +90,26 @@ export function sectionMinSlides(section: { guide_category?: string | null }): n
   return MIN_SLIDES;
 }
 
+/** Product Video placeholders count as filled slider slots (export excluded). */
+export function countProductVideoPlaceholders(images: RuleImage[], sectionId: string): number {
+  return images.filter(
+    (img) =>
+      img.section_id === sectionId &&
+      img.is_placeholder &&
+      isProductVideoPlaceholder(img.placeholder_label),
+  ).length;
+}
+
+/** Minimum real images required in a section (rule 1/5). */
+export function sectionRequiredRealImages(
+  section: { id: string; guide_category?: string | null },
+  images: RuleImage[],
+): number {
+  const base = sectionMinSlides(section);
+  const videoSlots = countProductVideoPlaceholders(images, section.id);
+  return Math.max(1, base - videoSlots);
+}
+
 type RuleImage = {
   id: string;
   section_id: string | null;
@@ -96,6 +117,7 @@ type RuleImage = {
   season?: number | null;
   created_at?: string | null;
   is_placeholder?: boolean | null;
+  placeholder_label?: string | null;
 };
 
 type RaceLike = {
@@ -154,15 +176,20 @@ export function evaluateRaceRules({
     const label = `${section.kind.toUpperCase()} „${section.name}“`;
 
     // Rule 1 + 5: at least 6 images per slider (less when the guide category
-    // defines fewer slides, e.g. Parking with 1).
-    const minSlides = sectionMinSlides(section);
+    // defines fewer slides, e.g. Parking with 1, or a Product Video placeholder
+    // occupies one slot).
+    const minSlides = sectionRequiredRealImages(section, images);
     if (imgs.length < minSlides) {
+      const videoNote =
+        countProductVideoPlaceholders(images, section.id) > 0
+          ? " (Product Video placeholder counts as one slot)"
+          : "";
       violations.push({
         rule: 1,
         key: `min-slides-${section.id}`,
         severity: "error",
         sectionId: section.id,
-        message: `${label}: only ${imgs.length}/${minSlides} images — fill remaining slides (rule 1/5).`,
+        message: `${label}: only ${imgs.length}/${minSlides} images — fill remaining slots (rule 1/5)${videoNote}.`,
       });
     }
 

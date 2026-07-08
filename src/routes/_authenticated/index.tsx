@@ -104,7 +104,7 @@ function Dashboard() {
     const [{ data: raceRows }, { data: sectionRows }, { data: imageRows }] = await Promise.all([
       supabase.from("races").select("id, series, race_date"),
       supabase.from("slider_sections").select("id, race_id, kind, name, max_slides, guide_category"),
-      supabase.from("slider_images").select("id, race_id, section_id, image_type, season, created_at, is_placeholder"),
+      supabase.from("slider_images").select("id, race_id, section_id, image_type, season, created_at, is_placeholder, placeholder_label"),
     ]);
     const seasonBySeries = computeSeriesSeasonInfo(raceRows ?? []);
     const sectionsByRace = new Map<string, NonNullable<typeof sectionRows>>();

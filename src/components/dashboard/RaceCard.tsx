@@ -9,7 +9,7 @@ import { isRealImageSlot, PLACEHOLDER_SLOT_TYPES } from "@/lib/placeholderSlots"
 import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 import { isCompressEligible } from "@/lib/compressImage";
-import { sectionMinSlides, type SeriesSeasonInfo } from "@/lib/rules";
+import { sectionRequiredRealImages, type SeriesSeasonInfo } from "@/lib/rules";
 import { backupFileName, createRaceBackupZip } from "@/lib/raceBackup";
 import { RuleCheckPanel } from "./RuleCheckPanel";
 import { findGuideCategory, guessCategory } from "@/lib/sliderGuide";
@@ -864,7 +864,13 @@ function SectionBlock({
               {section.name}
             </span>
           )}
-          <SlideCountBadge section={section} count={realImages.length} canEdit={canEdit} onReload={onReload} />
+          <SlideCountBadge
+            section={section}
+            count={realImages.length}
+            minSlides={sectionRequiredRealImages(section, images)}
+            canEdit={canEdit}
+            onReload={onReload}
+          />
           <button
             onClick={() => setGuideOpen(true)}
             className="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary"
@@ -1126,16 +1132,17 @@ function SectionBlock({
 function SlideCountBadge({
   section,
   count,
+  minSlides,
   canEdit,
   onReload,
 }: {
   section: SliderSection;
   count: number;
+  minSlides: number;
   canEdit: boolean;
   onReload: () => void;
 }) {
   const maxSlides = section.max_slides ?? null;
-  const minSlides = sectionMinSlides(section);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(maxSlides != null ? String(maxSlides) : "");
 
