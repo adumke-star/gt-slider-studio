@@ -23,6 +23,7 @@ import { CompressDialog } from "@/components/dashboard/CompressDialog";
 import type { SliderImage } from "@/components/dashboard/ImageCell";
 import { dataTransferHasFiles } from "@/lib/dropFiles";
 import { isCompressEligible } from "@/lib/compressImage";
+import { isRealImageSlot } from "@/lib/placeholderSlots";
 import { UserMenu } from "@/components/dashboard/UserMenu";
 import { RaceNav, type NavSelection, type RaceFlags } from "@/components/dashboard/RaceNav";
 import { RaceListView } from "@/components/dashboard/RaceListView";
@@ -271,6 +272,17 @@ function Dashboard() {
   }, [loadedImages]);
 
   const selectedImgs = loadedImages.filter((i) => selected.has(i.id));
+  const selectedExportImgs = selectedImgs.filter(isRealImageSlot);
+
+  // Drop stale ids when slots are removed outside the header delete flow (e.g. placeholder trash).
+  useEffect(() => {
+    if (selected.size === 0) return;
+    const valid = new Set(loadedImages.map((i) => i.id));
+    setSelected((prev) => {
+      const next = new Set([...prev].filter((id) => valid.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [loadedImages, selected.size]);
 
   async function performDelete() {
     if (selectedImgs.length === 0) return;
@@ -375,12 +387,12 @@ function Dashboard() {
                   if (selectedImgs.length === 0) return;
                   setDeleteOpen(true);
                 }}
-                disabled={selected.size === 0}
+                disabled={selectedImgs.length === 0}
                 variant="outline"
                 className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
               >
                 <Trash2 className="h-4 w-4" />
-                Delete {selected.size > 0 && <span className="rounded bg-destructive/20 px-1.5 text-xs">{selected.size}</span>}
+                Delete {selectedImgs.length > 0 && <span className="rounded bg-destructive/20 px-1.5 text-xs">{selectedImgs.length}</span>}
               </Button>
             )}
 
@@ -395,34 +407,36 @@ function Dashboard() {
                   setCompressImages(imgs);
                   setCompressOpen(true);
                 }}
-                disabled={selected.size === 0}
+                disabled={selectedImgs.length === 0}
                 variant="outline"
                 className="gap-1.5 disabled:opacity-40"
               >
                 <Wand2 className="h-4 w-4" />
-                Compress {selected.size > 0 && <span className="rounded bg-foreground/10 px-1.5 text-xs">{selected.size}</span>}
+                Compress {selectedImgs.length > 0 && <span className="rounded bg-foreground/10 px-1.5 text-xs">{selectedImgs.length}</span>}
               </Button>
             )}
             <Button
               onClick={() => {
-                if (selectedImgs.length === 0) return;
-                setExportImages(selectedImgs);
+                if (selectedExportImgs.length === 0) return;
+                setExportImages(selectedExportImgs);
                 setExportOpen(true);
               }}
-              disabled={selected.size === 0}
+              disabled={selectedExportImgs.length === 0}
               className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
             >
               <Download className="h-4 w-4" />
-              Export {selected.size > 0 && <span className="rounded bg-primary-foreground/20 px-1.5 text-xs">{selected.size}</span>}
+              Export {selectedExportImgs.length > 0 && (
+                <span className="rounded bg-primary-foreground/20 px-1.5 text-xs">{selectedExportImgs.length}</span>
+              )}
             </Button>
             <UserMenu />
           </div>
         </div>
 
-        {selected.size > 0 && (
+        {selectedImgs.length > 0 && (
           <div className="border-t border-border bg-primary/10 px-6 py-2 text-xs text-primary">
             <button onClick={() => setSelected(new Set())} className="inline-flex items-center gap-1 hover:underline">
-              <X className="h-3 w-3" /> Clear selection ({selected.size})
+              <X className="h-3 w-3" /> Clear selection ({selectedImgs.length})
             </button>
           </div>
         )}
