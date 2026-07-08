@@ -134,7 +134,6 @@ export function CompressDialog({
 
         const folder = img.section_id ?? img.area;
         const outPath = `${img.race_id}/${folder}/${img.id}.${ext}`;
-        const prevOriginalPath = img.original_path;
         const prevCompressedPath = img.compressed_path;
 
         await uploadFile("compressed", outPath, out, mime);
@@ -143,8 +142,6 @@ export function CompressDialog({
           compressed_path: outPath,
           compressed_size_kb: sizeKB,
           format,
-          original_path: null,
-          original_size_kb: null,
           status: img.status === "live" ? "live" : "image_done",
         }).eq("id", img.id);
 
@@ -160,13 +157,6 @@ export function CompressDialog({
           continue;
         }
 
-        if (prevOriginalPath) {
-          try {
-            await removeFile("originals", prevOriginalPath);
-          } catch (e) {
-            console.warn("failed to delete original after compression", prevOriginalPath, e);
-          }
-        }
         if (prevCompressedPath && prevCompressedPath !== outPath) {
           try {
             await removeFile("compressed", prevCompressedPath);
@@ -216,8 +206,8 @@ export function CompressDialog({
           </DialogTitle>
           <DialogDescription>
             {passthrough
-              ? "Takes the uploaded files as-is for export — nothing is re-encoded. The original is moved, not copied."
-              : "Crop to 633×382 and compress. Uses the original when available; otherwise re-compresses the existing web image. The original is deleted after a successful run."}
+              ? "Takes the uploaded files as-is for export — nothing is re-encoded. The working copy in originals is kept for later format changes."
+              : "Crop to 633×382 and compress. Uses the original when available; otherwise re-compresses the existing web image. The working copy in originals is kept."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-2">
@@ -268,6 +258,7 @@ export function CompressDialog({
 
               <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
                 Output: <span className="text-foreground">633 × 382 px</span> · cover fill, center crop.
+                Working copies (up to 2000 px) stay in storage for re-compression.
                 Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
               </div>
             </>

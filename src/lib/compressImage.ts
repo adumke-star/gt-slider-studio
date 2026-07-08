@@ -72,8 +72,8 @@ const FORMAT_BY_EXT: Record<string, string> = {
 
 /**
  * Take an already-compressed upload as the final export asset:
- * copies the original blob 1:1 into the compressed bucket (no re-encoding),
- * updates the DB row like a compress run, and deletes the original.
+ * copies the original blob 1:1 into the compressed bucket (no re-encoding)
+ * and keeps the working copy in originals for later re-compression.
  */
 export async function acceptWithoutCompression(img: PassthroughImage): Promise<PassthroughResult> {
   if (!img.original_path) {
@@ -91,7 +91,6 @@ export async function acceptWithoutCompression(img: PassthroughImage): Promise<P
 
   const folder = img.section_id ?? img.area;
   const outPath = `${img.race_id}/${folder}/${img.id}.${known.ext}`;
-  const prevOriginalPath = img.original_path;
   const prevCompressedPath = img.compressed_path;
 
   try {
@@ -104,8 +103,6 @@ export async function acceptWithoutCompression(img: PassthroughImage): Promise<P
     compressed_path: outPath,
     compressed_size_kb: Math.round(blob.size / 1000),
     format: known.format,
-    original_path: null,
-    original_size_kb: null,
     status: img.status === "live" ? "live" : "image_done",
   }).eq("id", img.id);
 
@@ -118,11 +115,6 @@ export async function acceptWithoutCompression(img: PassthroughImage): Promise<P
     return { outcome: "failed", message: error.message };
   }
 
-  try {
-    await removeFile("originals", prevOriginalPath);
-  } catch (e) {
-    console.warn("failed to delete original after passthrough", prevOriginalPath, e);
-  }
   if (prevCompressedPath && prevCompressedPath !== outPath) {
     try {
       await removeFile("compressed", prevCompressedPath);
