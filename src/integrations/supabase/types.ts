@@ -257,6 +257,7 @@ export type Database = {
           original_size_kb: number | null
           original_url: string | null
           placeholder_label: string | null
+          placeholder_group_id: string | null
           position: number
           race_id: string
           season: number | null
@@ -282,6 +283,7 @@ export type Database = {
           original_size_kb?: number | null
           original_url?: string | null
           placeholder_label?: string | null
+          placeholder_group_id?: string | null
           position?: number
           race_id: string
           season?: number | null
@@ -307,6 +309,7 @@ export type Database = {
           original_size_kb?: number | null
           original_url?: string | null
           placeholder_label?: string | null
+          placeholder_group_id?: string | null
           position?: number
           race_id?: string
           season?: number | null

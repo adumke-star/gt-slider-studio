@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { BadgeAlert, Clapperboard, Crown, Tent } from "lucide-react";
+import { BadgeAlert, Bike, Clapperboard, Crown, Tent } from "lucide-react";
 
 export type PlaceholderSlotType = {
   label: string;
@@ -31,6 +31,11 @@ export const PLACEHOLDER_SLOT_TYPES: PlaceholderSlotType[] = [
     label: "VIP Incomplete",
     icon: BadgeAlert,
     accent: "border-rose-400/50 bg-rose-600/85",
+  },
+  {
+    label: "Snipers",
+    icon: Bike,
+    accent: "border-orange-400/50 bg-orange-700/85",
   },
 ];
 

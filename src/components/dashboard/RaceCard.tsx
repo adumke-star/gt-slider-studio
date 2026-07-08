@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, ChevronLeft, ChevronRight, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2, BookOpenText, Info, User, MoreHorizontal } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, ExternalLink, Pencil, Check, X, GripVertical, Download, Wand2, BookOpenText, Info, User, MoreHorizontal, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ImageCell, type SliderImage } from "./ImageCell";
 import { PlaceholderSlotCell } from "./PlaceholderSlotCell";
+import { AddPlaceholderDialog } from "./AddPlaceholderDialog";
 import { isRealImageSlot, PLACEHOLDER_SLOT_TYPES } from "@/lib/placeholderSlots";
+import { getPlaceholderDragBlock, placeholderGroupSizes, remainingGroupMemberIds } from "@/lib/placeholderGroups";
 import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 import { isCompressEligible } from "@/lib/compressImage";
@@ -223,30 +225,80 @@ export function RaceCard({
     onReload();
   }
 
-  async function addPlaceholderSlot(s: SliderSection, label: string) {
+  async function addPlaceholderSlots(s: SliderSection, label: string, count: number) {
+    const n = Math.min(12, Math.max(1, count));
     const list = imagesBySection.get(s.id) ?? [];
-    const nextPos = (list[list.length - 1]?.position ?? -1) + 1;
-    const { error } = await supabase.from("slider_images").insert({
+    let nextPos = (list[list.length - 1]?.position ?? -1) + 1;
+    const groupId = n > 1 ? crypto.randomUUID() : null;
+    const rows = Array.from({ length: n }, (_, i) => ({
       race_id: race.id,
       area: s.kind,
       section_id: s.id,
-      position: nextPos,
-      status: "blank",
+      position: nextPos + i,
+      status: "blank" as const,
       is_placeholder: true,
       placeholder_label: label,
-    });
+      placeholder_group_id: groupId,
+    }));
+    const { error } = await supabase.from("slider_images").insert(rows);
     if (error) {
-      toast.error(`Could not add placeholder: ${error.message}`);
+      toast.error(`Could not add placeholder${n > 1 ? "s" : ""}: ${error.message}`);
       return;
+    }
+    toast.success(n > 1 ? `${n} linked placeholders added` : "Placeholder added");
+    onReload();
+  }
+
+  async function linkPlaceholderGroup(s: SliderSection, ids: string[]) {
+    if (ids.length < 2) return;
+    const groupId = crypto.randomUUID();
+    const { error } = await supabase
+      .from("slider_images")
+      .update({ placeholder_group_id: groupId })
+      .in("id", ids)
+      .eq("section_id", s.id);
+    if (error) {
+      toast.error(`Could not link placeholders: ${error.message}`);
+      return;
+    }
+    toast.success(`${ids.length} placeholders linked — drag any one to move the group`);
+    onReload();
+  }
+
+  async function unlinkPlaceholder(s: SliderSection, id: string) {
+    const list = imagesBySection.get(s.id) ?? [];
+    const item = list.find((i) => i.id === id);
+    if (!item?.placeholder_group_id) return;
+    const groupId = item.placeholder_group_id;
+    const { error } = await supabase
+      .from("slider_images")
+      .update({ placeholder_group_id: null })
+      .eq("id", id);
+    if (error) {
+      toast.error("Could not unlink placeholder");
+      return;
+    }
+    const others = remainingGroupMemberIds(list, groupId, id);
+    if (others.length === 1) {
+      await supabase.from("slider_images").update({ placeholder_group_id: null }).eq("id", others[0]);
     }
     onReload();
   }
 
-  async function deletePlaceholder(id: string) {
+  async function deletePlaceholder(s: SliderSection, id: string) {
+    const list = imagesBySection.get(s.id) ?? [];
+    const item = list.find((i) => i.id === id);
+    const groupId = item?.placeholder_group_id ?? null;
     const { error } = await supabase.from("slider_images").delete().eq("id", id);
     if (error) {
       toast.error("Could not remove placeholder");
       return;
+    }
+    if (groupId) {
+      const others = remainingGroupMemberIds(list, groupId, id);
+      if (others.length === 1) {
+        await supabase.from("slider_images").update({ placeholder_group_id: null }).eq("id", others[0]);
+      }
     }
     onReload();
   }
@@ -307,16 +359,16 @@ export function RaceCard({
   async function reorder(section: SliderSection, draggedId: string, targetId: string, side: "before" | "after") {
     if (draggedId === targetId) return;
     const list = (imagesBySection.get(section.id) ?? []).slice();
-    const from = list.findIndex((i) => i.id === draggedId);
-    if (from === -1) return; // dragged from another section — ignore for now
-    const [moved] = list.splice(from, 1);
-    let to = list.findIndex((i) => i.id === targetId);
+    const block = getPlaceholderDragBlock(list, draggedId);
+    if (block.length === 0) return;
+    const blockIds = new Set(block.map((i) => i.id));
+    const filtered = list.filter((i) => !blockIds.has(i.id));
+    let to = filtered.findIndex((i) => i.id === targetId);
     if (to === -1) return;
     if (side === "after") to += 1;
-    list.splice(to, 0, moved);
-    // Persist new positions
+    filtered.splice(to, 0, ...block);
     await Promise.all(
-      list.map((img, idx) =>
+      filtered.map((img, idx) =>
         img.position === idx
           ? Promise.resolve()
           : supabase.from("slider_images").update({ position: idx }).eq("id", img.id),
@@ -510,8 +562,10 @@ export function RaceCard({
                 onSetLinks={(links) => setSectionLinks(s, links)}
                 onDelete={() => deleteSection(s)}
                 onAddSlot={() => addSlot(s)}
-                onAddPlaceholder={(label) => addPlaceholderSlot(s, label)}
-                onDeletePlaceholder={deletePlaceholder}
+                onAddPlaceholder={(label, count) => addPlaceholderSlots(s, label, count)}
+                onLinkPlaceholders={(ids) => linkPlaceholderGroup(s, ids)}
+                onUnlinkPlaceholder={(id) => unlinkPlaceholder(s, id)}
+                onDeletePlaceholder={(id) => deletePlaceholder(s, id)}
                 onDragStart={(id) => setDragId(id)}
                 onDropOn={(targetId, side) => {
                   if (!dragId) return;
@@ -544,6 +598,8 @@ function SectionBlock({
   onDelete,
   onAddSlot,
   onAddPlaceholder,
+  onLinkPlaceholders,
+  onUnlinkPlaceholder,
   onDeletePlaceholder,
   onDragStart,
   onDropOn,
@@ -565,7 +621,9 @@ function SectionBlock({
   onSetLinks: (links: SectionLink[]) => void;
   onDelete: () => void;
   onAddSlot: () => void;
-  onAddPlaceholder: (label: string) => void;
+  onAddPlaceholder: (label: string, count: number) => void;
+  onLinkPlaceholders: (ids: string[]) => void;
+  onUnlinkPlaceholder: (id: string) => void;
   onDeletePlaceholder: (id: string) => void;
   onDragStart: (id: string) => void;
   onDropOn: (targetId: string, side: "before" | "after") => void;
@@ -579,6 +637,21 @@ function SectionBlock({
 }) {
   const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const realImages = images.filter(isRealImageSlot);
+  const groupSizes = placeholderGroupSizes(images);
+  const selectedPlaceholderIds = images.filter((i) => i.is_placeholder && selected.has(i.id)).map((i) => i.id);
+  const [placeholderDialogOpen, setPlaceholderDialogOpen] = useState(false);
+  const [placeholderPreset, setPlaceholderPreset] = useState<string | undefined>();
+
+  function openPlaceholderDialog(preset?: string) {
+    setPlaceholderPreset(preset);
+    setPlaceholderDialogOpen(true);
+  }
+
+  function groupIndexFor(img: SliderImage): number {
+    if (!img.placeholder_group_id) return 1;
+    const same = images.filter((i) => i.placeholder_group_id === img.placeholder_group_id);
+    return same.findIndex((i) => i.id === img.id) + 1;
+  }
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(section.name);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -927,6 +1000,17 @@ function SectionBlock({
               onDone={onReload}
             />
           )}
+          {canEdit && selectedPlaceholderIds.length >= 2 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onLinkPlaceholders(selectedPlaceholderIds)}
+              className="h-7 gap-1 text-xs text-muted-foreground hover:text-primary"
+              title="Link selected placeholders so they move together"
+            >
+              <Link2 className="h-3.5 w-3.5" /> Link ({selectedPlaceholderIds.length})
+            </Button>
+          )}
           {canEdit && (
             <>
               <DropdownMenu>
@@ -940,12 +1024,15 @@ function SectionBlock({
                     Image slot
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => openPlaceholderDialog()}>
+                    Placeholder…
+                  </DropdownMenuItem>
                   {PLACEHOLDER_SLOT_TYPES.map((t) => {
                     const Icon = t.icon;
                     return (
-                      <DropdownMenuItem key={t.label} onSelect={() => onAddPlaceholder(t.label)}>
+                      <DropdownMenuItem key={t.label} onSelect={() => openPlaceholderDialog(t.label)}>
                         <Icon className="mr-2 h-3.5 w-3.5 shrink-0 opacity-70" />
-                        {t.label}
+                        {t.label}…
                       </DropdownMenuItem>
                     );
                   })}
@@ -978,7 +1065,16 @@ function SectionBlock({
                 key={img.id}
                 image={img}
                 canEdit={canEdit}
+                selected={selected.has(img.id)}
+                groupSize={img.placeholder_group_id ? (groupSizes.get(img.placeholder_group_id) ?? 1) : 1}
+                groupIndex={groupIndexFor(img)}
+                onToggleSelect={() => onToggleSelect(img.id)}
                 onDelete={() => onDeletePlaceholder(img.id)}
+                onUnlink={
+                  img.placeholder_group_id
+                    ? () => onUnlinkPlaceholder(img.id)
+                    : undefined
+                }
                 onDragStart={() => onDragStart(img.id)}
                 onDropBefore={() => onDropOn(img.id, "before")}
                 onDropAfter={() => onDropOn(img.id, "after")}
@@ -1125,6 +1221,12 @@ function SectionBlock({
           </div>
         </div>
       )}
+      <AddPlaceholderDialog
+        open={placeholderDialogOpen}
+        onOpenChange={setPlaceholderDialogOpen}
+        initialLabel={placeholderPreset}
+        onConfirm={(label, count) => onAddPlaceholder(label, count)}
+      />
     </div>
   );
 }
