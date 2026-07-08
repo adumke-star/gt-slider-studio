@@ -351,7 +351,7 @@ export function ImageCell({
           title={isGrouped ? "Drag to move linked group" : "Drag to reorder"}
           className={cn(
             "absolute top-1.5 z-10 grid h-5 w-5 cursor-grab place-items-center rounded border border-border bg-background/80 text-muted-foreground backdrop-blur active:cursor-grabbing",
-            isGrouped && onUnlink ? "right-14" : "right-1.5",
+            isGrouped && onUnlink ? "right-8" : "right-1.5",
           )}
         >
           <GripVertical className="h-3 w-3" />
@@ -363,7 +363,7 @@ export function ImageCell({
           type="button"
           onClick={onUnlink}
           title="Remove from group"
-          className="absolute right-8 top-1.5 z-10 grid h-5 w-5 place-items-center rounded border border-border bg-background/80 text-muted-foreground backdrop-blur hover:text-primary"
+          className="absolute right-1.5 top-1.5 z-10 grid h-5 w-5 place-items-center rounded border border-border bg-background/80 text-muted-foreground backdrop-blur hover:text-primary"
         >
           <Unlink className="h-3 w-3" />
         </button>
