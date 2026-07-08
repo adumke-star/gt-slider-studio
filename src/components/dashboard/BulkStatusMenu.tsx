@@ -162,7 +162,7 @@ export function BulkStatusMenu({
             size="sm"
             variant="ghost"
             disabled={eligible.length === 0}
-            className="h-7 gap-1 text-xs text-muted-foreground hover:text-accent-foreground disabled:opacity-40"
+            className="h-7 gap-1 text-xs text-muted-foreground hover:bg-accent hover:text-black data-[state=open]:bg-accent data-[state=open]:text-black disabled:opacity-40"
             title="Set status for section"
           >
             <CircleDot className="h-3.5 w-3.5" />
