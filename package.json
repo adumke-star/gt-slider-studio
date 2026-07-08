@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
+    "dev:staging": "bash scripts/dev-staging.sh",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
