@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare, ChevronDown, Wand2, Crop, FileCheck2 } from "lucide-react";
+import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare, ChevronDown, Wand2, Crop, FileCheck2, Link2, Unlink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,10 @@ export function ImageCell({
   image,
   selected,
   canEdit,
+  groupSize = 1,
+  groupIndex = 1,
   onToggleSelect,
+  onUnlink,
   onChanged,
   onDragStart,
   onDropBefore,
@@ -62,7 +65,10 @@ export function ImageCell({
   image: SliderImage;
   selected: boolean;
   canEdit: boolean;
+  groupSize?: number;
+  groupIndex?: number;
   onToggleSelect: () => void;
+  onUnlink?: () => void;
   onChanged: () => void;
   onDragStart: () => void;
   onDropBefore: () => void;
@@ -264,6 +270,7 @@ export function ImageCell({
   const cropAdjusted = hasCustomCropArea(cropArea) || hasCustomCrop(image.crop_x, image.crop_y);
   const canCrop = Boolean(image.original_path && !image.compressed_path && preview);
   const displayPreview = croppedPreview ?? preview;
+  const isGrouped = groupSize > 1;
 
   return (
     <div
@@ -309,6 +316,7 @@ export function ImageCell({
         image.status === "changes" ? "bg-[#CB4F10]/20 border-[#CB4F10]/50" :
         image.status === "solved" ? "bg-[var(--status-solved)]/20 border-[var(--status-solved)]/50" :
         image.status === "image_done" ? "bg-[#D4A843]/20 border-[#D4A843]/50" : "bg-surface-2 border-border hover:border-primary/40",
+        isGrouped && "ring-2 ring-white/25 ring-offset-1 ring-offset-transparent",
         selected ? "ring-2 ring-primary/40" : "",
       )}
     >
@@ -326,15 +334,39 @@ export function ImageCell({
         {selected && <Check className="h-3.5 w-3.5 text-primary" strokeWidth={3} />}
       </label>
 
+      {isGrouped && (
+        <span
+          className="absolute left-1.5 top-7 z-10 inline-flex items-center gap-0.5 rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-bold text-foreground backdrop-blur"
+          title="Linked group — drag any member to move all together"
+        >
+          <Link2 className="h-2.5 w-2.5" />
+          {groupIndex}/{groupSize}
+        </span>
+      )}
+
       {canEdit && (
         <div
           draggable
           onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", image.id); e.dataTransfer.setData("application/x-slider-image", image.id); onDragStart(); }}
-          title="Drag to reorder"
-          className="absolute right-1.5 top-1.5 z-10 grid h-5 w-5 cursor-grab place-items-center rounded border border-border bg-background/80 text-muted-foreground backdrop-blur active:cursor-grabbing"
+          title={isGrouped ? "Drag to move linked group" : "Drag to reorder"}
+          className={cn(
+            "absolute top-1.5 z-10 grid h-5 w-5 cursor-grab place-items-center rounded border border-border bg-background/80 text-muted-foreground backdrop-blur active:cursor-grabbing",
+            isGrouped && onUnlink ? "right-14" : "right-1.5",
+          )}
         >
           <GripVertical className="h-3 w-3" />
         </div>
+      )}
+
+      {canEdit && isGrouped && onUnlink && (
+        <button
+          type="button"
+          onClick={onUnlink}
+          title="Remove from group"
+          className="absolute right-8 top-1.5 z-10 grid h-5 w-5 place-items-center rounded border border-border bg-background/80 text-muted-foreground backdrop-blur hover:text-primary"
+        >
+          <Unlink className="h-3 w-3" />
+        </button>
       )}
 
       <div className="relative aspect-[633/382] w-full overflow-hidden bg-background">

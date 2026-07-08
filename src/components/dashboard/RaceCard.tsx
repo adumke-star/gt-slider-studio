@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ImageCell, type SliderImage } from "./ImageCell";
 import { PlaceholderSlotCell } from "./PlaceholderSlotCell";
 import { AddPlaceholderDialog } from "./AddPlaceholderDialog";
+import { AddSlotDialog } from "./AddSlotDialog";
 import { isRealImageSlot, PLACEHOLDER_SLOT_TYPES } from "@/lib/placeholderSlots";
 import { getPlaceholderDragBlock, placeholderGroupSizes, remainingGroupMemberIds } from "@/lib/placeholderGroups";
 import { cn } from "@/lib/utils";
@@ -225,16 +226,25 @@ export function RaceCard({
     onReload();
   }
 
-  async function addSlot(s: SliderSection) {
+  async function addImageSlots(s: SliderSection, count: number) {
+    const n = Math.min(12, Math.max(1, count));
     const list = imagesBySection.get(s.id) ?? [];
-    const nextPos = (list[list.length - 1]?.position ?? -1) + 1;
-    await supabase.from("slider_images").insert({
+    let nextPos = (list[list.length - 1]?.position ?? -1) + 1;
+    const groupId = n > 1 ? crypto.randomUUID() : null;
+    const rows = Array.from({ length: n }, (_, i) => ({
       race_id: race.id,
       area: s.kind,
       section_id: s.id,
-      position: nextPos,
-      status: "todo",
-    });
+      position: nextPos + i,
+      status: "todo" as const,
+      placeholder_group_id: groupId,
+    }));
+    const { error } = await supabase.from("slider_images").insert(rows);
+    if (error) {
+      toast.error(`Could not add slot${n > 1 ? "s" : ""}: ${error.message}`);
+      return;
+    }
+    toast.success(n > 1 ? `${n} linked slots added` : "Slot added");
     onReload();
   }
 
@@ -262,7 +272,7 @@ export function RaceCard({
     onReload();
   }
 
-  async function linkPlaceholderGroup(s: SliderSection, ids: string[]) {
+  async function linkSlotGroup(s: SliderSection, ids: string[]) {
     if (ids.length < 2) return;
     const groupId = crypto.randomUUID();
     const { error } = await supabase
@@ -271,14 +281,14 @@ export function RaceCard({
       .in("id", ids)
       .eq("section_id", s.id);
     if (error) {
-      toast.error(`Could not link placeholders: ${error.message}`);
+      toast.error(`Could not link slots: ${error.message}`);
       return;
     }
-    toast.success(`${ids.length} placeholders linked — drag any one to move the group`);
+    toast.success(`${ids.length} slots linked — drag any one to move the group`);
     onReload();
   }
 
-  async function unlinkPlaceholder(s: SliderSection, id: string) {
+  async function unlinkSlot(s: SliderSection, id: string) {
     const list = imagesBySection.get(s.id) ?? [];
     const item = list.find((i) => i.id === id);
     if (!item?.placeholder_group_id) return;
@@ -288,7 +298,7 @@ export function RaceCard({
       .update({ placeholder_group_id: null })
       .eq("id", id);
     if (error) {
-      toast.error("Could not unlink placeholder");
+      toast.error("Could not unlink slot");
       return;
     }
     const others = remainingGroupMemberIds(list, groupId, id);
@@ -574,10 +584,10 @@ export function RaceCard({
                 onRename={(n) => renameSection(s, n)}
                 onSetLinks={(links) => setSectionLinks(s, links)}
                 onDelete={() => deleteSection(s)}
-                onAddSlot={() => addSlot(s)}
+                onAddSlots={(count) => addImageSlots(s, count)}
                 onAddPlaceholder={(label, count) => addPlaceholderSlots(s, label, count)}
-                onLinkPlaceholders={(ids) => linkPlaceholderGroup(s, ids)}
-                onUnlinkPlaceholder={(id) => unlinkPlaceholder(s, id)}
+                onLinkSlots={(ids) => linkSlotGroup(s, ids)}
+                onUnlinkSlot={(id) => unlinkSlot(s, id)}
                 onDeletePlaceholder={(id) => deletePlaceholder(s, id)}
                 onDragStart={(id) => setDragId(id)}
                 onDropOn={(targetId, side) => {
@@ -609,10 +619,10 @@ function SectionBlock({
   onRename,
   onSetLinks,
   onDelete,
-  onAddSlot,
+  onAddSlots,
   onAddPlaceholder,
-  onLinkPlaceholders,
-  onUnlinkPlaceholder,
+  onLinkSlots,
+  onUnlinkSlot,
   onDeletePlaceholder,
   onDragStart,
   onDropOn,
@@ -633,10 +643,10 @@ function SectionBlock({
   onRename: (name: string) => void;
   onSetLinks: (links: SectionLink[]) => void;
   onDelete: () => void;
-  onAddSlot: () => void;
+  onAddSlots: (count: number) => void;
   onAddPlaceholder: (label: string, count: number) => void;
-  onLinkPlaceholders: (ids: string[]) => void;
-  onUnlinkPlaceholder: (id: string) => void;
+  onLinkSlots: (ids: string[]) => void;
+  onUnlinkSlot: (id: string) => void;
   onDeletePlaceholder: (id: string) => void;
   onDragStart: (id: string) => void;
   onDropOn: (targetId: string, side: "before" | "after") => void;
@@ -651,8 +661,9 @@ function SectionBlock({
   const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const realImages = images.filter(isRealImageSlot);
   const groupSizes = placeholderGroupSizes(images);
-  const selectedPlaceholderIds = images.filter((i) => i.is_placeholder && selected.has(i.id)).map((i) => i.id);
+  const selectedLinkIds = images.filter((i) => selected.has(i.id)).map((i) => i.id);
   const [placeholderDialogOpen, setPlaceholderDialogOpen] = useState(false);
+  const [slotDialogOpen, setSlotDialogOpen] = useState(false);
   const [placeholderPreset, setPlaceholderPreset] = useState<string | undefined>();
   const [pendingPlaceholderDelete, setPendingPlaceholderDelete] = useState<SliderImage | null>(null);
   const [sectionDeleteOpen, setSectionDeleteOpen] = useState(false);
@@ -1015,15 +1026,15 @@ function SectionBlock({
               onDone={onReload}
             />
           )}
-          {canEdit && selectedPlaceholderIds.length >= 2 && (
+          {canEdit && selectedLinkIds.length >= 2 && (
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => onLinkPlaceholders(selectedPlaceholderIds)}
+              onClick={() => onLinkSlots(selectedLinkIds)}
               className={SECTION_HEADER_GHOST_BTN}
-              title="Link selected placeholders so they move together"
+              title="Link selected slots so they move together"
             >
-              <Link2 className="h-3.5 w-3.5" /> Link ({selectedPlaceholderIds.length})
+              <Link2 className="h-3.5 w-3.5" /> Link ({selectedLinkIds.length})
             </Button>
           )}
           {canEdit && (
@@ -1035,8 +1046,8 @@ function SectionBlock({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => onAddSlot()}>
-                    Image slot
+                  <DropdownMenuItem onSelect={() => setSlotDialogOpen(true)}>
+                    Image slot…
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => openPlaceholderDialog()}>
@@ -1087,7 +1098,7 @@ function SectionBlock({
                 onDelete={() => setPendingPlaceholderDelete(img)}
                 onUnlink={
                   img.placeholder_group_id
-                    ? () => onUnlinkPlaceholder(img.id)
+                    ? () => onUnlinkSlot(img.id)
                     : undefined
                 }
                 onDragStart={() => onDragStart(img.id)}
@@ -1100,7 +1111,14 @@ function SectionBlock({
                 image={img}
                 canEdit={canEdit}
                 selected={selected.has(img.id)}
+                groupSize={img.placeholder_group_id ? (groupSizes.get(img.placeholder_group_id) ?? 1) : 1}
+                groupIndex={groupIndexFor(img)}
                 onToggleSelect={() => onToggleSelect(img.id)}
+                onUnlink={
+                  img.placeholder_group_id
+                    ? () => onUnlinkSlot(img.id)
+                    : undefined
+                }
                 onChanged={onReload}
                 onDragStart={() => onDragStart(img.id)}
                 onDropBefore={() => onDropOn(img.id, "before")}
@@ -1236,6 +1254,11 @@ function SectionBlock({
           </div>
         </div>
       )}
+      <AddSlotDialog
+        open={slotDialogOpen}
+        onOpenChange={setSlotDialogOpen}
+        onConfirm={(count) => onAddSlots(count)}
+      />
       <AddPlaceholderDialog
         open={placeholderDialogOpen}
         onOpenChange={setPlaceholderDialogOpen}
