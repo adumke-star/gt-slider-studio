@@ -50,7 +50,7 @@ function AuthPage() {
       return "An account with this email already exists. Please sign in or reset your password.";
     }
     if (lower.includes("password should be")) {
-      return "Password must be at least 6 characters.";
+      return "Password must be at least 8 characters.";
     }
     if (lower.includes("pwned") || lower.includes("compromised")) {
       return "This password was found in a data breach. Please choose a different one.";

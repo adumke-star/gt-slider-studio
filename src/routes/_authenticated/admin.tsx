@@ -26,16 +26,11 @@ function roleBadgeClass(role: AppRole) {
   return "border-border bg-muted text-muted-foreground";
 }
 
-async function syncUserRoleForEmail(email: string, role: AppRole) {
-  if (isSuperuserEmail(email)) return;
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("email", email)
-    .maybeSingle();
-  if (!profile) return;
-  await supabase.from("user_roles").delete().eq("user_id", profile.id);
-  await supabase.from("user_roles").insert({ user_id: profile.id, role });
+/** Sync the live role of an already-registered user (admin-gated in the DB). */
+async function syncUserRoleForEmail(email: string, role: AppRole): Promise<string | null> {
+  if (isSuperuserEmail(email)) return null;
+  const { error } = await supabase.rpc("admin_set_user_role", { _email: email, _role: role });
+  return error?.message ?? null;
 }
 
 function AdminPage() {
@@ -94,7 +89,8 @@ function AdminPage() {
       setError(err.message);
       return;
     }
-    await syncUserRoleForEmail(row.email, next);
+    const syncError = await syncUserRoleForEmail(row.email, next);
+    if (syncError) setError(`Allowlist updated, but the active role could not be changed: ${syncError}`);
     load();
   }
 

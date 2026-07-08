@@ -408,6 +408,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_set_user_role: {
+        Args: {
+          _email: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: undefined
+      }
       can_edit_content: { Args: { _user_id: string }; Returns: boolean }
       get_public_profiles: {
         Args: never
