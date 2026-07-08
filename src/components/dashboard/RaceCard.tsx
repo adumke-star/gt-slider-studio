@@ -24,6 +24,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type Race = {
   id: string;
@@ -188,7 +198,6 @@ export function RaceCard({
 
 
   async function deleteSection(s: SliderSection) {
-    if (!confirm(`Delete section "${s.name}"? All images inside will be removed.`)) return;
     await supabase.from("slider_sections").delete().eq("id", s.id);
     onReload();
   }
@@ -641,6 +650,8 @@ function SectionBlock({
   const selectedPlaceholderIds = images.filter((i) => i.is_placeholder && selected.has(i.id)).map((i) => i.id);
   const [placeholderDialogOpen, setPlaceholderDialogOpen] = useState(false);
   const [placeholderPreset, setPlaceholderPreset] = useState<string | undefined>();
+  const [pendingPlaceholderDelete, setPendingPlaceholderDelete] = useState<SliderImage | null>(null);
+  const [sectionDeleteOpen, setSectionDeleteOpen] = useState(false);
 
   function openPlaceholderDialog(preset?: string) {
     setPlaceholderPreset(preset);
@@ -1039,7 +1050,7 @@ function SectionBlock({
                 </DropdownMenuContent>
               </DropdownMenu>
               <button
-                onClick={onDelete}
+                onClick={() => setSectionDeleteOpen(true)}
                 className="rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive"
                 title="Delete section"
               >
@@ -1069,7 +1080,7 @@ function SectionBlock({
                 groupSize={img.placeholder_group_id ? (groupSizes.get(img.placeholder_group_id) ?? 1) : 1}
                 groupIndex={groupIndexFor(img)}
                 onToggleSelect={() => onToggleSelect(img.id)}
-                onDelete={() => onDeletePlaceholder(img.id)}
+                onDelete={() => setPendingPlaceholderDelete(img)}
                 onUnlink={
                   img.placeholder_group_id
                     ? () => onUnlinkPlaceholder(img.id)
@@ -1227,6 +1238,57 @@ function SectionBlock({
         initialLabel={placeholderPreset}
         onConfirm={(label, count) => onAddPlaceholder(label, count)}
       />
+      <AlertDialog open={pendingPlaceholderDelete != null} onOpenChange={(v) => { if (!v) setPendingPlaceholderDelete(null); }}>
+        <AlertDialogContent className="bg-surface-2">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-xl">
+              Remove placeholder?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete &ldquo;{pendingPlaceholderDelete?.placeholder_label ?? "Placeholder"}&rdquo; from{" "}
+              {section.kind.toUpperCase()} {section.name}? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                if (pendingPlaceholderDelete) onDeletePlaceholder(pendingPlaceholderDelete.id);
+                setPendingPlaceholderDelete(null);
+              }}
+            >
+              Delete placeholder
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={sectionDeleteOpen} onOpenChange={setSectionDeleteOpen}>
+        <AlertDialogContent className="bg-surface-2">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-xl">
+              Delete {section.kind.toUpperCase()} section?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete &ldquo;{section.name}&rdquo; and all slots inside (images and placeholders)? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                onDelete();
+                setSectionDeleteOpen(false);
+              }}
+            >
+              Delete section
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
