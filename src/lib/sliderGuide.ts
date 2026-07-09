@@ -72,6 +72,15 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
     note: "Attribut 2–10 follow the same pattern: 6 USP slides each (supplier or generic — view, food, lounge, atmosphere, etc.).",
   },
   {
+    label: "VIP Generic",
+    kind: "pdp",
+    title: "PDP — VIP Generic",
+    slides: [
+      COMPOSITING_OR_ACTION,
+      ...Array(5).fill("Generic VIP atmosphere (supplier or generic)"),
+    ],
+  },
+  {
     label: "Travel",
     kind: "pdp",
     title: "PDP — Travel",
@@ -151,6 +160,7 @@ export function findGuideCategory(value: string | null | undefined): GuideCatego
 export function guessCategory(name: string, kind: SectionKind): string | null {
   if (kind === "plp") return "Main Page";
   const n = name.toLowerCase();
+  if (n.includes("vip generic") || n.includes("vip-generic")) return "VIP Generic";
   if (n.includes("vip")) return "VIP";
   if (n.includes("travel")) return "Travel";
   if (n.includes("resell")) return "Camping Resell";
