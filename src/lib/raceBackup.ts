@@ -490,6 +490,10 @@ export async function restoreRaceBackup(
     await deleteRaceCompletely(raceId);
   }
 
+  // Upload files before inserting rows: realtime reloads the dashboard as soon
+  // as the rows appear, and previews fetched before the files exist stay blank.
+  const files = await uploadArchiveFiles(archive.files, onProgress);
+
   onProgress?.("Restoring race…");
   {
     const { error } = await db.from("races").insert(archive.race);
@@ -506,7 +510,6 @@ export async function restoreRaceBackup(
 
   // Comments are best-effort: they reference user accounts that may no longer exist.
   const comments = await insertBestEffort("comments", archive.comments);
-  const files = await uploadArchiveFiles(archive.files, onProgress);
 
   return {
     sections: archive.sections.length,
@@ -553,6 +556,10 @@ export async function restoreFullBackup(
     await deleteRaceCompletely(id);
   }
 
+  // Upload files before inserting rows: realtime reloads the dashboard as soon
+  // as the rows appear, and previews fetched before the files exist stay blank.
+  const files = await uploadArchiveFiles(archive.files, onProgress);
+
   onProgress?.("Restoring races…");
   await insertChunked("races", archive.races);
   if (archive.sections.length > 0) {
@@ -568,8 +575,6 @@ export async function restoreFullBackup(
   const comments = await insertBestEffort("comments", archive.comments);
   // Allowlist rows that already exist fail on the unique email and are skipped.
   const allowed = await insertBestEffort("allowed_emails", archive.allowedEmails);
-
-  const files = await uploadArchiveFiles(archive.files, onProgress);
 
   return {
     races_replaced: existing.size,
