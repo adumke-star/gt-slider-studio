@@ -754,10 +754,24 @@ function SectionBlock({
     setLinksDraft(links.length ? links : [{ label: "Originals", url: "" }]);
     setEditingLinks(true);
   }
-  function commitLinks() {
-    const cleaned = linksDraft
-      .map((l) => ({ label: l.label.trim() || "Link", url: l.url.trim() }))
-      .filter((l) => l.url);
+  function readLinksFromForm(form: HTMLFormElement): SectionLink[] {
+    const cleaned: SectionLink[] = [];
+    form.querySelectorAll("[data-link-row]").forEach((row) => {
+      const label = row.querySelector<HTMLInputElement>("[data-link-label]")?.value.trim() || "Link";
+      const url = row.querySelector<HTMLInputElement>("[data-link-url]")?.value.trim() ?? "";
+      if (url) cleaned.push({ label, url });
+    });
+    return cleaned;
+  }
+
+  function commitLinksFromForm(form: HTMLFormElement) {
+    const cleaned = readLinksFromForm(form);
+    const urlInputs = [...form.querySelectorAll<HTMLInputElement>("[data-link-url]")];
+    const hasUrlDraft = urlInputs.some((el) => el.value.trim().length > 0);
+    if (urlInputs.length > 0 && !hasUrlDraft) {
+      toast.error("Enter a URL before saving.");
+      return;
+    }
     setEditingLinks(false);
     onSetLinks(cleaned);
   }
@@ -1178,7 +1192,7 @@ function SectionBlock({
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault();
-              commitLinks();
+              commitLinksFromForm(e.currentTarget);
             }}
             className="w-full max-w-lg rounded-lg border border-border bg-surface-2 p-4 shadow-xl"
           >
@@ -1201,9 +1215,10 @@ function SectionBlock({
                 </div>
               )}
               {linksDraft.map((l, idx) => (
-                <div key={idx} className="grid grid-cols-[140px_minmax(0,1fr)_auto] gap-2">
+                <div key={idx} data-link-row className="grid grid-cols-[140px_minmax(0,1fr)_auto] gap-2">
                   <input
                     type="text"
+                    data-link-label
                     placeholder="Label"
                     value={l.label}
                     onChange={(e) => {
@@ -1211,10 +1226,21 @@ function SectionBlock({
                       next[idx] = { ...next[idx], label: e.target.value };
                       setLinksDraft(next);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const urlInput = e.currentTarget.parentElement?.querySelector<HTMLInputElement>(
+                          "[data-link-url]",
+                        );
+                        urlInput?.focus();
+                      }
+                    }}
                     className="rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
                   />
                   <input
-                    type="url"
+                    type="text"
+                    inputMode="url"
+                    data-link-url
                     placeholder="https://…"
                     value={l.url}
                     onChange={(e) => {
@@ -1225,6 +1251,7 @@ function SectionBlock({
                     className="rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
                   />
                   <button
+                    type="button"
                     onClick={() => setLinksDraft(linksDraft.filter((_, i) => i !== idx))}
                     className="rounded p-1.5 text-muted-foreground hover:bg-background hover:text-destructive"
                     title="Remove link"
