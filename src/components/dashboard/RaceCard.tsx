@@ -108,7 +108,7 @@ export function RaceCard({
     setBackupRunning(true);
     const toastId = toast.loading(`Creating backup of "${race.name}"…`);
     try {
-      const { blob, manifest } = await createRaceBackupZip(race.id, (msg) =>
+      const { blob, manifest, failures } = await createRaceBackupZip(race.id, (msg) =>
         toast.loading(`Backup "${race.name}": ${msg}`, { id: toastId }),
       );
       const url = URL.createObjectURL(blob);
@@ -120,10 +120,18 @@ export function RaceCard({
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
       const { files_saved, files_failed } = manifest.counts;
-      toast.success(
-        `Backup ready: ${manifest.counts.images} slots, ${files_saved} files${files_failed ? ` (${files_failed} failed)` : ""}`,
-        { id: toastId },
-      );
+      if (files_failed > 0) {
+        toast.error(
+          `Backup incomplete: ${files_failed} of ${files_saved + files_failed} image files could not be downloaded ` +
+          `(first error: ${failures[0]?.error ?? "unknown"}). The ZIP is missing these images — do not rely on it for restore.`,
+          { id: toastId, duration: 15000 },
+        );
+      } else {
+        toast.success(
+          `Backup ready: ${manifest.counts.images} slots, ${files_saved} files`,
+          { id: toastId },
+        );
+      }
     } catch (e) {
       console.error("race backup failed", e);
       toast.error(`Backup failed: ${(e as Error).message ?? e}`, { id: toastId });

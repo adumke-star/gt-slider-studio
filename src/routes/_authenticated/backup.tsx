@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   createFullBackupZip,
   existingRaceIds,
+  expectedFileCount,
   fullBackupFileName,
   raceExists,
   readBackup,
@@ -45,7 +46,7 @@ function BackupPage() {
     setBackupRunning(true);
     setBackupMsg("Starting…");
     try {
-      const { blob, manifest } = await createFullBackupZip((msg) => setBackupMsg(msg));
+      const { blob, manifest, failures } = await createFullBackupZip((msg) => setBackupMsg(msg));
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -55,9 +56,15 @@ function BackupPage() {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
       const { races, images, files_saved, files_failed } = manifest.counts;
-      toast.success(
-        `Backup ready: ${races} races, ${images} slots, ${files_saved} files${files_failed ? ` (${files_failed} failed)` : ""}`,
-      );
+      if (files_failed > 0) {
+        toast.error(
+          `Backup incomplete: ${files_failed} of ${files_saved + files_failed} image files could not be downloaded ` +
+          `(first error: ${failures[0]?.error ?? "unknown"}). The ZIP is missing these images — do not rely on it for restore.`,
+          { duration: 15000 },
+        );
+      } else {
+        toast.success(`Backup ready: ${races} races, ${images} slots, ${files_saved} files`);
+      }
     } catch (e) {
       console.error(e);
       toast.error(`Backup failed: ${(e as Error).message ?? e}`);
@@ -114,20 +121,37 @@ function BackupPage() {
     try {
       if (restoreArchive.kind === "race") {
         const result = await restoreRaceBackup(restoreArchive, { replace: restoreExists }, setRestoreMsg);
-        toast.success(
-          `Race "${restoreArchive.manifest.race.name}" restored: ${result.sections} sections, ${result.images} slots, ` +
-          `${result.files_uploaded} files${result.files_failed ? ` (${result.files_failed} failed)` : ""}` +
-          `${result.comments_skipped ? ` — ${result.comments_skipped} comments skipped` : ""}`,
-          { duration: 8000 },
-        );
+        if (result.files_failed > 0) {
+          toast.error(
+            `Race "${restoreArchive.manifest.race.name}" restored, but ${result.files_failed} of ` +
+            `${result.files_uploaded + result.files_failed} image files failed to upload ` +
+            `(first error: ${result.file_failures[0]?.error ?? "unknown"}).`,
+            { duration: 15000 },
+          );
+        } else {
+          toast.success(
+            `Race "${restoreArchive.manifest.race.name}" restored: ${result.sections} sections, ${result.images} slots, ` +
+            `${result.files_uploaded} files` +
+            `${result.comments_skipped ? ` — ${result.comments_skipped} comments skipped` : ""}`,
+            { duration: 8000 },
+          );
+        }
       } else {
         const result = await restoreFullBackup(restoreArchive, setRestoreMsg);
-        toast.success(
-          `Full backup restored: ${result.races_replaced} races replaced, ${result.races_created} recreated, ` +
-          `${result.images} slots, ${result.files_uploaded} files${result.files_failed ? ` (${result.files_failed} failed)` : ""}` +
-          `${result.comments_skipped ? ` — ${result.comments_skipped} comments skipped` : ""}`,
-          { duration: 10000 },
-        );
+        if (result.files_failed > 0) {
+          toast.error(
+            `Full backup restored, but ${result.files_failed} of ${result.files_uploaded + result.files_failed} ` +
+            `image files failed to upload (first error: ${result.file_failures[0]?.error ?? "unknown"}).`,
+            { duration: 15000 },
+          );
+        } else {
+          toast.success(
+            `Full backup restored: ${result.races_replaced} races replaced, ${result.races_created} recreated, ` +
+            `${result.images} slots, ${result.files_uploaded} files` +
+            `${result.comments_skipped ? ` — ${result.comments_skipped} comments skipped` : ""}`,
+            { duration: 10000 },
+          );
+        }
       }
       setRestoreArchive(null);
     } catch (e) {
@@ -220,6 +244,13 @@ function BackupPage() {
               {" "}· backup from {new Date(restoreArchive.manifest.created_at).toLocaleString()}
               {" "}· {restoreArchive.manifest.counts.sections} sections, {restoreArchive.manifest.counts.images} slots,
               {" "}{restoreArchive.files.length} files
+              {restoreArchive.files.length < expectedFileCount(restoreArchive.images) && (
+                <div className="mt-1 font-bold text-destructive">
+                  Warning: this backup only contains {restoreArchive.files.length} of{" "}
+                  {expectedFileCount(restoreArchive.images)} referenced image files — the missing images
+                  cannot be restored from this ZIP.
+                </div>
+              )}
               {restoreExists && (
                 <div className="mt-1 font-bold text-[var(--status-todo)]">
                   This race still exists — restoring will replace its current state.
@@ -233,6 +264,13 @@ function BackupPage() {
               {" "}· from {new Date(restoreArchive.manifest.created_at).toLocaleString()}
               {" "}· {restoreArchive.manifest.counts.races} races, {restoreArchive.manifest.counts.sections} sections,
               {" "}{restoreArchive.manifest.counts.images} slots, {restoreArchive.files.length} files
+              {restoreArchive.files.length < expectedFileCount(restoreArchive.images) && (
+                <div className="mt-1 font-bold text-destructive">
+                  Warning: this backup only contains {restoreArchive.files.length} of{" "}
+                  {expectedFileCount(restoreArchive.images)} referenced image files — the missing images
+                  cannot be restored from this ZIP.
+                </div>
+              )}
               <div className="mt-1">
                 {restoreExistingCount > 0 && (
                   <span className="font-bold text-[var(--status-todo)]">

@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
+import { downloadFile, signedUrl, uploadFile, removeFile } from "@/lib/storage";
 
 /**
  * Backup & restore, entirely client-side. Two ZIP kinds share one layout:
@@ -101,12 +101,16 @@ function contentTypeForPath(path: string): string {
   const map: Record<string, string> = {
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
+    jfif: "image/jpeg",
     png: "image/png",
     webp: "image/webp",
     avif: "image/avif",
     gif: "image/gif",
   };
-  return map[ext] ?? "application/octet-stream";
+  // Buckets only accept raster-image MIME types (see security hardening
+  // migration) — application/octet-stream would be rejected on restore, so
+  // default unknown extensions to JPEG. Everything the app stores is an image.
+  return map[ext] ?? "image/jpeg";
 }
 
 function dateStamp(): string {
@@ -127,34 +131,55 @@ export function fullBackupFileName(): string {
 
 type ZipLike = { file: (path: string, content: Blob | string) => unknown };
 
+export type FileFailure = { bucket: string; path: string; error: string };
+
+/** Direct storage download with a signed-URL fetch as fallback, one retry each. */
+async function fetchStorageBlob(bucket: "compressed" | "originals", path: string): Promise<Blob> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await downloadFile(bucket, path);
+    } catch (e) {
+      lastError = e;
+    }
+    try {
+      const url = await signedUrl(bucket, path);
+      if (!url) throw new Error("no signed url");
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.blob();
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 /** Download every referenced storage file into files/<bucket>/<path> inside the ZIP. */
 async function addStorageFilesToZip(
   zip: ZipLike,
   images: Row[],
   onProgress?: (msg: string) => void,
-): Promise<{ saved: number; failed: number }> {
+): Promise<{ saved: number; failed: number; failures: FileFailure[] }> {
   const wanted: { bucket: "compressed" | "originals"; path: string }[] = [];
   for (const img of images) {
     if (img.compressed_path) wanted.push({ bucket: "compressed", path: img.compressed_path as string });
     if (img.original_path) wanted.push({ bucket: "originals", path: img.original_path as string });
   }
   let saved = 0;
-  let failed = 0;
+  const failures: FileFailure[] = [];
   for (const f of wanted) {
-    onProgress?.(`File ${saved + failed + 1}/${wanted.length}…`);
+    onProgress?.(`File ${saved + failures.length + 1}/${wanted.length}…`);
     try {
-      const url = await signedUrl(f.bucket, f.path);
-      if (!url) throw new Error("no signed url");
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      zip.file(`files/${f.bucket}/${f.path}`, await res.blob());
+      zip.file(`files/${f.bucket}/${f.path}`, await fetchStorageBlob(f.bucket, f.path));
       saved++;
     } catch (e) {
-      console.warn("backup: failed to fetch", f.bucket, f.path, e);
-      failed++;
+      const error = (e as Error).message ?? String(e);
+      console.warn("backup: failed to fetch", f.bucket, f.path, error);
+      failures.push({ bucket: f.bucket, path: f.path, error });
     }
   }
-  return { saved, failed };
+  return { saved, failed: failures.length, failures };
 }
 
 function raceSummary(race: Row): RaceSummary {
@@ -169,7 +194,7 @@ function raceSummary(race: Row): RaceSummary {
 export async function createRaceBackupZip(
   raceId: string,
   onProgress?: (msg: string) => void,
-): Promise<{ blob: Blob; manifest: RaceBackupManifest }> {
+): Promise<{ blob: Blob; manifest: RaceBackupManifest; failures: FileFailure[] }> {
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
 
@@ -200,7 +225,7 @@ export async function createRaceBackupZip(
   zip.file("database/comments.json", JSON.stringify(comments, null, 2));
 
   // Storage files, keeping the original storage paths.
-  const { saved, failed } = await addStorageFilesToZip(zip, images, onProgress);
+  const { saved, failed, failures } = await addStorageFilesToZip(zip, images, onProgress);
 
   const manifest: RaceBackupManifest = {
     version: BACKUP_VERSION,
@@ -220,12 +245,12 @@ export async function createRaceBackupZip(
 
   onProgress?.("Packing ZIP…");
   const blob = await zip.generateAsync({ type: "blob" });
-  return { blob, manifest };
+  return { blob, manifest, failures };
 }
 
 export async function createFullBackupZip(
   onProgress?: (msg: string) => void,
-): Promise<{ blob: Blob; manifest: FullBackupManifest }> {
+): Promise<{ blob: Blob; manifest: FullBackupManifest; failures: FileFailure[] }> {
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
 
@@ -245,7 +270,7 @@ export async function createFullBackupZip(
   zip.file("database/comments.json", JSON.stringify(comments, null, 2));
   zip.file("database/allowed_emails.json", JSON.stringify(allowedEmails, null, 2));
 
-  const { saved, failed } = await addStorageFilesToZip(zip, images, onProgress);
+  const { saved, failed, failures } = await addStorageFilesToZip(zip, images, onProgress);
 
   const manifest: FullBackupManifest = {
     version: BACKUP_VERSION,
@@ -267,7 +292,7 @@ export async function createFullBackupZip(
 
   onProgress?.("Packing ZIP…");
   const blob = await zip.generateAsync({ type: "blob" });
-  return { blob, manifest };
+  return { blob, manifest, failures };
 }
 
 export type ArchiveFile = { bucket: "compressed" | "originals"; path: string; getBlob: () => Promise<Blob> };
@@ -402,21 +427,30 @@ async function insertBestEffort(table: string, rows: Row[]): Promise<{ ok: numbe
 async function uploadArchiveFiles(
   files: ArchiveFile[],
   onProgress?: (msg: string) => void,
-): Promise<{ uploaded: number; failed: number }> {
+): Promise<{ uploaded: number; failed: number; failures: FileFailure[] }> {
   let uploaded = 0;
-  let failed = 0;
+  const failures: FileFailure[] = [];
   for (const f of files) {
-    onProgress?.(`Uploading file ${uploaded + failed + 1}/${files.length}…`);
-    try {
-      const blob = await f.getBlob();
-      await uploadFile(f.bucket, f.path, blob, contentTypeForPath(f.path));
+    onProgress?.(`Uploading file ${uploaded + failures.length + 1}/${files.length}…`);
+    let lastError = "";
+    let ok = false;
+    for (let attempt = 0; attempt < 2 && !ok; attempt++) {
+      try {
+        const blob = await f.getBlob();
+        await uploadFile(f.bucket, f.path, blob, contentTypeForPath(f.path));
+        ok = true;
+      } catch (e) {
+        lastError = (e as Error).message ?? String(e);
+      }
+    }
+    if (ok) {
       uploaded++;
-    } catch (e) {
-      console.warn("restore: upload failed", f.bucket, f.path, e);
-      failed++;
+    } else {
+      console.warn("restore: upload failed", f.bucket, f.path, lastError);
+      failures.push({ bucket: f.bucket, path: f.path, error: lastError });
     }
   }
-  return { uploaded, failed };
+  return { uploaded, failed: failures.length, failures };
 }
 
 export type RestoreResult = {
@@ -426,7 +460,18 @@ export type RestoreResult = {
   comments_skipped: number;
   files_uploaded: number;
   files_failed: number;
+  file_failures: FileFailure[];
 };
+
+/** How many storage files the image rows reference (original + compressed). */
+export function expectedFileCount(images: Row[]): number {
+  let n = 0;
+  for (const img of images) {
+    if (img.original_path) n++;
+    if (img.compressed_path) n++;
+  }
+  return n;
+}
 
 /**
  * Restore a race from a parsed backup. If `replace` is set and the race still
@@ -470,6 +515,7 @@ export async function restoreRaceBackup(
     comments_skipped: comments.skipped,
     files_uploaded: files.uploaded,
     files_failed: files.failed,
+    file_failures: files.failures,
   };
 }
 
@@ -484,6 +530,7 @@ export type FullRestoreResult = {
   allowed_emails_skipped: number;
   files_uploaded: number;
   files_failed: number;
+  file_failures: FileFailure[];
 };
 
 /**
@@ -535,5 +582,6 @@ export async function restoreFullBackup(
     allowed_emails_skipped: allowed.skipped,
     files_uploaded: files.uploaded,
     files_failed: files.failed,
+    file_failures: files.failures,
   };
 }
