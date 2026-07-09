@@ -35,9 +35,15 @@ export async function downloadFile(bucket: string, path: string): Promise<Blob> 
 }
 
 export async function uploadFile(bucket: string, path: string, file: Blob, contentType?: string) {
-  const { error } = await supabase.storage.from(bucket).upload(path, file, {
+  // storage-js ignores the `contentType` option for Blob bodies (it wraps them
+  // in FormData and uses the Blob's own type). JSZip blobs have an empty type,
+  // which the buckets' image-only MIME whitelist rejects with a 400 — so make
+  // sure the Blob itself carries the intended type before uploading.
+  const type = contentType || file.type || "image/jpeg";
+  const body = file.type === type ? file : new Blob([file], { type });
+  const { error } = await supabase.storage.from(bucket).upload(path, body, {
     upsert: true,
-    contentType: contentType ?? (file instanceof File ? file.type : "application/octet-stream"),
+    contentType: type,
   });
   if (error) throw error;
 }
