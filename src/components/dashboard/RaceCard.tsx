@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { removeFile } from "@/lib/storage";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 import { isCompressEligible } from "@/lib/compressImage";
-import { sectionRequiredRealImages, type SeriesSeasonInfo } from "@/lib/rules";
+import { currentCalendarYear, sectionRequiredRealImages, type SeriesSeasonInfo } from "@/lib/rules";
 import { backupFileName, createRaceBackupZip } from "@/lib/raceBackup";
 import { RuleCheckPanel } from "./RuleCheckPanel";
 import { findGuideCategory, guessCategory } from "@/lib/sliderGuide";
@@ -236,12 +236,14 @@ export function RaceCard({
     const list = imagesBySection.get(s.id) ?? [];
     let nextPos = (list[list.length - 1]?.position ?? -1) + 1;
     const groupId = n > 1 ? crypto.randomUUID() : null;
+    const season = currentCalendarYear();
     const rows = Array.from({ length: n }, (_, i) => ({
       race_id: race.id,
       area: s.kind,
       section_id: s.id,
       position: nextPos + i,
       status: "todo" as const,
+      season,
       placeholder_group_id: groupId,
     }));
     const { error } = await supabase.from("slider_images").insert(rows);
@@ -259,12 +261,14 @@ export function RaceCard({
     let nextPos = (list[list.length - 1]?.position ?? -1) + 1;
     const groupId = n > 1 ? crypto.randomUUID() : null;
     const title = note?.trim() || null;
+    const season = currentCalendarYear();
     const rows = Array.from({ length: n }, (_, i) => ({
       race_id: race.id,
       area: s.kind,
       section_id: s.id,
       position: nextPos + i,
       status: "blank" as const,
+      season,
       is_placeholder: true,
       placeholder_label: label,
       placeholder_group_id: groupId,
@@ -360,6 +364,7 @@ export function RaceCard({
         section_id: s.id,
         position: nextPos++,
         status: "todo",
+        season: currentCalendarYear(),
         title: baseName || null,
       }).select().single();
       if (error || !row) {

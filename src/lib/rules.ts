@@ -133,12 +133,17 @@ export type SeriesSeasonInfo = {
   deadline: Date | null;
 };
 
+/** Default season for new slots — same calendar year used in rules 3/4. */
+export function currentCalendarYear(now = new Date()): number {
+  return now.getFullYear();
+}
+
 /**
  * Current season = calendar year. Deadline = earliest race date of the series
  * in the current year + 4 weeks. Null when the series has no dated races this year.
  */
 export function computeSeriesSeasonInfo(races: RaceLike[], now = new Date()): Map<string, SeriesSeasonInfo> {
-  const season = now.getFullYear();
+  const season = currentCalendarYear(now);
   const result = new Map<string, SeriesSeasonInfo>();
   for (const race of races) {
     if (!result.has(race.series)) result.set(race.series, { season, deadline: null });
