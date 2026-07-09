@@ -245,11 +245,12 @@ export function RaceCard({
     onReload();
   }
 
-  async function addPlaceholderSlots(s: SliderSection, label: string, count: number) {
+  async function addPlaceholderSlots(s: SliderSection, label: string, count: number, note?: string) {
     const n = Math.min(12, Math.max(1, count));
     const list = imagesBySection.get(s.id) ?? [];
     let nextPos = (list[list.length - 1]?.position ?? -1) + 1;
     const groupId = n > 1 ? crypto.randomUUID() : null;
+    const title = note?.trim() || null;
     const rows = Array.from({ length: n }, (_, i) => ({
       race_id: race.id,
       area: s.kind,
@@ -259,6 +260,7 @@ export function RaceCard({
       is_placeholder: true,
       placeholder_label: label,
       placeholder_group_id: groupId,
+      title,
     }));
     const { error } = await supabase.from("slider_images").insert(rows);
     if (error) {
@@ -580,7 +582,7 @@ export function RaceCard({
                 onSetLinks={(links) => setSectionLinks(s, links)}
                 onDelete={() => deleteSection(s)}
                 onAddSlots={(count) => addImageSlots(s, count)}
-                onAddPlaceholder={(label, count) => addPlaceholderSlots(s, label, count)}
+                onAddPlaceholder={(label, count, note) => addPlaceholderSlots(s, label, count, note)}
                 onLinkSlots={(ids) => linkSlotGroup(s, ids)}
                 onUnlinkSlot={(id) => unlinkSlot(s, id)}
                 onDeletePlaceholder={(id) => deletePlaceholder(s, id)}
@@ -635,7 +637,7 @@ function SectionBlock({
   onSetLinks: (links: SectionLink[]) => void;
   onDelete: () => void;
   onAddSlots: (count: number) => void;
-  onAddPlaceholder: (label: string, count: number) => void;
+  onAddPlaceholder: (label: string, count: number, note?: string) => void;
   onLinkSlots: (ids: string[]) => void;
   onUnlinkSlot: (id: string) => void;
   onDeletePlaceholder: (id: string) => void;
@@ -1189,6 +1191,7 @@ function SectionBlock({
                 onDragStart={() => onDragStart(img.id)}
                 onDropBefore={() => onDropOn(img.id, "before")}
                 onDropAfter={() => onDropOn(img.id, "after")}
+                onChanged={onReload}
               />
             ) : (
               <ImageCell
@@ -1375,7 +1378,7 @@ function SectionBlock({
         open={placeholderDialogOpen}
         onOpenChange={setPlaceholderDialogOpen}
         initialLabel={placeholderPreset}
-        onConfirm={(label, count) => onAddPlaceholder(label, count)}
+        onConfirm={(label, count, note) => onAddPlaceholder(label, count, note)}
       />
       <AlertDialog open={slotsDeleteOpen} onOpenChange={(v) => { if (!deletingSlots) setSlotsDeleteOpen(v); }}>
         <AlertDialogContent className="bg-surface-2">

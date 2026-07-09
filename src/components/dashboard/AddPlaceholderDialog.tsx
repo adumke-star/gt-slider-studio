@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PLACEHOLDER_SLOT_TYPES } from "@/lib/placeholderSlots";
+import { PLACEHOLDER_SLOT_TYPES, isProductVideoPlaceholder } from "@/lib/placeholderSlots";
 
 const MAX_COUNT = 12;
 
@@ -29,16 +29,18 @@ export function AddPlaceholderDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialLabel?: string;
-  onConfirm: (label: string, count: number) => void;
+  onConfirm: (label: string, count: number, note?: string) => void;
 }) {
   const defaultLabel = initialLabel ?? PLACEHOLDER_SLOT_TYPES[0]?.label ?? "Product Video";
   const [label, setLabel] = useState(defaultLabel);
   const [count, setCount] = useState(1);
+  const [videoName, setVideoName] = useState("");
 
   useEffect(() => {
     if (open) {
       setLabel(initialLabel ?? PLACEHOLDER_SLOT_TYPES[0]?.label ?? "Product Video");
       setCount(1);
+      setVideoName("");
     }
   }, [open, initialLabel]);
 
@@ -47,7 +49,8 @@ export function AddPlaceholderDialog({
 
   function submit() {
     const n = Math.min(MAX_COUNT, Math.max(1, Number(count) || 1));
-    onConfirm(label, n);
+    const note = isProductVideoPlaceholder(label) ? videoName.trim() : undefined;
+    onConfirm(label, n, note || undefined);
     onOpenChange(false);
   }
 
@@ -106,6 +109,22 @@ export function AddPlaceholderDialog({
             />
             <p className="text-[11px] text-muted-foreground">1–{MAX_COUNT} slots in a row</p>
           </div>
+          {isProductVideoPlaceholder(label) && (
+            <div className="space-y-2">
+              <Label htmlFor="placeholder-video-name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Video name
+              </Label>
+              <input
+                id="placeholder-video-name"
+                type="text"
+                value={videoName}
+                onChange={(e) => setVideoName(e.target.value)}
+                placeholder="e.g. Mavericks F1 / GP"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+              />
+              <p className="text-[11px] text-muted-foreground">Optional — shown on the placeholder slot</p>
+            </div>
+          )}
           {Icon && (
             <div
               className={`flex items-center gap-3 rounded-md border-2 border-dashed px-3 py-3 text-white ${selectedType?.accent ?? ""}`}
@@ -114,7 +133,11 @@ export function AddPlaceholderDialog({
               <div>
                 <p className="font-display text-xs font-black uppercase tracking-wide">{label}</p>
                 <p className="text-[10px] text-white/75">
-                  {count > 1 ? `${count} linked placeholders` : "Single placeholder"}
+                  {isProductVideoPlaceholder(label) && videoName.trim()
+                    ? videoName.trim()
+                    : count > 1
+                      ? `${count} linked placeholders`
+                      : "Single placeholder"}
                 </p>
               </div>
             </div>

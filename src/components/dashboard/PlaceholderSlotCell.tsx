@@ -1,7 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, GripVertical, Link2, Trash2, Unlink } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-import { findPlaceholderType } from "@/lib/placeholderSlots";
+import { findPlaceholderType, isProductVideoPlaceholder } from "@/lib/placeholderSlots";
 import type { SliderImage } from "./ImageCell";
 
 export function PlaceholderSlotCell({
@@ -16,6 +18,7 @@ export function PlaceholderSlotCell({
   onDragStart,
   onDropBefore,
   onDropAfter,
+  onChanged,
 }: {
   image: SliderImage;
   canEdit: boolean;
@@ -30,6 +33,7 @@ export function PlaceholderSlotCell({
   onDragStart: () => void;
   onDropBefore: () => void;
   onDropAfter: () => void;
+  onChanged?: () => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [dropSide, setDropSide] = useState<"left" | "right" | null>(null);
@@ -37,6 +41,8 @@ export function PlaceholderSlotCell({
   const Icon = type?.icon;
   const label = image.placeholder_label ?? "Placeholder";
   const isGrouped = groupSize > 1;
+  const isProductVideo = isProductVideoPlaceholder(image.placeholder_label);
+  const videoName = image.title?.trim() ?? "";
 
   return (
     <div
@@ -149,9 +155,108 @@ export function PlaceholderSlotCell({
           <p className="font-display text-[11px] font-black uppercase leading-tight tracking-wide">
             {label}
           </p>
-          <p className="text-[10px] text-white/75">Visual slot only</p>
+          <PlaceholderSubtitle
+            imageId={image.id}
+            isProductVideo={isProductVideo}
+            videoName={videoName}
+            canEdit={canEdit}
+            onChanged={onChanged}
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+function PlaceholderSubtitle({
+  imageId,
+  isProductVideo,
+  videoName,
+  canEdit,
+  onChanged,
+}: {
+  imageId: string;
+  isProductVideo: boolean;
+  videoName: string;
+  canEdit: boolean;
+  onChanged?: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(videoName);
+
+  useEffect(() => {
+    if (!editing) setDraft(videoName);
+  }, [videoName, editing]);
+
+  if (!isProductVideo) {
+    return <p className="text-[10px] text-white/75">Visual slot only</p>;
+  }
+
+  async function save(next: string) {
+    const trimmed = next.trim();
+    const value = trimmed || null;
+    if (value === (videoName || null)) {
+      setEditing(false);
+      return;
+    }
+    const { error } = await supabase.from("slider_images").update({ title: value }).eq("id", imageId);
+    if (error) {
+      toast.error(`Could not save video name: ${error.message}`);
+      setDraft(videoName);
+      return;
+    }
+    setEditing(false);
+    onChanged?.();
+  }
+
+  if (editing && canEdit) {
+    return (
+      <input
+        autoFocus
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => save(draft)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            void save(draft);
+          }
+          if (e.key === "Escape") {
+            setDraft(videoName);
+            setEditing(false);
+          }
+        }}
+        placeholder="Add video name…"
+        className="w-full max-w-[150px] rounded border border-white/30 bg-black/20 px-1.5 py-0.5 text-center text-[10px] text-white placeholder:text-white/50 focus:border-white/60 focus:outline-none"
+      />
+    );
+  }
+
+  if (videoName) {
+    return canEdit ? (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        title="Edit video name"
+        className="max-w-[150px] truncate text-[10px] text-white/90 hover:text-white hover:underline"
+      >
+        {videoName}
+      </button>
+    ) : (
+      <p className="max-w-[150px] truncate text-[10px] text-white/75">{videoName}</p>
+    );
+  }
+
+  return canEdit ? (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="text-[10px] italic text-white/60 hover:text-white/90"
+    >
+      Add video name…
+    </button>
+  ) : (
+    <p className="text-[10px] text-white/75">Visual slot only</p>
   );
 }
