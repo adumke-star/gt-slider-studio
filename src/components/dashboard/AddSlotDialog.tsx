@@ -29,7 +29,7 @@ export function AddSlotDialog({
   }, [open]);
 
   function submit() {
-    const n = Math.min(MAX_COUNT, Math.max(1, count));
+    const n = Math.min(MAX_COUNT, Math.max(1, Number(count) || 1));
     onConfirm(n);
     onOpenChange(false);
   }
@@ -44,7 +44,13 @@ export function AddSlotDialog({
             group together.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-2">
+        <form
+          className="space-y-4 py-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
           <div className="space-y-2">
             <Label htmlFor="slot-count" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Count
@@ -71,15 +77,15 @@ export function AddSlotDialog({
               </p>
             </div>
           </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={submit} className="bg-primary text-primary-foreground hover:bg-primary/90">
-            Add {count > 1 ? `${count} slots` : "slot"}
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="px-0 pb-0 pt-2">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90">
+              Add {count > 1 ? `${count} slots` : "slot"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

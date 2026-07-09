@@ -749,11 +749,27 @@ function SectionBlock({
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [hasOpenComments, setHasOpenComments] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const linksFormRef = useRef<HTMLFormElement>(null);
+  const focusNewLinkRow = useRef(false);
 
   function openLinksEditor() {
     setLinksDraft(links.length ? links : [{ label: "Originals", url: "" }]);
     setEditingLinks(true);
   }
+
+  function appendLinkRow() {
+    focusNewLinkRow.current = true;
+    setLinksDraft((prev) => [...prev, { label: "", url: "" }]);
+  }
+
+  useEffect(() => {
+    if (!editingLinks || !focusNewLinkRow.current) return;
+    focusNewLinkRow.current = false;
+    const form = linksFormRef.current;
+    const rows = form?.querySelectorAll("[data-link-row]");
+    const last = rows?.[rows.length - 1];
+    last?.querySelector<HTMLInputElement>("[data-link-label]")?.focus();
+  }, [linksDraft, editingLinks]);
   function readLinksFromForm(form: HTMLFormElement): SectionLink[] {
     const cleaned: SectionLink[] = [];
     form.querySelectorAll("[data-link-row]").forEach((row) => {
@@ -1189,6 +1205,7 @@ function SectionBlock({
           onClick={() => setEditingLinks(false)}
         >
           <form
+            ref={linksFormRef}
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault();
@@ -1248,10 +1265,17 @@ function SectionBlock({
                       next[idx] = { ...next[idx], url: e.target.value };
                       setLinksDraft(next);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Tab" && !e.shiftKey && idx === linksDraft.length - 1) {
+                        e.preventDefault();
+                        appendLinkRow();
+                      }
+                    }}
                     className="rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
                   />
                   <button
                     type="button"
+                    tabIndex={-1}
                     onClick={() => setLinksDraft(linksDraft.filter((_, i) => i !== idx))}
                     className="rounded p-1.5 text-muted-foreground hover:bg-background hover:text-destructive"
                     title="Remove link"
@@ -1266,7 +1290,7 @@ function SectionBlock({
                 type="button"
                 size="sm"
                 variant="ghost"
-                onClick={() => setLinksDraft([...linksDraft, { label: "", url: "" }])}
+                onClick={appendLinkRow}
                 className="gap-1 text-xs"
               >
                 <Plus className="h-3.5 w-3.5" /> Add link
