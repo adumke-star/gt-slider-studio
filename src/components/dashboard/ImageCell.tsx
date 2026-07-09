@@ -81,7 +81,6 @@ export function ImageCell({
   const [croppedPreview, setCroppedPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState(image.title ?? "");
-  const [seasonDraft, setSeasonDraft] = useState(image.season?.toString() ?? "");
   const [typeDraft, setTypeDraft] = useState(imageTypeLabel(image.image_type));
   const [dropSide, setDropSide] = useState<"left" | "right" | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -118,10 +117,6 @@ export function ImageCell({
     })();
     return () => { alive = false; };
   }, [preview, showCropPreview, image.crop_area]);
-
-  useEffect(() => {
-    setSeasonDraft(image.season?.toString() ?? "");
-  }, [image.season]);
 
   useEffect(() => {
     setTypeDraft(imageTypeLabel(image.image_type));
@@ -481,16 +476,9 @@ export function ImageCell({
             )
           )}
           {canEdit ? (
-            <input
-              type="text"
-              inputMode="numeric"
-              value={seasonDraft}
-              onChange={(e) => setSeasonDraft(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
-              onBlur={() => saveSeason(seasonDraft)}
-              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-              placeholder="Season"
-              title="Season shown in the image (rules 3/4)"
-              className="w-14 shrink-0 rounded border border-border bg-background/50 px-1.5 py-0.5 text-[10px] text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            <SeasonPicker
+              value={image.season ?? null}
+              onCommit={(year) => saveSeason(year === null ? "" : String(year))}
             />
           ) : (
             image.season && (
@@ -601,6 +589,183 @@ export function ImageCell({
           onSaved={onChanged}
         />
       )}
+    </div>
+  );
+}
+
+const SEASON_YEAR_SPAN = 12;
+
+function seasonYearOptions(selected: number, currentYear: number): number[] {
+  const min = Math.min(selected, currentYear) - SEASON_YEAR_SPAN;
+  const max = Math.max(selected, currentYear) + 4;
+  const years: number[] = [];
+  for (let y = min; y <= max; y++) years.push(y);
+  return years;
+}
+
+/** Year picker for the season field — defaults to the current calendar year. */
+function SeasonPicker({
+  value,
+  onCommit,
+}: {
+  value: number | null;
+  onCommit: (year: number | null) => void;
+}) {
+  const currentYear = new Date().getFullYear();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const selectedRef = useRef<HTMLButtonElement>(null);
+  const skipBlurCommit = useRef(false);
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value ?? currentYear);
+  const [rect, setRect] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(
+    null,
+  );
+
+  const years = seasonYearOptions(draft, currentYear);
+
+  useEffect(() => {
+    if (!open) setDraft(value ?? currentYear);
+  }, [value, currentYear, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    selectedRef.current?.scrollIntoView({ block: "center" });
+  }, [open, draft]);
+
+  const updateRect = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - r.bottom;
+    if (spaceBelow < 170) {
+      setRect({ bottom: window.innerHeight - r.top + 2, left: r.left, width: Math.max(r.width, 56) });
+    } else {
+      setRect({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, 56) });
+    }
+  };
+
+  useEffect(() => {
+    if (!rect) return;
+    window.addEventListener("scroll", updateRect, true);
+    window.addEventListener("resize", updateRect);
+    return () => {
+      window.removeEventListener("scroll", updateRect, true);
+      window.removeEventListener("resize", updateRect);
+    };
+  }, [rect !== null]);
+
+  function bumpYear(delta: number) {
+    setDraft((y) => {
+      const idx = years.indexOf(y);
+      const next = years[Math.min(years.length - 1, Math.max(0, idx + delta))];
+      return next ?? y + delta;
+    });
+  }
+
+  function commitYear(year: number) {
+    onCommit(year);
+    setOpen(false);
+    setRect(null);
+  }
+
+  function openPicker() {
+    setDraft(value ?? currentYear);
+    setOpen(true);
+    updateRect();
+  }
+
+  const display = value?.toString() ?? "";
+
+  return (
+    <div className="shrink-0">
+      <input
+        ref={inputRef}
+        type="text"
+        inputMode="numeric"
+        readOnly
+        value={open ? String(draft) : display}
+        placeholder={String(currentYear)}
+        onFocus={openPicker}
+        onClick={openPicker}
+        onBlur={() => {
+          setOpen(false);
+          setRect(null);
+          if (skipBlurCommit.current) {
+            skipBlurCommit.current = false;
+            return;
+          }
+          commitYear(draft);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            bumpYear(-1);
+          }
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            bumpYear(1);
+          }
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commitYear(draft);
+            skipBlurCommit.current = true;
+            inputRef.current?.blur();
+          }
+          if (e.key === "Escape") {
+            setDraft(value ?? currentYear);
+            setOpen(false);
+            setRect(null);
+            skipBlurCommit.current = true;
+            inputRef.current?.blur();
+          }
+        }}
+        onWheel={(e) => {
+          e.preventDefault();
+          bumpYear(e.deltaY > 0 ? 1 : -1);
+        }}
+        title="Season shown in the image (rules 3/4) — scroll or use arrow keys to change year"
+        className="w-14 cursor-pointer rounded border border-border bg-background/50 px-1.5 py-0.5 text-[10px] text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+      />
+      {open && rect &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: rect.top,
+              bottom: rect.bottom,
+              left: rect.left,
+              width: rect.width,
+            }}
+            className="z-50 max-h-40 overflow-auto rounded border border-border bg-popover py-0.5 shadow-md"
+            onWheel={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              bumpYear(e.deltaY > 0 ? 1 : -1);
+            }}
+          >
+            {years.map((year) => (
+              <button
+                key={year}
+                ref={year === draft ? selectedRef : undefined}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setDraft(year);
+                  commitYear(year);
+                  skipBlurCommit.current = true;
+                  inputRef.current?.blur();
+                }}
+                className={cn(
+                  "block w-full px-2 py-1 text-center text-[10px] hover:bg-accent hover:text-accent-foreground",
+                  year === draft ? "bg-accent/80 font-semibold text-foreground" : "text-foreground",
+                )}
+              >
+                {year}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
