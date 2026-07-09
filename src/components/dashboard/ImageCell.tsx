@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare, ChevronDown, Wand2, Crop, FileCheck2, Link2, Unlink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
+import { downloadFile, loadImagePreview, isBlobPreviewUrl, signedUrl, uploadFile, removeFile } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 import { CommentsSheet } from "./CommentsSheet";
@@ -78,6 +78,7 @@ export function ImageCell({
   onCompress?: () => void;
 }) {
   const [preview, setPreview] = useState<string | null>(null);
+  const [previewMissing, setPreviewMissing] = useState(false);
   const [croppedPreview, setCroppedPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState(image.title ?? "");
@@ -92,15 +93,31 @@ export function ImageCell({
   useEffect(() => { setName(image.title ?? ""); }, [image.title]);
   useEffect(() => {
     let alive = true;
+    let objectUrl: string | null = null;
     (async () => {
       const path = image.compressed_path || image.original_path;
-      if (!path) return setPreview(null);
+      if (!path) {
+        if (alive) {
+          setPreview(null);
+          setPreviewMissing(false);
+        }
+        return;
+      }
       const bucket = image.compressed_path ? "compressed" : "originals";
-      const url = await signedUrl(bucket, path);
-      if (alive) setPreview(url);
+      const url = await loadImagePreview(bucket, path);
+      if (!alive) {
+        if (url && isBlobPreviewUrl(url)) URL.revokeObjectURL(url);
+        return;
+      }
+      if (url && isBlobPreviewUrl(url)) objectUrl = url;
+      setPreview(url);
+      setPreviewMissing(!url);
     })();
-    return () => { alive = false; };
-  }, [image.compressed_path, image.original_path]);
+    return () => {
+      alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [image.compressed_path, image.original_path, image.id]);
 
   const cropArea = parseCropArea(image.crop_area);
   const showCropPreview = Boolean(preview && image.original_path && !image.compressed_path);
@@ -375,7 +392,11 @@ export function ImageCell({
           <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground">
             <ImageIcon className="h-6 w-6" />
             <span className="text-[10px] uppercase tracking-wider">
-              {canEdit ? "Drop / click" : "Empty slot"}
+              {previewMissing && (image.original_path || image.compressed_path)
+                ? "File missing"
+                : canEdit
+                  ? "Drop / click"
+                  : "Empty slot"}
             </span>
             {canEdit && (
               <label className="absolute inset-0 cursor-pointer">

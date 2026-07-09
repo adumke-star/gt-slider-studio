@@ -10,6 +10,7 @@ import {
   fullBackupFileName,
   raceExists,
   readBackup,
+  reuploadRaceFilesFromArchive,
   restoreFullBackup,
   restoreRaceBackup,
   type BackupArchive,
@@ -31,6 +32,7 @@ function BackupPage() {
   const [restoreExists, setRestoreExists] = useState(false);
   const [restoreExistingCount, setRestoreExistingCount] = useState(0);
   const [restoreRunning, setRestoreRunning] = useState(false);
+  const [reuploadRunning, setReuploadRunning] = useState(false);
   const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,6 +93,49 @@ function BackupPage() {
       toast.error(`Could not read backup: ${(e as Error).message ?? e}`, { duration: 8000 });
     } finally {
       if (restoreInputRef.current) restoreInputRef.current.value = "";
+    }
+  }
+
+  async function runReuploadFiles() {
+    if (!restoreArchive || restoreArchive.kind !== "race") return;
+    if (!restoreExists) {
+      toast.error("Race does not exist yet — use full restore first.");
+      return;
+    }
+    if (restoreArchive.files.length === 0) {
+      toast.error("This backup ZIP contains no image files.");
+      return;
+    }
+    if (!confirm(
+      `Re-upload ${restoreArchive.files.length} image files for "${restoreArchive.manifest.race.name}"? ` +
+      "Database rows (sections, slots, statuses) stay unchanged.",
+    )) {
+      return;
+    }
+
+    setReuploadRunning(true);
+    setRestoreMsg("Starting…");
+    try {
+      const result = await reuploadRaceFilesFromArchive(restoreArchive, setRestoreMsg);
+      if (result.files_failed > 0) {
+        toast.error(
+          `${result.files_failed} of ${result.files_uploaded + result.files_failed} files failed to upload ` +
+          `(first error: ${result.file_failures[0]?.error ?? "unknown"}).`,
+          { duration: 15000 },
+        );
+      } else {
+        toast.success(
+          `Re-uploaded ${result.files_uploaded} image files for "${restoreArchive.manifest.race.name}". ` +
+          "Reload the dashboard to refresh previews.",
+          { duration: 10000 },
+        );
+      }
+    } catch (e) {
+      console.error("re-upload failed", e);
+      toast.error(`Re-upload failed: ${(e as Error).message ?? e}`, { duration: 10000 });
+    } finally {
+      setReuploadRunning(false);
+      setRestoreMsg(null);
     }
   }
 
@@ -219,19 +264,24 @@ function BackupPage() {
             <Button
               variant="outline"
               onClick={() => restoreInputRef.current?.click()}
-              disabled={restoreRunning}
+              disabled={restoreRunning || reuploadRunning}
               className="gap-1.5"
             >
               <HardDriveUpload className="h-4 w-4" /> Choose backup ZIP
             </Button>
-            {restoreArchive && !restoreRunning && (
+            {restoreArchive && !restoreRunning && !reuploadRunning && (
               <Button onClick={runRestore} className="gap-1.5">
                 {restoreArchive.kind === "full"
                   ? "Restore full backup"
                   : restoreExists ? "Replace existing race" : "Restore race"}
               </Button>
             )}
-            {restoreRunning && (
+            {restoreArchive?.kind === "race" && restoreExists && !restoreRunning && !reuploadRunning && (
+              <Button variant="outline" onClick={runReuploadFiles} className="gap-1.5">
+                Re-upload images only
+              </Button>
+            )}
+            {(restoreRunning || reuploadRunning) && (
               <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> {restoreMsg}
               </span>
@@ -254,6 +304,7 @@ function BackupPage() {
               {restoreExists && (
                 <div className="mt-1 font-bold text-[var(--status-todo)]">
                   This race still exists — restoring will replace its current state.
+                  If only images are missing, use <span className="text-foreground">Re-upload images only</span> instead.
                 </div>
               )}
             </div>

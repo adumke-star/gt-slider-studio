@@ -171,7 +171,9 @@ async function addStorageFilesToZip(
   for (const f of wanted) {
     onProgress?.(`File ${saved + failures.length + 1}/${wanted.length}…`);
     try {
-      zip.file(`files/${f.bucket}/${f.path}`, await fetchStorageBlob(f.bucket, f.path));
+      const blob = await fetchStorageBlob(f.bucket, f.path);
+      if (blob.size === 0) throw new Error("empty file in storage");
+      zip.file(`files/${f.bucket}/${f.path}`, blob);
       saved++;
     } catch (e) {
       const error = (e as Error).message ?? String(e);
@@ -437,6 +439,7 @@ async function uploadArchiveFiles(
     for (let attempt = 0; attempt < 2 && !ok; attempt++) {
       try {
         const blob = await f.getBlob();
+        if (blob.size === 0) throw new Error("empty file in backup ZIP");
         await uploadFile(f.bucket, f.path, blob, contentTypeForPath(f.path));
         ok = true;
       } catch (e) {
@@ -451,6 +454,29 @@ async function uploadArchiveFiles(
     }
   }
   return { uploaded, failed: failures.length, failures };
+}
+
+/**
+ * Re-upload image files from a parsed race backup without touching database rows.
+ * Use when structure/metadata restored correctly but storage files are missing.
+ */
+export async function reuploadRaceFilesFromArchive(
+  archive: RaceBackupArchive,
+  onProgress?: (msg: string) => void,
+): Promise<{ files_uploaded: number; files_failed: number; file_failures: FileFailure[] }> {
+  const raceId = archive.manifest.race.id;
+  if (!(await raceExists(raceId))) {
+    throw new Error(`Race "${archive.manifest.race.name}" not found — restore structure first.`);
+  }
+  if (archive.files.length === 0) {
+    throw new Error("This backup ZIP contains no image files.");
+  }
+  const files = await uploadArchiveFiles(archive.files, onProgress);
+  return {
+    files_uploaded: files.uploaded,
+    files_failed: files.failed,
+    file_failures: files.failures,
+  };
 }
 
 export type RestoreResult = {
