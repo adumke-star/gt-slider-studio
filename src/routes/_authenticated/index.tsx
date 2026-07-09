@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Download, Plus, X, Trash2, Wand2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -22,8 +22,6 @@ import { ExportDialog } from "@/components/dashboard/ExportDialog";
 import { CompressDialog } from "@/components/dashboard/CompressDialog";
 import type { SliderImage } from "@/components/dashboard/ImageCell";
 import { dataTransferHasFiles } from "@/lib/dropFiles";
-import { isCompressEligible } from "@/lib/compressImage";
-import { isRealImageSlot } from "@/lib/placeholderSlots";
 import { UserMenu } from "@/components/dashboard/UserMenu";
 import { RaceNav, type NavSelection, type RaceFlags } from "@/components/dashboard/RaceNav";
 import { RaceListView } from "@/components/dashboard/RaceListView";
@@ -60,14 +58,11 @@ function Dashboard() {
   const [bundleByRace, setBundleByRace] = useState<Map<string, RaceBundle>>(new Map());
   const [loadingRaceIds, setLoadingRaceIds] = useState<Set<string>>(new Set());
 
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportImages, setExportImages] = useState<SliderImage[] | null>(null);
   const [compressOpen, setCompressOpen] = useState(false);
   const [compressImages, setCompressImages] = useState<SliderImage[] | null>(null);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [raceToDelete, setRaceToDelete] = useState<{ id: string; name: string } | null>(null);
   const [deletingRace, setDeletingRace] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
@@ -234,15 +229,11 @@ function Dashboard() {
     };
   }, [loading, loadFlags, loadRuleFlags, loadRace]);
 
-  function toggle(id: string) {
-    setSelected((s) => {
-      const n = new Set(s);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
-  }
+  const onSelectNav = (sel: NavSelection) => {
+    setSelection(sel);
+  };
 
-  // All loaded images (across cached races) — needed for selection-based actions
+  // All loaded images (across cached races) — needed for slide numbers in export.
   const loadedImages = useMemo(() => {
     const arr: SliderImage[] = [];
     for (const b of bundleByRace.values()) arr.push(...b.images);
@@ -271,41 +262,6 @@ function Dashboard() {
     return map;
   }, [loadedImages]);
 
-  const selectedImgs = loadedImages.filter((i) => selected.has(i.id));
-  const selectedExportImgs = selectedImgs.filter(isRealImageSlot);
-
-  // Drop stale ids when slots are removed outside the header delete flow (e.g. placeholder trash).
-  useEffect(() => {
-    if (selected.size === 0) return;
-    const valid = new Set(loadedImages.map((i) => i.id));
-    setSelected((prev) => {
-      const next = new Set([...prev].filter((id) => valid.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [loadedImages, selected.size]);
-
-  async function performDelete() {
-    if (selectedImgs.length === 0) return;
-    setDeleting(true);
-    try {
-      await Promise.all(selectedImgs.flatMap((img) => [
-        img.original_path ? removeFile("originals", img.original_path).catch(() => {}) : Promise.resolve(),
-        img.compressed_path ? removeFile("compressed", img.compressed_path).catch(() => {}) : Promise.resolve(),
-      ]));
-      await supabase.from("slider_images").delete().in("id", selectedImgs.map((i) => i.id));
-      const raceIds = new Set(selectedImgs.map((i) => i.race_id));
-      setSelected(new Set());
-      await Promise.all([loadFlags(), ...Array.from(raceIds).map((id) => loadRace(id))]);
-      toast.success(`${selectedImgs.length} slot${selectedImgs.length === 1 ? "" : "s"} deleted`);
-      setDeleteOpen(false);
-    } catch (e) {
-      console.error(e);
-      toast.error("Delete failed");
-    } finally {
-      setDeleting(false);
-    }
-  }
-
   async function performDeleteRace() {
     if (!raceToDelete) return;
     const { id, name } = raceToDelete;
@@ -333,7 +289,6 @@ function Dashboard() {
         n.delete(id);
         return n;
       });
-      setSelected(new Set());
       if (selection.kind === "race" && selection.raceId === id) {
         setSelection({ kind: "overview" });
       }
@@ -348,11 +303,6 @@ function Dashboard() {
       setDeletingRace(false);
     }
   }
-
-  const onSelectNav = (sel: NavSelection) => {
-    setSelected(new Set());
-    setSelection(sel);
-  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -381,65 +331,9 @@ function Dashboard() {
                 <Plus className="h-4 w-4" /> Race
               </Button>
             )}
-            {showEditUI && (
-              <Button
-                onClick={() => {
-                  if (selectedImgs.length === 0) return;
-                  setDeleteOpen(true);
-                }}
-                disabled={selectedImgs.length === 0}
-                variant="outline"
-                className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete {selectedImgs.length > 0 && <span className="rounded bg-destructive/20 px-1.5 text-xs">{selectedImgs.length}</span>}
-              </Button>
-            )}
-
-            {showEditUI && (
-              <Button
-                onClick={() => {
-                  const imgs = selectedImgs.filter(isCompressEligible);
-                  if (imgs.length === 0) {
-                    toast.error("No compressible images selected.");
-                    return;
-                  }
-                  setCompressImages(imgs);
-                  setCompressOpen(true);
-                }}
-                disabled={selectedImgs.length === 0}
-                variant="outline"
-                className="gap-1.5 disabled:opacity-40"
-              >
-                <Wand2 className="h-4 w-4" />
-                Compress {selectedImgs.length > 0 && <span className="rounded bg-foreground/10 px-1.5 text-xs">{selectedImgs.length}</span>}
-              </Button>
-            )}
-            <Button
-              onClick={() => {
-                if (selectedExportImgs.length === 0) return;
-                setExportImages(selectedExportImgs);
-                setExportOpen(true);
-              }}
-              disabled={selectedExportImgs.length === 0}
-              className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
-            >
-              <Download className="h-4 w-4" />
-              Export {selectedExportImgs.length > 0 && (
-                <span className="rounded bg-primary-foreground/20 px-1.5 text-xs">{selectedExportImgs.length}</span>
-              )}
-            </Button>
             <UserMenu />
           </div>
         </div>
-
-        {selectedImgs.length > 0 && (
-          <div className="border-t border-border bg-primary/10 px-6 py-2 text-xs text-primary">
-            <button onClick={() => setSelected(new Set())} className="inline-flex items-center gap-1 hover:underline">
-              <X className="h-3 w-3" /> Clear selection ({selectedImgs.length})
-            </button>
-          </div>
-        )}
       </header>
 
       <main className="mx-auto max-w-[1600px] space-y-4 px-6 py-6">
@@ -498,10 +392,8 @@ function Dashboard() {
                 race={race}
                 sections={bundle.sections}
                 images={bundle.images}
-                selected={selected}
                 canEdit={showEditUI}
                 seasonInfo={seasonInfoBySeries.get(race.series)}
-                onToggleSelect={toggle}
                 onReload={() => {
                   loadRace(race.id);
                   loadFlags();
@@ -528,7 +420,7 @@ function Dashboard() {
       <CompressDialog
         open={compressOpen}
         onOpenChange={(v) => { setCompressOpen(v); if (!v) setCompressImages(null); }}
-        images={compressImages ?? selectedImgs.filter(isCompressEligible)}
+        images={compressImages ?? []}
         onDone={async () => {
           setCompressImages(null);
           await loadFlags();
@@ -538,44 +430,15 @@ function Dashboard() {
       <ExportDialog
         open={exportOpen}
         onOpenChange={(v) => { setExportOpen(v); if (!v) setExportImages(null); }}
-        images={exportImages ?? selectedImgs}
+        images={exportImages ?? []}
         races={races}
         slideNumbers={slideNumbers}
         canEdit={showEditUI}
-        onExported={(ids) => {
-          setSelected((prev) => {
-            const n = new Set(prev);
-            for (const id of ids) n.delete(id);
-            return n;
-          });
-        }}
         onDone={async () => {
           await loadFlags();
           if (selection.kind === "race") await loadRace(selection.raceId);
         }}
       />
-      <AlertDialog open={deleteOpen} onOpenChange={(v) => { if (!deleting) setDeleteOpen(v); }}>
-        <AlertDialogContent className="bg-surface-2">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-display text-xl">
-              Delete {selectedImgs.length} slot{selectedImgs.length === 1 ? "" : "s"}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              The selected slots will be permanently removed, including their original and compressed images. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); performDelete(); }}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting ? "Deleting…" : "Delete permanently"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <AlertDialog
         open={raceToDelete != null}
         onOpenChange={(v) => {

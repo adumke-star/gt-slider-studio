@@ -10,6 +10,7 @@ import { AddSlotDialog } from "./AddSlotDialog";
 import { isRealImageSlot, PLACEHOLDER_SLOT_TYPES } from "@/lib/placeholderSlots";
 import { getPlaceholderDragBlock, placeholderGroupSizes, remainingGroupMemberIds } from "@/lib/placeholderGroups";
 import { cn } from "@/lib/utils";
+import { removeFile } from "@/lib/storage";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
 import { isCompressEligible } from "@/lib/compressImage";
 import { sectionRequiredRealImages, type SeriesSeasonInfo } from "@/lib/rules";
@@ -68,9 +69,7 @@ export function RaceCard({
   race,
   sections,
   images,
-  selected,
   canEdit,
-  onToggleSelect,
   onReload,
   onExport,
   onCompress,
@@ -81,9 +80,7 @@ export function RaceCard({
   race: Race;
   sections: SliderSection[];
   images: SliderImage[];
-  selected: Set<string>;
   canEdit: boolean;
-  onToggleSelect: (id: string) => void;
   onReload: () => void;
   onExport: (images: SliderImage[]) => void;
   onCompress: (images: SliderImage[]) => void;
@@ -577,9 +574,7 @@ export function RaceCard({
                 key={s.id}
                 section={s}
                 images={list}
-                selected={selected}
                 canEdit={canEdit}
-                onToggleSelect={onToggleSelect}
                 onReload={onReload}
                 onRename={(n) => renameSection(s, n)}
                 onSetLinks={(links) => setSectionLinks(s, links)}
@@ -612,9 +607,7 @@ export function RaceCard({
 function SectionBlock({
   section,
   images,
-  selected,
   canEdit,
-  onToggleSelect,
   onReload,
   onRename,
   onSetLinks,
@@ -636,9 +629,7 @@ function SectionBlock({
 }: {
   section: SliderSection;
   images: SliderImage[];
-  selected: Set<string>;
   canEdit: boolean;
-  onToggleSelect: (id: string) => void;
   onReload: () => void;
   onRename: (name: string) => void;
   onSetLinks: (links: SectionLink[]) => void;
@@ -661,12 +652,54 @@ function SectionBlock({
   const links: SectionLink[] = Array.isArray(section.external_links) ? section.external_links : [];
   const realImages = images.filter(isRealImageSlot);
   const groupSizes = placeholderGroupSizes(images);
-  const selectedLinkIds = images.filter((i) => selected.has(i.id)).map((i) => i.id);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selectedImgs = images.filter((i) => selected.has(i.id));
+  const selectedLinkIds = selectedImgs.map((i) => i.id);
   const [placeholderDialogOpen, setPlaceholderDialogOpen] = useState(false);
   const [slotDialogOpen, setSlotDialogOpen] = useState(false);
   const [placeholderPreset, setPlaceholderPreset] = useState<string | undefined>();
   const [pendingPlaceholderDelete, setPendingPlaceholderDelete] = useState<SliderImage | null>(null);
+  const [slotsDeleteOpen, setSlotsDeleteOpen] = useState(false);
+  const [deletingSlots, setDeletingSlots] = useState(false);
   const [sectionDeleteOpen, setSectionDeleteOpen] = useState(false);
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    if (selected.size === 0) return;
+    const valid = new Set(images.map((i) => i.id));
+    setSelected((prev) => {
+      const next = new Set([...prev].filter((id) => valid.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [images, selected.size]);
+
+  async function performDeleteSelected() {
+    if (selectedImgs.length === 0) return;
+    setDeletingSlots(true);
+    try {
+      await Promise.all(selectedImgs.flatMap((img) => [
+        img.original_path ? removeFile("originals", img.original_path).catch(() => {}) : Promise.resolve(),
+        img.compressed_path ? removeFile("compressed", img.compressed_path).catch(() => {}) : Promise.resolve(),
+      ]));
+      await supabase.from("slider_images").delete().in("id", selectedImgs.map((i) => i.id));
+      setSelected(new Set());
+      onReload();
+      toast.success(`${selectedImgs.length} slot${selectedImgs.length === 1 ? "" : "s"} deleted`);
+      setSlotsDeleteOpen(false);
+    } catch (e) {
+      console.error(e);
+      toast.error("Delete failed");
+    } finally {
+      setDeletingSlots(false);
+    }
+  }
 
   function openPlaceholderDialog(preset?: string) {
     setPlaceholderPreset(preset);
@@ -1094,10 +1127,32 @@ function SectionBlock({
                   })}
                 </DropdownMenuContent>
               </DropdownMenu>
+              {selectedImgs.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(new Set())}
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-background hover:text-foreground"
+                    title="Clear slot selection"
+                  >
+                    <X className="h-3 w-3" /> Clear ({selectedImgs.length})
+                  </button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setSlotsDeleteOpen(true)}
+                    className={cn(SECTION_HEADER_GHOST_BTN, "text-destructive hover:bg-destructive/10 hover:text-destructive")}
+                    title="Delete selected slots"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Delete ({selectedImgs.length})
+                  </Button>
+                  <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
+                </>
+              )}
               <button
                 onClick={() => setSectionDeleteOpen(true)}
                 className="rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive"
-                title="Delete section"
+                title="Delete entire section"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -1124,7 +1179,7 @@ function SectionBlock({
                 selected={selected.has(img.id)}
                 groupSize={img.placeholder_group_id ? (groupSizes.get(img.placeholder_group_id) ?? 1) : 1}
                 groupIndex={groupIndexFor(img)}
-                onToggleSelect={() => onToggleSelect(img.id)}
+                onToggleSelect={() => toggleSelect(img.id)}
                 onDelete={() => setPendingPlaceholderDelete(img)}
                 onUnlink={
                   img.placeholder_group_id
@@ -1143,7 +1198,7 @@ function SectionBlock({
                 selected={selected.has(img.id)}
                 groupSize={img.placeholder_group_id ? (groupSizes.get(img.placeholder_group_id) ?? 1) : 1}
                 groupIndex={groupIndexFor(img)}
-                onToggleSelect={() => onToggleSelect(img.id)}
+                onToggleSelect={() => toggleSelect(img.id)}
                 onUnlink={
                   img.placeholder_group_id
                     ? () => onUnlinkSlot(img.id)
@@ -1322,6 +1377,29 @@ function SectionBlock({
         initialLabel={placeholderPreset}
         onConfirm={(label, count) => onAddPlaceholder(label, count)}
       />
+      <AlertDialog open={slotsDeleteOpen} onOpenChange={(v) => { if (!deletingSlots) setSlotsDeleteOpen(v); }}>
+        <AlertDialogContent className="bg-surface-2">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-xl">
+              Delete {selectedImgs.length} slot{selectedImgs.length === 1 ? "" : "s"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The selected slots in {section.kind.toUpperCase()} &ldquo;{section.name}&rdquo; will be permanently removed,
+              including their original and compressed images. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingSlots}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); performDeleteSelected(); }}
+              disabled={deletingSlots}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingSlots ? "Deleting…" : "Delete slots"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={pendingPlaceholderDelete != null} onOpenChange={(v) => { if (!v) setPendingPlaceholderDelete(null); }}>
         <AlertDialogContent className="bg-surface-2">
           <AlertDialogHeader>
