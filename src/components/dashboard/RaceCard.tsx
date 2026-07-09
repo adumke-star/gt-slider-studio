@@ -1174,8 +1174,12 @@ function SectionBlock({
           className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur"
           onClick={() => setEditingLinks(false)}
         >
-          <div
+          <form
             onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              commitLinks();
+            }}
             className="w-full max-w-lg rounded-lg border border-border bg-surface-2 p-4 shadow-xl"
           >
             <div className="mb-3 flex items-center justify-between">
@@ -1183,6 +1187,7 @@ function SectionBlock({
                 External links — {section.name}
               </h3>
               <button
+                type="button"
                 onClick={() => setEditingLinks(false)}
                 className="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground"
               >
@@ -1231,6 +1236,7 @@ function SectionBlock({
             </div>
             <div className="mt-3 flex items-center justify-between gap-2">
               <Button
+                type="button"
                 size="sm"
                 variant="ghost"
                 onClick={() => setLinksDraft([...linksDraft, { label: "", url: "" }])}
@@ -1239,19 +1245,19 @@ function SectionBlock({
                 <Plus className="h-3.5 w-3.5" /> Add link
               </Button>
               <div className="flex gap-2">
-                <Button size="sm" variant="ghost" onClick={() => setEditingLinks(false)}>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setEditingLinks(false)}>
                   Cancel
                 </Button>
                 <Button
+                  type="submit"
                   size="sm"
-                  onClick={commitLinks}
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   Save
                 </Button>
               </div>
             </div>
-          </div>
+          </form>
         </div>
       )}
       <AddSlotDialog

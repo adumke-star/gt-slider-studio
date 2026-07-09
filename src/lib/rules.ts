@@ -82,7 +82,7 @@ type RuleSection = {
 
 /**
  * Minimum slides for a section (rule 1/5). Guide categories that define fewer
- * than 6 slides lower the minimum — e.g. "Parking" only requires 1 image.
+ * than 6 slides lower the minimum — e.g. "Parking" and "Pitlane" only require 1 image.
  */
 export function sectionMinSlides(section: { guide_category?: string | null }): number {
   const category = findGuideCategory(section.guide_category);
@@ -176,7 +176,7 @@ export function evaluateRaceRules({
     const label = `${section.kind.toUpperCase()} „${section.name}“`;
 
     // Rule 1 + 5: at least 6 images per slider (less when the guide category
-    // defines fewer slides, e.g. Parking with 1, or a Product Video placeholder
+    // defines fewer slides, e.g. Parking or Pitlane with 1, or a Product Video placeholder
     // occupies one slot).
     const minSlides = sectionRequiredRealImages(section, images);
     if (imgs.length < minSlides) {

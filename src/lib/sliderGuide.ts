@@ -124,6 +124,12 @@ export const GUIDE_CATEGORIES: GuideCategory[] = [
     title: "PDP — Parking",
     slides: [COMPOSITING_OR_ACTION],
   },
+  {
+    label: "Pitlane",
+    kind: "pdp",
+    title: "PDP — Pitlane",
+    slides: [COMPOSITING_OR_ACTION],
+  },
 ];
 
 /** Combobox suggestions for a section of the given kind. */
@@ -150,6 +156,7 @@ export function guessCategory(name: string, kind: SectionKind): string | null {
   if (n.includes("resell")) return "Camping Resell";
   if (n.includes("glamping") || n.includes("camping")) return "Glamping & Camping";
   if (n.includes("parking")) return "Parking";
+  if (n.includes("pitlane") || n.includes("pit lane")) return "Pitlane";
   if (n.includes("premier") || (n.includes("motogp") && n.includes("experience"))) return "MotoGP Premier";
   if (n.includes("experience")) return "F1 Experiences";
   if (n.includes("ticket")) return "Tickets";
