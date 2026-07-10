@@ -22,7 +22,13 @@ export function useAppRole() {
       await (supabase.rpc as unknown as (fn: string) => PromiseLike<unknown>)(
         "sync_my_role_from_allowlist",
       );
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
+      const { data: roles, error } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
+      if (!error && (roles ?? []).length === 0) {
+        // Removed from the allowlist: end the stale session.
+        await supabase.auth.signOut();
+        window.location.href = "/auth";
+        return;
+      }
       if (alive) setRole(pickPrimaryRole(roles ?? []));
     })();
     return () => { alive = false; };

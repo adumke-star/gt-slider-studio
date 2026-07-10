@@ -118,8 +118,14 @@ function AdminPage() {
       setError("The primary administrator cannot be removed from the allowlist.");
       return;
     }
-    if (!confirm("Really delete this entry? The user won't be able to sign in again (existing sessions stay active).")) return;
+    if (!confirm("Really delete this entry? The user loses all access — they are signed out the next time the app loads.")) return;
     await supabase.from("allowed_emails").delete().eq("id", id);
+    // Revoke the live role immediately (admin-gated RPC, newer than the generated types).
+    const { error: revokeErr } = await (supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ error: { message: string } | null }>)("admin_revoke_user_roles", { _email: rowEmail });
+    if (revokeErr) setError(`Allowlist entry deleted, but live access could not be revoked: ${revokeErr.message}`);
     load();
   }
 
