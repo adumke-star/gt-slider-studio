@@ -97,10 +97,27 @@ function Dashboard() {
 
   // Rule flags for all races: lightweight query, evaluated client-side.
   const loadRuleFlags = useCallback(async () => {
-    const [{ data: raceRows }, { data: sectionRows }, { data: imageRows }] = await Promise.all([
-      supabase.from("races").select("id, series, race_date"),
-      supabase.from("slider_sections").select("id, race_id, kind, name, max_slides, guide_category"),
-      supabase.from("slider_images").select("id, race_id, section_id, image_type, season, created_at, is_placeholder, placeholder_label"),
+    // PostgREST caps unpaged selects at 1000 rows; slider_images exceeds that,
+    // and silently truncated rows made healthy races look like violations.
+    const fetchPaged = async <T,>(
+      build: (from: number, to: number) => PromiseLike<{ data: T[] | null }>,
+    ): Promise<T[]> => {
+      const page = 1000;
+      let from = 0;
+      const rows: T[] = [];
+      for (;;) {
+        const { data } = await build(from, from + page - 1);
+        const batch = data ?? [];
+        rows.push(...batch);
+        if (batch.length < page) break;
+        from += page;
+      }
+      return rows;
+    };
+    const [raceRows, sectionRows, imageRows] = await Promise.all([
+      fetchPaged((f, t) => supabase.from("races").select("id, series, race_date").order("id").range(f, t)),
+      fetchPaged((f, t) => supabase.from("slider_sections").select("id, race_id, kind, name, max_slides, guide_category").order("id").range(f, t)),
+      fetchPaged((f, t) => supabase.from("slider_images").select("id, race_id, section_id, image_type, season, created_at, is_placeholder, placeholder_label").order("id").range(f, t)),
     ]);
     const seasonBySeries = computeSeriesSeasonInfo(raceRows ?? []);
     const sectionsByRace = new Map<string, NonNullable<typeof sectionRows>>();
