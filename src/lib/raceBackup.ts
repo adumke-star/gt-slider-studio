@@ -10,6 +10,9 @@ import { downloadFile, signedUrl, uploadFile, removeFile } from "@/lib/storage";
  *   database/sections.json    slider_sections rows
  *   database/images.json      slider_images rows
  *   database/comments.json    comments rows (restored best-effort)
+ *   database/feedback.json    confidential jury feedback (only present when the
+ *                             backup creator is jury/primary admin; restored
+ *                             via the restore_feedback RPC)
  *   files/<bucket>/<storage path>
  *
  * Everything ("full-backup"):
@@ -18,6 +21,7 @@ import { downloadFile, signedUrl, uploadFile, removeFile } from "@/lib/storage";
  *   database/sections.json    all slider_sections rows
  *   database/images.json      all slider_images rows
  *   database/comments.json    all comments (restored best-effort)
+ *   database/feedback.json    confidential jury feedback (see above)
  *   database/allowed_emails.json  allowlist (restored best-effort)
  *   files/<bucket>/<storage path>
  *
@@ -41,6 +45,7 @@ export type RaceBackupManifest = {
     sections: number;
     images: number;
     comments: number;
+    feedback?: number;
     files_saved: number;
     files_failed: number;
   };
@@ -57,6 +62,7 @@ export type FullBackupManifest = {
     sections: number;
     images: number;
     comments: number;
+    feedback?: number;
     allowed_emails: number;
     files_saved: number;
     files_failed: number;
@@ -79,7 +85,45 @@ const db = supabase as unknown as {
       eq: (col: string, val: string) => Promise<{ error: { message: string } | null }>;
     };
   };
+  rpc: (
+    fn: string,
+    args?: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
 };
+
+/**
+ * Confidential jury feedback is exported via a SECURITY DEFINER RPC. Non-jury
+ * callers get an empty set — their backups simply contain no feedback.
+ */
+async function exportFeedback(raceId: string | null): Promise<Row[]> {
+  const { data, error } = await db.rpc("export_feedback", { _race_id: raceId });
+  if (error) {
+    // RPC not deployed yet (old DB) — back up without feedback.
+    console.warn("backup: export_feedback unavailable:", error.message);
+    return [];
+  }
+  return (data as Row[] | null) ?? [];
+}
+
+/**
+ * Restore feedback with original ids/authors via the restore_feedback RPC.
+ * Fails soft: if the restorer is not jury/primary admin (or the RPC does not
+ * exist), all rows are reported as skipped instead of failing the restore.
+ */
+async function restoreFeedbackRows(rows: Row[]): Promise<{ ok: number; skipped: number }> {
+  if (rows.length === 0) return { ok: 0, skipped: 0 };
+  try {
+    const { data, error } = await db.rpc("restore_feedback", { _rows: rows });
+    if (error) throw new Error(error.message);
+    const result = (Array.isArray(data) ? data[0] : data) as
+      | { restored?: number; skipped?: number }
+      | null;
+    return { ok: result?.restored ?? 0, skipped: result?.skipped ?? 0 };
+  } catch (e) {
+    console.warn("restore: feedback skipped:", (e as Error).message);
+    return { ok: 0, skipped: rows.length };
+  }
+}
 
 async function fetchAll(table: string): Promise<Row[]> {
   const pageSize = 1000;
@@ -220,11 +264,13 @@ export async function createRaceBackupZip(
     const commentsRes = await db.from("comments").select("*").in("image_id", imageIds);
     comments = commentsRes.data ?? [];
   }
+  const feedback = await exportFeedback(raceId);
 
   zip.file("database/race.json", JSON.stringify(race, null, 2));
   zip.file("database/sections.json", JSON.stringify(sections, null, 2));
   zip.file("database/images.json", JSON.stringify(images, null, 2));
   zip.file("database/comments.json", JSON.stringify(comments, null, 2));
+  zip.file("database/feedback.json", JSON.stringify(feedback, null, 2));
 
   // Storage files, keeping the original storage paths.
   const { saved, failed, failures } = await addStorageFilesToZip(zip, images, onProgress);
@@ -239,6 +285,7 @@ export async function createRaceBackupZip(
       sections: sections.length,
       images: images.length,
       comments: comments.length,
+      feedback: feedback.length,
       files_saved: saved,
       files_failed: failed,
     },
@@ -257,11 +304,12 @@ export async function createFullBackupZip(
   const zip = new JSZip();
 
   onProgress?.("Reading database…");
-  const [races, sections, images, comments, allowedEmails] = await Promise.all([
+  const [races, sections, images, comments, feedback, allowedEmails] = await Promise.all([
     fetchAll("races"),
     fetchAll("slider_sections"),
     fetchAll("slider_images"),
     fetchAll("comments"),
+    exportFeedback(null),
     fetchAll("allowed_emails").catch(() => [] as Row[]),
   ]);
   if (races.length === 0) throw new Error("No races found — nothing to back up.");
@@ -270,6 +318,7 @@ export async function createFullBackupZip(
   zip.file("database/sections.json", JSON.stringify(sections, null, 2));
   zip.file("database/images.json", JSON.stringify(images, null, 2));
   zip.file("database/comments.json", JSON.stringify(comments, null, 2));
+  zip.file("database/feedback.json", JSON.stringify(feedback, null, 2));
   zip.file("database/allowed_emails.json", JSON.stringify(allowedEmails, null, 2));
 
   const { saved, failed, failures } = await addStorageFilesToZip(zip, images, onProgress);
@@ -285,6 +334,7 @@ export async function createFullBackupZip(
       sections: sections.length,
       images: images.length,
       comments: comments.length,
+      feedback: feedback.length,
       allowed_emails: allowedEmails.length,
       files_saved: saved,
       files_failed: failed,
@@ -306,6 +356,7 @@ export type RaceBackupArchive = {
   sections: Row[];
   images: Row[];
   comments: Row[];
+  feedback: Row[];
   files: ArchiveFile[];
 };
 
@@ -316,6 +367,7 @@ export type FullBackupArchive = {
   sections: Row[];
   images: Row[];
   comments: Row[];
+  feedback: Row[];
   allowedEmails: Row[];
   files: ArchiveFile[];
 };
@@ -368,18 +420,20 @@ export async function readBackup(file: File | Blob): Promise<BackupArchive> {
   const sections = ((await readJson("database/sections.json")) as Row[] | null) ?? [];
   const images = ((await readJson("database/images.json")) as Row[] | null) ?? [];
   const comments = ((await readJson("database/comments.json")) as Row[] | null) ?? [];
+  // Older backups have no feedback file — treat as empty.
+  const feedback = ((await readJson("database/feedback.json")) as Row[] | null) ?? [];
 
   if (manifest.kind === "race-backup") {
     if (!manifest.race?.id) throw new Error("Backup manifest is missing the race entry.");
     const race = (await readJson("database/race.json")) as Row | null;
     if (!race || !race.id) throw new Error("database/race.json missing or empty.");
-    return { kind: "race", manifest, race, sections, images, comments, files };
+    return { kind: "race", manifest, race, sections, images, comments, feedback, files };
   }
 
   const races = ((await readJson("database/races.json")) as Row[] | null) ?? [];
   if (races.length === 0) throw new Error("database/races.json missing or empty.");
   const allowedEmails = ((await readJson("database/allowed_emails.json")) as Row[] | null) ?? [];
-  return { kind: "full", manifest, races, sections, images, comments, allowedEmails, files };
+  return { kind: "full", manifest, races, sections, images, comments, feedback, allowedEmails, files };
 }
 
 export async function raceExists(raceId: string): Promise<boolean> {
@@ -484,6 +538,8 @@ export type RestoreResult = {
   images: number;
   comments_restored: number;
   comments_skipped: number;
+  feedback_restored: number;
+  feedback_skipped: number;
   files_uploaded: number;
   files_failed: number;
   file_failures: FileFailure[];
@@ -536,12 +592,15 @@ export async function restoreRaceBackup(
 
   // Comments are best-effort: they reference user accounts that may no longer exist.
   const comments = await insertBestEffort("comments", archive.comments);
+  const feedback = await restoreFeedbackRows(archive.feedback);
 
   return {
     sections: archive.sections.length,
     images: archive.images.length,
     comments_restored: comments.ok,
     comments_skipped: comments.skipped,
+    feedback_restored: feedback.ok,
+    feedback_skipped: feedback.skipped,
     files_uploaded: files.uploaded,
     files_failed: files.failed,
     file_failures: files.failures,
@@ -555,6 +614,8 @@ export type FullRestoreResult = {
   images: number;
   comments_restored: number;
   comments_skipped: number;
+  feedback_restored: number;
+  feedback_skipped: number;
   allowed_emails_restored: number;
   allowed_emails_skipped: number;
   files_uploaded: number;
@@ -599,6 +660,7 @@ export async function restoreFullBackup(
 
   onProgress?.("Restoring comments & allowlist…");
   const comments = await insertBestEffort("comments", archive.comments);
+  const feedback = await restoreFeedbackRows(archive.feedback);
   // Allowlist rows that already exist fail on the unique email and are skipped.
   const allowed = await insertBestEffort("allowed_emails", archive.allowedEmails);
 
@@ -609,6 +671,8 @@ export async function restoreFullBackup(
     images: archive.images.length,
     comments_restored: comments.ok,
     comments_skipped: comments.skipped,
+    feedback_restored: feedback.ok,
+    feedback_skipped: feedback.skipped,
     allowed_emails_restored: allowed.ok,
     allowed_emails_skipped: allowed.skipped,
     files_uploaded: files.uploaded,

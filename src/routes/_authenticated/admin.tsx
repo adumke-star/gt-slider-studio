@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeft, Star, Trash2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,12 @@ import {
   normalizeRole,
   type AppRole,
 } from "@/lib/roles";
+import {
+  addJuryMemberByEmail,
+  listJuryMembers,
+  removeJuryMember,
+  type JuryMember,
+} from "@/lib/feedback";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -38,6 +44,7 @@ function AdminPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<AppRole>("viewer");
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isPrimary, setIsPrimary] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function load() {
     const { data } = await supabase.from("allowed_emails").select("*").order("created_at", { ascending: false });
@@ -48,6 +55,7 @@ function AdminPage() {
     (async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return;
+      setIsPrimary(isSuperuserEmail(u.user.email ?? ""));
       const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
       setIsAdmin(!!roles?.some((r) => r.role === "admin"));
       load();
@@ -206,7 +214,98 @@ function AdminPage() {
             </tbody>
           </table>
         </section>
+
+        {isPrimary && <JurySection />}
       </main>
     </div>
+  );
+}
+
+/**
+ * Jury administration — only rendered for the primary admin; the DB policies
+ * on jury_members enforce the same restriction server-side.
+ */
+function JurySection() {
+  const [members, setMembers] = useState<JuryMember[]>([]);
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    try {
+      setMembers(await listJuryMembers());
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function add() {
+    setError(null);
+    setBusy(true);
+    try {
+      const err = await addJuryMemberByEmail(email);
+      if (err) setError(err);
+      else {
+        setEmail("");
+        load();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(m: JuryMember) {
+    if (!confirm(`Remove ${m.full_name || m.email} from the jury? They will lose access to all feedback.`)) return;
+    const err = await removeJuryMember(m.user_id);
+    if (err) setError(err);
+    else load();
+  }
+
+  return (
+    <section className="rounded-lg border border-amber-500/30 bg-surface-2 p-4">
+      <h2 className="mb-1 flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+        <Star className="h-4 w-4 text-amber-400" /> Jury
+      </h2>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Jury members can see and write the confidential slot feedback — independent of their normal role.
+        Only you (primary admin) can manage this list and see it.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="name@example.com (must have signed in once)"
+          className="min-w-[260px] flex-1"
+          onKeyDown={(e) => { if (e.key === "Enter") add(); }}
+        />
+        <Button onClick={add} disabled={busy} className="gap-1.5">
+          <UserPlus className="h-4 w-4" /> Add to jury
+        </Button>
+      </div>
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+      <ul className="mt-3 divide-y divide-border/50 rounded border border-border">
+        {members.length === 0 && (
+          <li className="px-4 py-4 text-center text-xs text-muted-foreground">
+            No jury members yet — currently only you can see feedback.
+          </li>
+        )}
+        {members.map((m) => (
+          <li key={m.user_id} className="flex items-center gap-2 px-4 py-2 text-sm">
+            <span className="min-w-0 truncate">{m.full_name || m.email}</span>
+            {m.full_name && <span className="truncate text-xs text-muted-foreground">{m.email}</span>}
+            <button
+              onClick={() => remove(m)}
+              title="Remove from jury"
+              className="ml-auto inline-flex items-center rounded p-1.5 text-muted-foreground hover:bg-background hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

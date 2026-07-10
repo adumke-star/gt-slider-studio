@@ -177,8 +177,15 @@ function BackupPage() {
           toast.success(
             `Race "${restoreArchive.manifest.race.name}" restored: ${result.sections} sections, ${result.images} slots, ` +
             `${result.files_uploaded} files` +
+            `${result.feedback_restored ? `, ${result.feedback_restored} feedback` : ""}` +
             `${result.comments_skipped ? ` — ${result.comments_skipped} comments skipped` : ""}`,
             { duration: 8000 },
+          );
+        }
+        if (result.feedback_skipped > 0) {
+          toast.warning(
+            `${result.feedback_skipped} feedback entries were not restored — only jury members or the primary admin can restore feedback.`,
+            { duration: 12000 },
           );
         }
       } else {
@@ -193,8 +200,15 @@ function BackupPage() {
           toast.success(
             `Full backup restored: ${result.races_replaced} races replaced, ${result.races_created} recreated, ` +
             `${result.images} slots, ${result.files_uploaded} files` +
+            `${result.feedback_restored ? `, ${result.feedback_restored} feedback` : ""}` +
             `${result.comments_skipped ? ` — ${result.comments_skipped} comments skipped` : ""}`,
             { duration: 10000 },
+          );
+        }
+        if (result.feedback_skipped > 0) {
+          toast.warning(
+            `${result.feedback_skipped} feedback entries were not restored — only jury members or the primary admin can restore feedback.`,
+            { duration: 12000 },
           );
         }
       }

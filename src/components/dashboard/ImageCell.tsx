@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare, ChevronDown, Wand2, Crop, FileCheck2, Link2, Unlink } from "lucide-react";
+import { Trash2, Upload, Image as ImageIcon, Check, Download, GripVertical, MessageSquare, ChevronDown, Wand2, Crop, FileCheck2, Link2, Unlink, Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadFile, loadImagePreview, isBlobPreviewUrl, signedUrl, uploadFile, removeFile } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { collectFilesFromDataTransfer, dataTransferHasFiles, isImageFile } from "@/lib/dropFiles";
+import { fetchFeedbackAccess, feedbackCount } from "@/lib/feedback";
 import { CommentsSheet } from "./CommentsSheet";
+import { FeedbackSheet } from "./FeedbackSheet";
 import { CropDialog } from "./CropDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { hasCustomCrop, hasCustomCropArea, parseCropArea, renderCroppedPreviewUrl } from "@/lib/cropUtils";
@@ -88,6 +90,9 @@ export function ImageCell({
   const [cropOpen, setCropOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(0);
   const [unreadMentions, setUnreadMentions] = useState(0);
+  const [feedbackAccess, setFeedbackAccess] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [fbCount, setFbCount] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setName(image.title ?? ""); }, [image.title]);
@@ -159,6 +164,21 @@ export function ImageCell({
     })();
     return () => { alive = false; };
   }, [image.id, commentsOpen]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const access = await fetchFeedbackAccess();
+      if (!alive) return;
+      setFeedbackAccess(access);
+      // Non-jury users get zero rows via RLS anyway — skip the query.
+      if (access) {
+        const n = await feedbackCount(image.id);
+        if (alive) setFbCount(n);
+      }
+    })();
+    return () => { alive = false; };
+  }, [image.id, feedbackOpen]);
 
   async function handleFile(rawFile: File) {
     setBusy(true);
@@ -523,6 +543,24 @@ export function ImageCell({
               )}>{unreadMentions > 0 ? unreadMentions : commentCount}</span>
             )}
           </button>
+          {feedbackAccess ? (
+            <button
+              onClick={() => setFeedbackOpen(true)}
+              title="Jury feedback"
+              className="relative rounded p-1 text-muted-foreground hover:bg-background hover:text-amber-400"
+            >
+              <Star className="h-3.5 w-3.5" />
+              {fbCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-amber-500 px-1 text-[8px] font-bold text-black">
+                  {fbCount}
+                </span>
+              )}
+            </button>
+          ) : (
+            <span className="rounded p-1 text-muted-foreground/30" aria-hidden>
+              <Star className="h-3.5 w-3.5" />
+            </span>
+          )}
           {canEdit && canCrop && (
             <button
               onClick={() => setCropOpen(true)}
@@ -600,6 +638,9 @@ export function ImageCell({
       )}
 
       <CommentsSheet image={image} open={commentsOpen} onOpenChange={setCommentsOpen} onChanged={onChanged} />
+      {feedbackAccess && (
+        <FeedbackSheet image={image} open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      )}
       {canCrop && preview && (
         <CropDialog
           key={image.id}
