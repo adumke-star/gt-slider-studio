@@ -26,6 +26,32 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 type Allowed = { id: string; email: string; role: string; created_at: string };
 
+type UserActivity = {
+  user_id: string;
+  email: string;
+  full_name: string | null;
+  registered_at: string | null;
+  last_sign_in_at: string | null;
+  last_seen_at: string | null;
+};
+
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.round(diff / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} h ago`;
+  const d = Math.round(h / 24);
+  return d === 1 ? "yesterday" : `${d} days ago`;
+}
+
+function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 function roleBadgeClass(role: AppRole) {
   if (role === "admin") return "border-primary/40 bg-primary/15 text-primary";
   if (role === "editor") return "border-amber-500/40 bg-amber-500/15 text-amber-600";
@@ -46,9 +72,15 @@ function AdminPage() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isPrimary, setIsPrimary] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activityByEmail, setActivityByEmail] = useState<Map<string, UserActivity>>(new Map());
   async function load() {
     const { data } = await supabase.from("allowed_emails").select("*").order("created_at", { ascending: false });
     setRows((data ?? []) as Allowed[]);
+    // Registration/login/activity info — admin-gated RPC, newer than the generated types.
+    const { data: activity } = await (supabase.rpc as unknown as (
+      fn: string,
+    ) => Promise<{ data: UserActivity[] | null }>)("admin_list_users");
+    setActivityByEmail(new Map((activity ?? []).map((a) => [a.email.toLowerCase(), a])));
   }
 
   useEffect(() => {
@@ -60,6 +92,9 @@ function AdminPage() {
       setIsAdmin(!!roles?.some((r) => r.role === "admin"));
       load();
     })();
+    // Keep the online indicators fresh while the page stays open.
+    const interval = setInterval(load, 60_000);
+    return () => clearInterval(interval);
   }, []);
 
   async function add() {
@@ -161,13 +196,24 @@ function AdminPage() {
         <section className="rounded-lg border border-border bg-surface-2">
           <table className="w-full text-sm">
             <thead className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr><th className="px-4 py-2">Email</th><th className="px-4 py-2">Role</th><th className="px-4 py-2 text-right">Actions</th></tr>
+              <tr>
+                <th className="px-4 py-2">Email</th>
+                <th className="px-4 py-2">Role</th>
+                <th className="px-4 py-2">Account</th>
+                <th className="px-4 py-2">Last login</th>
+                <th className="px-4 py-2">Activity</th>
+                <th className="px-4 py-2 text-right">Actions</th>
+              </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && <tr><td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">No entries yet.</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No entries yet.</td></tr>}
               {rows.map((r) => {
                 const normalized = normalizeRole(r.role);
                 const locked = isSuperuserEmail(r.email);
+                const activity = activityByEmail.get(r.email.toLowerCase());
+                const online =
+                  !!activity?.last_seen_at &&
+                  Date.now() - new Date(activity.last_seen_at).getTime() < ONLINE_WINDOW_MS;
                 return (
                   <tr key={r.id} className="border-b border-border/50 last:border-b-0">
                     <td className="px-4 py-2">
@@ -199,6 +245,23 @@ function AdminPage() {
                             <option key={opt} value={opt}>{ROLE_LABELS[opt]}</option>
                           ))}
                         </select>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-muted-foreground" title={activity?.full_name ?? undefined}>
+                      {activity?.registered_at ? shortDate(activity.registered_at) : "—"}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-muted-foreground">
+                      {activity?.last_sign_in_at ? relativeTime(activity.last_sign_in_at) : "—"}
+                    </td>
+                    <td className="px-4 py-2 text-xs">
+                      {online ? (
+                        <span className="inline-flex items-center gap-1.5 text-[var(--status-live)]">
+                          <span className="h-2 w-2 rounded-full bg-[var(--status-live)]" /> online
+                        </span>
+                      ) : activity?.last_seen_at ? (
+                        <span className="text-muted-foreground">{relativeTime(activity.last_seen_at)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="px-4 py-2 text-right">
