@@ -51,6 +51,69 @@ type Race = {
 };
 
 export type SectionLink = { label: string; url: string };
+
+const LINK_LABEL_SUGGESTIONS = ["Originals", "Hi-Res", "Compressed JPG", "Compressed WebP"];
+
+/** Label field in the links editor: free text plus a click-to-pick suggestion list. */
+function LinkLabelInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const current = value.trim().toLowerCase();
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        data-link-label
+        placeholder="Label"
+        value={value}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget
+              .closest("[data-link-row]")
+              ?.querySelector<HTMLInputElement>("[data-link-url]")
+              ?.focus();
+          }
+          if (e.key === "Escape") setOpen(false);
+        }}
+        className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
+      />
+      {open && (
+        <div className="absolute left-0 top-full z-10 mt-1 w-full overflow-hidden rounded border border-border bg-popover py-0.5 shadow-md">
+          {LINK_LABEL_SUGGESTIONS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              // onMouseDown so the pick wins over the input blur
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange(s);
+                setOpen(false);
+              }}
+              className={cn(
+                "block w-full px-2 py-1.5 text-left text-xs hover:bg-accent hover:text-accent-foreground",
+                s.toLowerCase() === current ? "bg-accent/80 font-semibold text-foreground" : "text-foreground",
+              )}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 export type BatchItem = { name: string; status: "pending" | "uploading" | "done" | "error"; error?: string };
 
 export type SliderSection = {
@@ -801,7 +864,10 @@ function SectionBlock({
   const focusNewLinkRow = useRef(false);
 
   function openLinksEditor() {
-    setLinksDraft(links.length ? links : [{ label: "Originals", url: "" }]);
+    // With existing links, start on a fresh empty row so nobody accidentally
+    // overwrites a link while adding a new one.
+    focusNewLinkRow.current = links.length > 0;
+    setLinksDraft(links.length ? [...links, { label: "", url: "" }] : [{ label: "Originals", url: "" }]);
     setEditingLinks(true);
   }
 
@@ -1304,26 +1370,13 @@ function SectionBlock({
               )}
               {linksDraft.map((l, idx) => (
                 <div key={idx} data-link-row className="grid grid-cols-[140px_minmax(0,1fr)_auto] gap-2">
-                  <input
-                    type="text"
-                    data-link-label
-                    placeholder="Label"
+                  <LinkLabelInput
                     value={l.label}
-                    onChange={(e) => {
+                    onChange={(v) => {
                       const next = linksDraft.slice();
-                      next[idx] = { ...next[idx], label: e.target.value };
+                      next[idx] = { ...next[idx], label: v };
                       setLinksDraft(next);
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        const urlInput = e.currentTarget.parentElement?.querySelector<HTMLInputElement>(
-                          "[data-link-url]",
-                        );
-                        urlInput?.focus();
-                      }
-                    }}
-                    className="rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
                   />
                   <input
                     type="text"
