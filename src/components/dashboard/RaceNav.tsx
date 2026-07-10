@@ -78,6 +78,8 @@ export function RaceNav({
       if (!m.has(r.series)) m.set(r.series, []);
       m.get(r.series)!.push(r);
     }
+    // Nav lists are sorted alphabetically; the dashboard keeps manual sort_order.
+    for (const list of m.values()) list.sort((a, b) => a.name.localeCompare(b.name, "de"));
     return m;
   }, [races]);
 
@@ -129,11 +131,19 @@ export function RaceNav({
           (selection.kind === "series" && selection.series === s.key) ||
           (selectedRace?.series === s.key);
         const flags = seriesFlags(s.key);
-        const label = selectedRace?.series === s.key ? `${s.label} › ${selectedRace.name}` : s.label;
+        // With a race selected, dots are split: series aggregate after the
+        // series label, the selected race's own flags after the race name.
+        const selectedInSeries = selectedRace?.series === s.key ? selectedRace : null;
+        const raceOwnFlags = selectedInSeries ? raceFlags(selectedInSeries.id) : null;
         return (
           <DropdownMenu key={s.key}>
             <DropdownMenuTrigger
               onClick={() => onSelect({ kind: "series", series: s.key })}
+              title={
+                flags.hasRuleViolations
+                  ? `Rule violations somewhere in ${s.label} — open the list or the overview to find the race`
+                  : undefined
+              }
               className={cn(
                 baseBtn,
                 "cursor-pointer outline-none",
@@ -142,11 +152,20 @@ export function RaceNav({
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <span>{label}</span>
+              <span>{s.label}</span>
               {flags.hasChanges && <NavStatusDot kind="changes" />}
               {flags.hasOpenComments && <NavStatusDot kind="comments" />}
               {flags.hasSolved && <NavStatusDot kind="solved" />}
               {flags.hasRuleViolations && <NavStatusDot kind="rules" />}
+              {selectedInSeries && raceOwnFlags && (
+                <>
+                  <span>› {selectedInSeries.name}</span>
+                  {raceOwnFlags.hasChanges && <NavStatusDot kind="changes" />}
+                  {raceOwnFlags.hasOpenComments && <NavStatusDot kind="comments" />}
+                  {raceOwnFlags.hasSolved && <NavStatusDot kind="solved" />}
+                  {raceOwnFlags.hasRuleViolations && <NavStatusDot kind="rules" />}
+                </>
+              )}
               <ChevronDown className="h-3 w-3 opacity-70" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[12rem]">
