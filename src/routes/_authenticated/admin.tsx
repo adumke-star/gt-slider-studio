@@ -33,6 +33,7 @@ type UserActivity = {
   registered_at: string | null;
   last_sign_in_at: string | null;
   last_seen_at: string | null;
+  live_role: string | null;
 };
 
 const ONLINE_WINDOW_MS = 5 * 60 * 1000;
@@ -211,6 +212,8 @@ function AdminPage() {
                 const normalized = normalizeRole(r.role);
                 const locked = isSuperuserEmail(r.email);
                 const activity = activityByEmail.get(r.email.toLowerCase());
+                const liveRole = activity?.live_role ? normalizeRole(activity.live_role) : null;
+                const roleDrift = liveRole != null && liveRole !== normalized;
                 const online =
                   !!activity?.last_seen_at &&
                   Date.now() - new Date(activity.last_seen_at).getTime() < ONLINE_WINDOW_MS;
@@ -245,6 +248,11 @@ function AdminPage() {
                             <option key={opt} value={opt}>{ROLE_LABELS[opt]}</option>
                           ))}
                         </select>
+                      )}
+                      {roleDrift && (
+                        <div className="mt-1 text-[10px] text-destructive" title="Live permissions differ from allowlist — user must reload the app">
+                          Live: {ROLE_LABELS[liveRole!]} — reload app to apply
+                        </div>
                       )}
                     </td>
                     <td className="px-4 py-2 text-xs text-muted-foreground" title={activity?.full_name ?? undefined}>

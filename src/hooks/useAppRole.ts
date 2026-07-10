@@ -18,6 +18,10 @@ export function useAppRole() {
         if (alive) setRole(null);
         return;
       }
+      // Live role must match the allowlist — sync before reading user_roles.
+      await (supabase.rpc as unknown as (fn: string) => PromiseLike<unknown>)(
+        "sync_my_role_from_allowlist",
+      );
       const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
       if (alive) setRole(pickPrimaryRole(roles ?? []));
     })();
