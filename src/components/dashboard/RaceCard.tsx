@@ -733,6 +733,12 @@ function SectionBlock({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const selectedImgs = images.filter((i) => selected.has(i.id));
   const selectedLinkIds = selectedImgs.map((i) => i.id);
+  // Compress/Export act on the checkbox selection when one exists, otherwise on the whole section.
+  const selectedReal = realImages.filter((i) => selected.has(i.id));
+  const actionScope = selectedReal.length > 0 ? selectedReal : realImages;
+  const compressTargets = actionScope.filter(isCompressEligible);
+  const exportTargets = actionScope.filter((i) => i.compressed_path || i.original_path);
+  const scopeSuffix = selectedReal.length > 0 ? ` (${selectedReal.length})` : "";
   const [placeholderDialogOpen, setPlaceholderDialogOpen] = useState(false);
   const [slotDialogOpen, setSlotDialogOpen] = useState(false);
   const [placeholderPreset, setPlaceholderPreset] = useState<string | undefined>();
@@ -1149,19 +1155,23 @@ function SectionBlock({
           )}
           {canEdit && (
             <Button size="sm" variant="ghost"
-              disabled={realImages.filter(isCompressEligible).length === 0}
-              onClick={() => onCompress(realImages.filter(isCompressEligible))}
+              disabled={compressTargets.length === 0}
+              onClick={() => onCompress(compressTargets)}
               className={cn(SECTION_HEADER_GHOST_BTN, "disabled:opacity-40")}
-              title={`Compress ${section.kind.toUpperCase()} images`}>
-              <Wand2 className="h-3.5 w-3.5" /> Compress
+              title={selectedReal.length > 0
+                ? `Compress ${selectedReal.length} selected slot${selectedReal.length === 1 ? "" : "s"}`
+                : `Compress ${section.kind.toUpperCase()} images`}>
+              <Wand2 className="h-3.5 w-3.5" /> Compress{scopeSuffix}
             </Button>
           )}
           <Button size="sm" variant="ghost"
-            disabled={realImages.filter((i) => i.compressed_path || i.original_path).length === 0}
-            onClick={() => onExport(realImages.filter((i) => i.compressed_path || i.original_path))}
+            disabled={exportTargets.length === 0}
+            onClick={() => onExport(exportTargets)}
             className={cn(SECTION_HEADER_GHOST_BTN, "disabled:opacity-40")}
-            title={`Export ${section.kind.toUpperCase()} images`}>
-            <Download className="h-3.5 w-3.5" /> Export
+            title={selectedReal.length > 0
+              ? `Export ${selectedReal.length} selected slot${selectedReal.length === 1 ? "" : "s"}`
+              : `Export ${section.kind.toUpperCase()} images`}>
+            <Download className="h-3.5 w-3.5" /> Export{scopeSuffix}
           </Button>
           {canEdit && (
             <BulkStatusMenu

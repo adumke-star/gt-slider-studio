@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, Check, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
+import { Send, Check, RotateCcw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signedUrl } from "@/lib/storage";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { useAppRole } from "@/hooks/useAppRole";
 import { cn } from "@/lib/utils";
 import type { SliderImage } from "./ImageCell";
 
@@ -54,6 +56,7 @@ export function CommentsSheet({
   const [suggest, setSuggest] = useState<{ open: boolean; query: string; from: number }>({
     open: false, query: "", from: -1,
   });
+  const { isAdmin } = useAppRole();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -155,10 +158,37 @@ export function CommentsSheet({
 
   async function toggleResolved(c: Comment) {
     if (!meId) return;
-    const nextResolved = c.resolved_at ? null : new Date().toISOString();
-    const nextBy = c.resolved_at ? null : meId;
+    const wantResolved = !c.resolved_at;
+    const nextResolved = wantResolved ? new Date().toISOString() : null;
+    const nextBy = wantResolved ? meId : null;
+    const prev = comments;
     setComments((list) => list.map((x) => x.id === c.id ? { ...x, resolved_at: nextResolved, resolved_by: nextBy } : x));
-    await supabase.from("comments").update({ resolved_at: nextResolved, resolved_by: nextBy }).eq("id", c.id);
+    const { error } = await (supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ error: { message: string } | null }>)("set_comment_resolved", {
+      _comment_id: c.id,
+      _resolved: wantResolved,
+    });
+    if (error) {
+      setComments(prev);
+      toast.error(`Could not ${wantResolved ? "solve" : "reopen"} the comment: ${error.message}`);
+      return;
+    }
+    onChanged?.();
+  }
+
+  async function deleteComment(c: Comment) {
+    if (!confirm("Delete this comment? This cannot be undone.")) return;
+    const prev = comments;
+    setComments((list) => list.filter((x) => x.id !== c.id));
+    const { error } = await supabase.from("comments").delete().eq("id", c.id);
+    if (error) {
+      setComments(prev);
+      toast.error(`Could not delete the comment: ${error.message}`);
+      return;
+    }
+    toast.success("Comment deleted");
     onChanged?.();
   }
 
@@ -222,17 +252,28 @@ export function CommentsSheet({
                     {isResolved && <span className="text-emerald-500">· solved</span>}
                   </div>
                   <div className={cn("whitespace-pre-wrap break-words", isResolved && "line-through")}>{renderBody(c.body, profiles)}</div>
-                  <button
-                    onClick={() => toggleResolved(c)}
-                    className={cn(
-                      "mt-1.5 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wider transition-colors",
-                      isResolved
-                        ? "border-border text-muted-foreground hover:bg-surface-2"
-                        : "border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10",
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <button
+                      onClick={() => toggleResolved(c)}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wider transition-colors",
+                        isResolved
+                          ? "border-border text-muted-foreground hover:bg-surface-2"
+                          : "border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10",
+                      )}
+                    >
+                      {isResolved ? <><RotateCcw className="h-3 w-3" /> Reopen</> : <><Check className="h-3 w-3" /> Solve</>}
+                    </button>
+                    {(isMe || isAdmin) && (
+                      <button
+                        onClick={() => deleteComment(c)}
+                        className="inline-flex items-center gap-1 rounded border border-destructive/40 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-destructive transition-colors hover:bg-destructive/10"
+                        title="Delete comment"
+                      >
+                        <Trash2 className="h-3 w-3" /> Delete
+                      </button>
                     )}
-                  >
-                    {isResolved ? <><RotateCcw className="h-3 w-3" /> Reopen</> : <><Check className="h-3 w-3" /> Solve</>}
-                  </button>
+                  </div>
                 </div>
               </div>
             );
