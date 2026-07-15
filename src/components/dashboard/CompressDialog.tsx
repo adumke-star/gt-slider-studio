@@ -104,11 +104,17 @@ export function CompressDialog({
       try {
         const source = await fetchCompressSource(img);
         if (!source) {
-          toast.error(`${label}: image file not found in storage. Try re-uploading.`, { duration: 7000 });
+          toast.error(
+            img.original_path
+              ? `${label}: original master not found in storage. Try re-uploading.`
+              : `${label}: image file not found in storage. Try re-uploading.`,
+            { duration: 7000 },
+          );
           failed++;
           continue;
         }
 
+        const fromOriginal = source.from === "originals";
         const useQualityFirst = format !== "png";
 
         const result = await transformImage(source.blob, {
@@ -123,9 +129,9 @@ export function CompressDialog({
             : {}),
           width: 633,
           height: 382,
-          cropArea: source.from === "originals" ? parseCropArea(img.crop_area) : null,
+          cropArea: fromOriginal ? parseCropArea(img.crop_area) : null,
           focalPoint:
-            source.from === "originals" && !parseCropArea(img.crop_area)
+            fromOriginal && !parseCropArea(img.crop_area)
               ? resolveFocal(img.crop_x, img.crop_y)
               : undefined,
         });
@@ -215,7 +221,7 @@ export function CompressDialog({
           <DialogDescription>
             {passthrough
               ? "Takes the uploaded files as-is for export — nothing is re-encoded. The working copy in originals is kept for later format changes."
-              : "Crop to 633×382 and compress. Uses the original when available; otherwise re-compresses the existing web image. The working copy in originals is kept."}
+              : "Crop to 633×382 and compress from the originals master when present — re-compress always re-renders from that file, not the existing web image. Without a master, falls back to the web image."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-2">
@@ -283,7 +289,7 @@ export function CompressDialog({
               <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
                 Output: <span className="text-foreground">633 × 382 px</span> at quality {Math.round(ENCODE_QUALITY * 100)}%
                 {format === "png" ? " (PNG uses lossless mode)" : " — KB is a ceiling only, resolution never reduced"}.
-                Uses the original when available. Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
+                Re-compress uses the originals master (crop/focal applied). Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
               </div>
             </>
           )}

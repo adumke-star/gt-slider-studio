@@ -28,10 +28,21 @@ async function fetchBlobFromBucket(bucket: "originals" | "compressed", path: str
   }
 }
 
+/** Load the originals master when the slot has one (never falls back to compressed). */
+export async function fetchOriginalSource(img: CompressibleImage): Promise<CompressSource | null> {
+  if (!img.original_path) return null;
+  const blob = await fetchBlobFromBucket("originals", img.original_path);
+  if (!blob) return null;
+  return { blob, from: "originals", path: img.original_path };
+}
+
+/**
+ * Source for compress: always originals when original_path is set (re-compress
+ * re-renders from the master). Falls back to compressed only when no master exists.
+ */
 export async function fetchCompressSource(img: CompressibleImage): Promise<CompressSource | null> {
   if (img.original_path) {
-    const blob = await fetchBlobFromBucket("originals", img.original_path);
-    if (blob) return { blob, from: "originals", path: img.original_path };
+    return fetchOriginalSource(img);
   }
   if (img.compressed_path) {
     const blob = await fetchBlobFromBucket("compressed", img.compressed_path);
