@@ -176,7 +176,12 @@ export function ExportDialog({
     for (const img of toExport) {
       try {
         const url = await signedUrl("compressed", img.compressed_path!);
-        if (!url) continue;
+        if (!url) {
+          toast.error(`${img.title || img.id.slice(0, 6)}: compressed file not found — skipped.`, { duration: 7000 });
+          done++;
+          setProgress(done);
+          continue;
+        }
         const blob = await (await fetch(url)).blob();
         results.push({ id: img.id, folder: size === "both" ? "slider" : null, name: exportName(img, SLIDER_SIZE_LABEL), blob });
       } catch (e) {
@@ -215,9 +220,6 @@ export function ExportDialog({
         });
         if (out.overTarget) {
           lightboxOverTarget++;
-          done++;
-          setProgress(done);
-          continue;
         }
         results.push({
           id: img.id,
@@ -235,8 +237,8 @@ export function ExportDialog({
 
     if (lightboxOverTarget > 0) {
       toast.warning(
-        `${lightboxOverTarget} lightbox image${lightboxOverTarget === 1 ? "" : "s"} over ${lightboxKB} KB even at min quality — skipped. Raise the KB limit.`,
-        { duration: 7000 },
+        `${lightboxOverTarget} lightbox file${lightboxOverTarget === 1 ? "" : "s"} over ${lightboxKB} KB even at min quality — included anyway. Raise the cap for PageSpeed compliance.`,
+        { duration: 8000 },
       );
     }
 
@@ -362,7 +364,7 @@ export function ExportDialog({
               <Slider value={[lightboxKB]} min={50} max={1000} step={10}
                 onValueChange={([v]) => setLightboxKB(v)} disabled={running} />
               <p className="text-[10px] text-muted-foreground">
-                960 × 579 px at quality {Math.round(ENCODE_QUALITY * 100)}% — KB is a ceiling only, resolution never reduced.
+                960 × 579 px at quality {Math.round(ENCODE_QUALITY * 100)}% — KB is a PageSpeed cap; files over the limit are still included with a warning.
                 Format from original or slider image (AVIF → WebP).
               </p>
               <div className="flex items-center justify-between rounded border border-border bg-background/50 p-3">

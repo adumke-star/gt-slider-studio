@@ -96,7 +96,7 @@ export function CompressDialog({
     const ext = extForFormat(format);
     let done = 0;
     let ok = 0;
-    let skipped = 0;
+    let overCap = 0;
     let failed = 0;
 
     for (const img of eligible) {
@@ -138,12 +138,7 @@ export function CompressDialog({
         const { blob: out, mime, sizeKB, overTarget } = result;
 
         if (overTarget) {
-          toast.error(
-            `${label}: over ${targetKB} KB even at minimum quality (${sizeKB} KB) — not saved.`,
-            { duration: 7000 },
-          );
-          skipped++;
-          continue;
+          overCap++;
         }
 
         const folder = img.section_id ?? img.area;
@@ -190,11 +185,13 @@ export function CompressDialog({
       }
     }
 
-    if (ok > 0) toast.success(`${ok} image${ok === 1 ? "" : "s"} compressed`);
-    if (skipped > 0) {
+    if (ok > 0) {
+      toast.success(`${ok} image${ok === 1 ? "" : "s"} compressed`);
+    }
+    if (overCap > 0) {
       toast.warning(
-        `${skipped} image${skipped === 1 ? "" : "s"} over ${targetKB} KB — not saved. Raise the KB limit.`,
-        { duration: 7000 },
+        `${overCap} image${overCap === 1 ? "" : "s"} over ${targetKB} KB even at minimum quality — saved anyway. Raise the cap for PageSpeed compliance.`,
+        { duration: 8000 },
       );
     }
     if (failed > 0) {
@@ -205,9 +202,12 @@ export function CompressDialog({
 
     setRunning(false);
 
-    if (ok > 0) {
+    const processed = ok + failed;
+    if (processed === eligible.length && failed === 0) {
       onDone();
       onOpenChange(false);
+    } else if (ok > 0) {
+      onDone();
     }
   }
 
@@ -288,7 +288,7 @@ export function CompressDialog({
 
               <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
                 Output: <span className="text-foreground">633 × 382 px</span> at quality {Math.round(ENCODE_QUALITY * 100)}%
-                {format === "png" ? " (PNG uses lossless mode)" : " — KB is a ceiling only, resolution never reduced"}.
+                {format === "png" ? " (PNG uses lossless mode)" : " — KB is a PageSpeed cap; files over the limit are still saved with a warning"}.
                 Re-compress uses the originals master (crop/focal applied). Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
               </div>
             </>

@@ -1,4 +1,4 @@
-import { signedUrl, uploadFile, removeFile } from "@/lib/storage";
+import { downloadFile, signedUrl, uploadFile, removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 
 export type CompressibleImage = {
@@ -17,14 +17,18 @@ export function isCompressEligible(img: CompressibleImage): boolean {
 }
 
 async function fetchBlobFromBucket(bucket: "originals" | "compressed", path: string): Promise<Blob | null> {
-  const url = await signedUrl(bucket, path);
-  if (!url) return null;
   try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    return await res.blob();
+    return await downloadFile(bucket, path);
   } catch {
-    return null;
+    const url = await signedUrl(bucket, path);
+    if (!url) return null;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      return await res.blob();
+    } catch {
+      return null;
+    }
   }
 }
 
