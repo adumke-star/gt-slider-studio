@@ -99,7 +99,7 @@ export function ExportDialog({
   // Uncompressed but with an original — can be accepted as final on the fly.
   const pending = realImages.filter((i) => !i.compressed_path && i.original_path);
   const skipped = realImages.length - eligible.length - pending.length;
-  // Lightbox versions are rendered fresh from the 2000px working copy.
+  // Lightbox versions are rendered fresh from the originals working copy.
   const eligible960 = realImages.filter((i) => i.original_path).sort(bySliderOrder);
   const missing960 = realImages.length - eligible960.length;
   const count633 = include633 ? eligible.length + (includePending ? pending.length : 0) : 0;
@@ -188,7 +188,7 @@ export function ExportDialog({
     }
 
     // Lightbox size: rendered fresh from the original (read-only, nothing is
-    // written back to storage — the 2000px working copy stays untouched).
+    // written back to storage — the originals working copy stays untouched).
     let lightboxOverTarget = 0;
     for (const img of lightboxList) {
       try {

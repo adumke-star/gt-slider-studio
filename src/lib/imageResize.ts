@@ -1,10 +1,16 @@
 // Browser-side image downscaling before upload.
-// Keeps aspect ratio, exports as JPEG. Skips small files and non-images.
+// Keeps aspect ratio, exports as high-quality JPEG when resize is needed.
+
+/** Longest edge for the working copy stored in the originals bucket. */
+export const UPLOAD_MAX_DIMENSION = 1500;
+
+/** JPEG quality for resized uploads — high master quality for downstream JPG compress/export. */
+export const UPLOAD_JPEG_QUALITY = 0.99;
 
 export async function resizeImageFile(
   file: File,
-  maxDimension = 2000,
-  quality = 0.92,
+  maxDimension = UPLOAD_MAX_DIMENSION,
+  quality = UPLOAD_JPEG_QUALITY,
 ): Promise<File> {
   if (!file.type.startsWith("image/")) return file;
   // GIF/SVG/etc — leave untouched
@@ -32,6 +38,7 @@ export async function resizeImageFile(
     bitmap.close?.();
     return file;
   }
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(bitmap, 0, 0, targetW, targetH);
   bitmap.close?.();
 
