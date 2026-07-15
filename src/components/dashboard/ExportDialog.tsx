@@ -22,6 +22,8 @@ const LIGHTBOX_WIDTH = 960;
 const LIGHTBOX_HEIGHT = 579;
 const SLIDER_SIZE_LABEL = "633x382";
 const LIGHTBOX_SIZE_LABEL = "960x579";
+/** Default unsharp-mask strength for lightbox export (mild). */
+const LIGHTBOX_SHARPEN_AMOUNT = 0.22;
 
 /**
  * Lightbox format follows the existing 633 image; avif/unknown fall back to
@@ -76,6 +78,7 @@ export function ExportDialog({
   const [includePending, setIncludePending] = useState(false);
   const [size, setSize] = useState<ExportSize>("633");
   const [lightboxKB, setLightboxKB] = useState(250);
+  const [lightboxSharpen, setLightboxSharpen] = useState(true);
   const [progress, setProgress] = useState(0);
   const [progressTotal, setProgressTotal] = useState(0);
   const [phase, setPhase] = useState<"accept" | "download" | null>(null);
@@ -209,6 +212,7 @@ export function ExportDialog({
           height: LIGHTBOX_HEIGHT,
           cropArea,
           focalPoint: cropArea ? undefined : resolveFocal(img.crop_x, img.crop_y),
+          sharpen: lightboxSharpen ? LIGHTBOX_SHARPEN_AMOUNT : undefined,
         });
         if (out.overTarget) {
           lightboxOverTarget++;
@@ -361,6 +365,19 @@ export function ExportDialog({
               <p className="text-[10px] text-muted-foreground">
                 960 × 579 px · same crop as the slider image · format follows the slider image (AVIF falls back to WebP).
               </p>
+              <div className="flex items-center justify-between rounded border border-border bg-background/50 p-3">
+                <label htmlFor="lightbox-sharpen" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Light sharpen (unsharp mask)
+                </label>
+                <input
+                  id="lightbox-sharpen"
+                  type="checkbox"
+                  checked={lightboxSharpen}
+                  onChange={(e) => setLightboxSharpen(e.target.checked)}
+                  disabled={running}
+                  className="h-4 w-4 accent-primary"
+                />
+              </div>
             </div>
           )}
 

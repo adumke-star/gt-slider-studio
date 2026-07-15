@@ -22,6 +22,8 @@ export interface TransformOptions {
   format: ExportFormat;
   cropArea?: CropAreaPercentages | null;
   focalPoint?: FocalPoint | null;
+  /** Unsharp-mask strength (0 = off, ~0.2 = mild). Applied at final resolution before encode. */
+  sharpen?: number;
 }
 
 export interface TransformResult {
@@ -117,6 +119,44 @@ function renderBaseCanvas(
   return drawCover(img, baseW, baseH, focal);
 }
 
+/** Mild unsharp mask — compensates for downscale/JPEG softness. amount ~0.15–0.3. */
+export function applyUnsharpMask(
+  canvas: HTMLCanvasElement,
+  amount: number,
+  radiusPx = 1,
+): void {
+  if (amount <= 0) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const { width: w, height: h } = canvas;
+  const original = ctx.getImageData(0, 0, w, h);
+
+  const blurCanvas = document.createElement("canvas");
+  blurCanvas.width = w;
+  blurCanvas.height = h;
+  const bctx = blurCanvas.getContext("2d");
+  if (!bctx) return;
+
+  bctx.filter = `blur(${radiusPx}px)`;
+  bctx.drawImage(canvas, 0, 0);
+  bctx.filter = "none";
+
+  const blurred = bctx.getImageData(0, 0, w, h);
+  const out = ctx.createImageData(w, h);
+  const a = Math.min(1, Math.max(0, amount));
+
+  for (let i = 0; i < original.data.length; i += 4) {
+    for (let c = 0; c < 3; c++) {
+      const o = original.data[i + c];
+      const b = blurred.data[i + c];
+      out.data[i + c] = Math.min(255, Math.max(0, Math.round(o + a * (o - b))));
+    }
+    out.data[i + 3] = original.data[i + 3];
+  }
+  ctx.putImageData(out, 0, 0);
+}
+
 export async function transformImage(
   file: Blob,
   opts: TransformOptions,
@@ -196,6 +236,15 @@ export async function transformImage(
       focal,
     );
     await fitQualityUnderTarget();
+  }
+
+  if (opts.sharpen && opts.sharpen > 0) {
+    applyUnsharpMask(canvas, opts.sharpen);
+    if (target > 0) {
+      await fitQualityUnderTarget();
+    } else {
+      blob = await canvasToBlob(canvas, mime, q);
+    }
   }
 
   return {
