@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 import { signedUrl } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { acceptWithoutCompression } from "@/lib/compressImage";
-import { transformImage, extForFormat, type ExportFormat } from "@/lib/imageProcess";
+import { transformImage, extForFormat, ENCODE_MIN_QUALITY, ENCODE_QUALITY, ENCODE_SHARPEN_AMOUNT, type ExportFormat } from "@/lib/imageProcess";
 import { parseCropArea, resolveFocal } from "@/lib/cropUtils";
 import type { SliderImage } from "./ImageCell";
 import { isRealImageSlot } from "@/lib/placeholderSlots";
@@ -22,13 +22,6 @@ const LIGHTBOX_WIDTH = 960;
 const LIGHTBOX_HEIGHT = 579;
 const SLIDER_SIZE_LABEL = "633x382";
 const LIGHTBOX_SIZE_LABEL = "960x579";
-/** Default unsharp-mask strength for lightbox export (mild). */
-const LIGHTBOX_SHARPEN_AMOUNT = 0.22;
-/** Lightbox: encode at this quality; KB slider is only a hard ceiling. */
-const LIGHTBOX_QUALITY = 0.92;
-const LIGHTBOX_MIN_QUALITY = 0.75;
-
-/** Format for lightbox re-encode — prefer compressed format, else original file extension. */
 function lightboxFormat(img: SliderImage): ExportFormat {
   const f = img.format;
   if (f === "jpeg" || f === "png" || f === "webp") return f;
@@ -212,13 +205,13 @@ export function ExportDialog({
         const out = await transformImage(srcBlob, {
           format: fmt,
           targetKB: lightboxKB,
-          qualityFirst: LIGHTBOX_QUALITY,
-          minQuality: LIGHTBOX_MIN_QUALITY,
+          qualityFirst: ENCODE_QUALITY,
+          minQuality: ENCODE_MIN_QUALITY,
           width: LIGHTBOX_WIDTH,
           height: LIGHTBOX_HEIGHT,
           cropArea,
           focalPoint: cropArea ? undefined : resolveFocal(img.crop_x, img.crop_y),
-          sharpen: lightboxSharpen ? LIGHTBOX_SHARPEN_AMOUNT : undefined,
+          sharpen: lightboxSharpen ? ENCODE_SHARPEN_AMOUNT : undefined,
         });
         if (out.overTarget) {
           lightboxOverTarget++;
@@ -369,7 +362,7 @@ export function ExportDialog({
               <Slider value={[lightboxKB]} min={50} max={1000} step={10}
                 onValueChange={([v]) => setLightboxKB(v)} disabled={running} />
               <p className="text-[10px] text-muted-foreground">
-                960 × 579 px at quality {Math.round(LIGHTBOX_QUALITY * 100)}% — KB is a ceiling only, resolution never reduced.
+                960 × 579 px at quality {Math.round(ENCODE_QUALITY * 100)}% — KB is a ceiling only, resolution never reduced.
                 Format from original or slider image (AVIF → WebP).
               </p>
               <div className="flex items-center justify-between rounded border border-border bg-background/50 p-3">

@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { transformImage, extForFormat, type ExportFormat } from "@/lib/imageProcess";
+import { transformImage, extForFormat, ENCODE_MIN_QUALITY, ENCODE_QUALITY, ENCODE_SHARPEN_AMOUNT, type ExportFormat } from "@/lib/imageProcess";
 import { parseCropArea, resolveFocal } from "@/lib/cropUtils";
 import { uploadFile, removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,7 +28,8 @@ export function CompressDialog({
   onDone: () => void;
 }) {
   const [targetKB, setTargetKB] = useState(120);
-  const [format, setFormat] = useState<ExportFormat>("webp");
+  const [format, setFormat] = useState<ExportFormat>("jpeg");
+  const [sharpen, setSharpen] = useState(false);
   const [passthrough, setPassthrough] = useState(false);
   const [progress, setProgress] = useState(0);
   const [running, setRunning] = useState(false);
@@ -108,9 +109,18 @@ export function CompressDialog({
           continue;
         }
 
+        const useQualityFirst = format !== "png";
+
         const result = await transformImage(source.blob, {
           format,
           targetKB,
+          ...(useQualityFirst
+            ? {
+                qualityFirst: ENCODE_QUALITY,
+                minQuality: ENCODE_MIN_QUALITY,
+                sharpen: sharpen ? ENCODE_SHARPEN_AMOUNT : undefined,
+              }
+            : {}),
           width: 633,
           height: 382,
           cropArea: source.from === "originals" ? parseCropArea(img.crop_area) : null,
@@ -119,18 +129,16 @@ export function CompressDialog({
               ? resolveFocal(img.crop_x, img.crop_y)
               : undefined,
         });
-        const { blob: out, mime, sizeKB, overTarget, downscaled } = result;
+        const { blob: out, mime, sizeKB, overTarget } = result;
 
         if (overTarget) {
           toast.error(
-            `${label} could not reach ${targetKB} KB (${sizeKB} KB) — not saved.`,
+            `${label}: over ${targetKB} KB even at minimum quality (${sizeKB} KB) — not saved.`,
             { duration: 7000 },
           );
           skipped++;
           continue;
         }
-
-        if (downscaled) toast.info(`${label}: resolution reduced to reach ${targetKB} KB.`);
 
         const folder = img.section_id ?? img.area;
         const outPath = `${img.race_id}/${folder}/${img.id}.${ext}`;
@@ -179,7 +187,7 @@ export function CompressDialog({
     if (ok > 0) toast.success(`${ok} image${ok === 1 ? "" : "s"} compressed`);
     if (skipped > 0) {
       toast.warning(
-        `${skipped} image${skipped === 1 ? "" : "s"} over ${targetKB} KB — not saved. Try a higher limit or WebP.`,
+        `${skipped} image${skipped === 1 ? "" : "s"} over ${targetKB} KB — not saved. Raise the KB limit.`,
         { duration: 7000 },
       );
     }
@@ -234,7 +242,7 @@ export function CompressDialog({
             <>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-bold uppercase tracking-wider text-muted-foreground">Target size</span>
+                  <span className="font-bold uppercase tracking-wider text-muted-foreground">Max file size (PageSpeed cap)</span>
                   <span className="font-display text-lg text-primary">{targetKB} KB</span>
                 </div>
                 <Slider value={[targetKB]} min={10} max={500} step={1}
@@ -248,18 +256,34 @@ export function CompressDialog({
                 <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)} disabled={running}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="webp">WebP (recommended)</SelectItem>
+                    <SelectItem value="jpeg">JPG (recommended)</SelectItem>
+                    <SelectItem value="webp">WebP</SelectItem>
                     <SelectItem value="avif">AVIF</SelectItem>
-                    <SelectItem value="jpeg">JPG</SelectItem>
                     <SelectItem value="png">PNG (lossless)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
+              {format !== "png" && (
+                <div className="flex items-center justify-between rounded border border-border bg-background/50 p-3">
+                  <label htmlFor="compress-sharpen" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                    Light sharpen
+                  </label>
+                  <input
+                    id="compress-sharpen"
+                    type="checkbox"
+                    checked={sharpen}
+                    onChange={(e) => setSharpen(e.target.checked)}
+                    disabled={running}
+                    className="h-4 w-4 accent-primary"
+                  />
+                </div>
+              )}
+
               <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
-                Output: <span className="text-foreground">633 × 382 px</span> · cover fill, center crop.
-                Working copies (up to 1920 px, high-quality JPG when resized) stay in storage for re-compression.
-                Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
+                Output: <span className="text-foreground">633 × 382 px</span> at quality {Math.round(ENCODE_QUALITY * 100)}%
+                {format === "png" ? " (PNG uses lossless mode)" : " — KB is a ceiling only, resolution never reduced"}.
+                Uses the original when available. Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
               </div>
             </>
           )}

@@ -51,6 +51,11 @@ const DEFAULT_H = SLIDER_OUTPUT_HEIGHT;
 // Decimal kB to match the size shown by the macOS Finder (1 KB = 1000 bytes).
 const BYTES_PER_KB = 1000;
 
+/** Quality-first encode defaults (slider 633 + lightbox 960). */
+export const ENCODE_QUALITY = 0.92;
+export const ENCODE_MIN_QUALITY = 0.75;
+export const ENCODE_SHARPEN_AMOUNT = 0.22;
+
 export async function fileToImage(file: Blob): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(file);
   try {
