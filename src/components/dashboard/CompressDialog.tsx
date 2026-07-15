@@ -258,7 +258,7 @@ export function CompressDialog({
 
               <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
                 Output: <span className="text-foreground">633 × 382 px</span> · cover fill, center crop.
-                Working copies (up to 1500 px, high-quality JPG) stay in storage for re-compression.
+                Working copies (up to 1920 px, high-quality JPG when resized) stay in storage for re-compression.
                 Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
               </div>
             </>

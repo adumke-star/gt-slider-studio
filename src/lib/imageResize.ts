@@ -2,7 +2,7 @@
 // Keeps aspect ratio, exports as high-quality JPEG when resize is needed.
 
 /** Longest edge for the working copy stored in the originals bucket. */
-export const UPLOAD_MAX_DIMENSION = 1500;
+export const UPLOAD_MAX_DIMENSION = 1920;
 
 /** JPEG quality for resized uploads — high master quality for downstream JPG compress/export. */
 export const UPLOAD_JPEG_QUALITY = 0.99;
