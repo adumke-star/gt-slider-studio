@@ -20,6 +20,8 @@ type ExportSize = "633" | "960" | "both";
 /** Lightbox output: same aspect ratio as the 633x382 slider images. */
 const LIGHTBOX_WIDTH = 960;
 const LIGHTBOX_HEIGHT = 579;
+const SLIDER_SIZE_LABEL = "633x382";
+const LIGHTBOX_SIZE_LABEL = "960x579";
 
 /**
  * Lightbox format follows the existing 633 image; avif/unknown fall back to
@@ -105,14 +107,14 @@ export function ExportDialog({
   const exportCount = count633 + count960;
   const raceMap = new Map(races.map((r) => [r.id, r]));
 
-  function exportName(img: SliderImage, extOverride?: string) {
+  function exportName(img: SliderImage, sizeLabel: string, extOverride?: string) {
     const ext = extOverride ?? (img.format ? (img.format === "jpeg" ? "jpg" : img.format) : "webp");
     const race = raceMap.get(img.race_id);
     const slugTitle = img.title ? slugify(img.title) : "";
     const base = slugTitle
       || `${race ? slugify(race.name) : img.race_id.slice(0, 8)}_${img.area}_${String(img.position).padStart(2, "0")}`;
     const prefix = numbered ? `${String(slideNo(img)).padStart(2, "0")}_` : "";
-    return `${prefix}${base}.${ext}`;
+    return `${prefix}${base}_${sizeLabel}.${ext}`;
   }
 
   async function run() {
@@ -176,7 +178,7 @@ export function ExportDialog({
         const url = await signedUrl("compressed", img.compressed_path!);
         if (!url) continue;
         const blob = await (await fetch(url)).blob();
-        results.push({ id: img.id, folder: size === "both" ? "slider" : null, name: exportName(img), blob });
+        results.push({ id: img.id, folder: size === "both" ? "slider" : null, name: exportName(img, SLIDER_SIZE_LABEL), blob });
       } catch (e) {
         console.error("export failed for", img.id, e);
         toast.error(`Export failed for image ${img.id.slice(0, 6)}`);
@@ -217,7 +219,7 @@ export function ExportDialog({
         results.push({
           id: img.id,
           folder: size === "both" ? "lightbox" : null,
-          name: exportName(img, extForFormat(fmt)),
+          name: exportName(img, LIGHTBOX_SIZE_LABEL, extForFormat(fmt)),
           blob: out.blob,
         });
       } catch (e) {
@@ -252,9 +254,9 @@ export function ExportDialog({
       const dot = name.lastIndexOf(".");
       return dot < 0 ? `${name}-${c}` : `${name.slice(0, dot)}-${c}${name.slice(dot)}`;
     };
-    // ZIP gets real subfolders; individual downloads can't, so prefix instead.
+    // ZIP / folder picker: slider/ and lightbox/ subfolders when both sizes.
+    // Filenames always include the pixel dimensions (e.g. _633x382, _960x579).
     const zipName = (r: (typeof results)[number]) => uniqueName(r.folder ? `${r.folder}/${r.name}` : r.name);
-    const flatName = (r: (typeof results)[number]) => uniqueName(r.folder ? `${r.folder}_${r.name}` : r.name);
 
     try {
       if (asZip && results.length > 1) {
@@ -265,14 +267,17 @@ export function ExportDialog({
         triggerDownload(zipBlob, `slider-export-${Date.now()}.zip`);
       } else if (dirHandle) {
         for (const r of results) {
-          const handle = await dirHandle.getFileHandle(flatName(r), { create: true });
+          const parent = r.folder
+            ? await dirHandle.getDirectoryHandle(r.folder, { create: true })
+            : dirHandle;
+          const handle = await parent.getFileHandle(uniqueName(r.name), { create: true });
           const writable = await handle.createWritable();
           await writable.write(r.blob);
           await writable.close();
         }
       } else {
         for (let i = 0; i < results.length; i++) {
-          triggerDownload(results[i].blob, flatName(results[i]));
+          triggerDownload(results[i].blob, uniqueName(results[i].name));
           if (i < results.length - 1) {
             await new Promise((r) => setTimeout(r, 600));
           }
@@ -340,7 +345,7 @@ export function ExportDialog({
             </Select>
             {size === "both" && asZip && (
               <p className="text-[10px] text-muted-foreground">
-                ZIP will contain <span className="text-foreground">slider/</span> and <span className="text-foreground">lightbox/</span> subfolders.
+                ZIP: <span className="text-foreground">slider/</span> (_633x382) and <span className="text-foreground">lightbox/</span> (_960x579).
               </p>
             )}
           </div>
