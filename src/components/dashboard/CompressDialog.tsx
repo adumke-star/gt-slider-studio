@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { transformImage, extForFormat, ENCODE_MIN_QUALITY, ENCODE_QUALITY, ENCODE_SHARPEN_AMOUNT, type ExportFormat } from "@/lib/imageProcess";
+import { transformImage, extForFormat, ENCODE_SHARPEN_AMOUNT, type ExportFormat } from "@/lib/imageProcess";
 import { parseCropArea, resolveFocal } from "@/lib/cropUtils";
 import { uploadFile, removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,7 +35,6 @@ export function CompressDialog({
   const [running, setRunning] = useState(false);
 
   const eligible = images.filter(isCompressEligible);
-  // Passthrough copies the uploaded file 1:1, so it needs an original to copy from.
   const passthroughEligible = images.filter((i) => i.original_path);
   const activeCount = passthrough ? passthroughEligible.length : eligible.length;
 
@@ -96,7 +95,7 @@ export function CompressDialog({
     const ext = extForFormat(format);
     let done = 0;
     let ok = 0;
-    let overCap = 0;
+    let skipped = 0;
     let failed = 0;
 
     for (const img of eligible) {
@@ -115,18 +114,10 @@ export function CompressDialog({
         }
 
         const fromOriginal = source.from === "originals";
-        const useQualityFirst = format !== "png";
 
         const result = await transformImage(source.blob, {
           format,
           targetKB,
-          ...(useQualityFirst
-            ? {
-                qualityFirst: ENCODE_QUALITY,
-                minQuality: ENCODE_MIN_QUALITY,
-                sharpen: sharpen ? ENCODE_SHARPEN_AMOUNT : undefined,
-              }
-            : {}),
           width: 633,
           height: 382,
           cropArea: fromOriginal ? parseCropArea(img.crop_area) : null,
@@ -134,11 +125,21 @@ export function CompressDialog({
             fromOriginal && !parseCropArea(img.crop_area)
               ? resolveFocal(img.crop_x, img.crop_y)
               : undefined,
+          sharpen: format !== "png" && sharpen ? ENCODE_SHARPEN_AMOUNT : undefined,
         });
-        const { blob: out, mime, sizeKB, overTarget } = result;
+        const { blob: out, mime, sizeKB, overTarget, downscaled } = result;
 
         if (overTarget) {
-          overCap++;
+          toast.error(
+            `${label}: could not reach ${targetKB} KB (${sizeKB} KB) — not saved.`,
+            { duration: 7000 },
+          );
+          skipped++;
+          continue;
+        }
+
+        if (downscaled) {
+          toast.info(`${label}: resolution reduced to reach ${targetKB} KB.`);
         }
 
         const folder = img.section_id ?? img.area;
@@ -185,13 +186,11 @@ export function CompressDialog({
       }
     }
 
-    if (ok > 0) {
-      toast.success(`${ok} image${ok === 1 ? "" : "s"} compressed`);
-    }
-    if (overCap > 0) {
+    if (ok > 0) toast.success(`${ok} image${ok === 1 ? "" : "s"} compressed`);
+    if (skipped > 0) {
       toast.warning(
-        `${overCap} image${overCap === 1 ? "" : "s"} over ${targetKB} KB target — saved at lowest quality anyway.`,
-        { duration: 8000 },
+        `${skipped} image${skipped === 1 ? "" : "s"} over ${targetKB} KB — not saved. Raise the limit or try WebP.`,
+        { duration: 7000 },
       );
     }
     if (failed > 0) {
@@ -202,12 +201,9 @@ export function CompressDialog({
 
     setRunning(false);
 
-    const processed = ok + failed;
-    if (processed === eligible.length && failed === 0) {
+    if (ok > 0) {
       onDone();
       onOpenChange(false);
-    } else if (ok > 0) {
-      onDone();
     }
   }
 
@@ -248,7 +244,7 @@ export function CompressDialog({
             <>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-bold uppercase tracking-wider text-muted-foreground">Max file size (target)</span>
+                  <span className="font-bold uppercase tracking-wider text-muted-foreground">Max file size</span>
                   <span className="font-display text-lg text-primary">{targetKB} KB</span>
                 </div>
                 <Slider value={[targetKB]} min={10} max={500} step={1}
@@ -262,8 +258,8 @@ export function CompressDialog({
                 <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)} disabled={running}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="jpeg">JPG (recommended)</SelectItem>
-                    <SelectItem value="webp">WebP</SelectItem>
+                    <SelectItem value="jpeg">JPG</SelectItem>
+                    <SelectItem value="webp">WebP (recommended)</SelectItem>
                     <SelectItem value="avif">AVIF</SelectItem>
                     <SelectItem value="png">PNG (lossless)</SelectItem>
                   </SelectContent>
@@ -287,11 +283,9 @@ export function CompressDialog({
               )}
 
               <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
-                Output: <span className="text-foreground">633 × 382 px</span> — starts at {Math.round(ENCODE_QUALITY * 100)}% quality
-                {format === "png"
-                  ? " (PNG lossless)"
-                  : `, steps down to ${Math.round(ENCODE_MIN_QUALITY * 100)}% to reach ${targetKB} KB. All images are saved even if over target.`}.
-                Re-compress uses the originals master (crop/focal applied). Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
+                Output: <span className="text-foreground">633 × 382 px</span> · cover fill, center crop.
+                Fits under {targetKB} KB (may reduce quality or resolution). Re-compress uses the originals master.
+                Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
               </div>
             </>
           )}
