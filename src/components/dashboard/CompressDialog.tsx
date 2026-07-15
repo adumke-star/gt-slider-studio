@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { transformImage, extForFormat, ENCODE_MIN_QUALITY, ENCODE_QUALITY, ENCODE_SHARPEN_AMOUNT, type ExportFormat } from "@/lib/imageProcess";
+import { transformImage, extForFormat, ENCODE_QUALITY, ENCODE_SHARPEN_AMOUNT, type ExportFormat } from "@/lib/imageProcess";
 import { parseCropArea, resolveFocal } from "@/lib/cropUtils";
 import { uploadFile, removeFile } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,7 +26,6 @@ export function CompressDialog({
   images: SliderImage[];
   onDone: () => void;
 }) {
-  const [targetKB, setTargetKB] = useState(120);
   const [format, setFormat] = useState<ExportFormat>("jpeg");
   const [sharpen, setSharpen] = useState(false);
   const [passthrough, setPassthrough] = useState(false);
@@ -96,7 +94,6 @@ export function CompressDialog({
     const ext = extForFormat(format);
     let done = 0;
     let ok = 0;
-    let overCap = 0;
     let failed = 0;
 
     for (const img of eligible) {
@@ -119,11 +116,10 @@ export function CompressDialog({
 
         const result = await transformImage(source.blob, {
           format,
-          targetKB,
+          targetKB: 0,
           ...(useQualityFirst
             ? {
                 qualityFirst: ENCODE_QUALITY,
-                minQuality: ENCODE_MIN_QUALITY,
                 sharpen: sharpen ? ENCODE_SHARPEN_AMOUNT : undefined,
               }
             : {}),
@@ -135,11 +131,7 @@ export function CompressDialog({
               ? resolveFocal(img.crop_x, img.crop_y)
               : undefined,
         });
-        const { blob: out, mime, sizeKB, overTarget } = result;
-
-        if (overTarget) {
-          overCap++;
-        }
+        const { blob: out, mime, sizeKB } = result;
 
         const folder = img.section_id ?? img.area;
         const outPath = `${img.race_id}/${folder}/${img.id}.${ext}`;
@@ -187,12 +179,6 @@ export function CompressDialog({
 
     if (ok > 0) {
       toast.success(`${ok} image${ok === 1 ? "" : "s"} compressed`);
-    }
-    if (overCap > 0) {
-      toast.warning(
-        `${overCap} image${overCap === 1 ? "" : "s"} over ${targetKB} KB even at minimum quality — saved anyway. Raise the cap for PageSpeed compliance.`,
-        { duration: 8000 },
-      );
     }
     if (failed > 0) {
       toast.error(`${failed} image${failed === 1 ? "" : "s"} failed. Adjust settings and try again.`, {
@@ -247,17 +233,6 @@ export function CompressDialog({
           ) : (
             <>
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-bold uppercase tracking-wider text-muted-foreground">Max file size (PageSpeed cap)</span>
-                  <span className="font-display text-lg text-primary">{targetKB} KB</span>
-                </div>
-                <Slider value={[targetKB]} min={10} max={500} step={1}
-                  onValueChange={([v]) => setTargetKB(v)} disabled={running} />
-                <div className="flex justify-between text-[10px] text-muted-foreground">
-                  <span>10 KB</span><span>500 KB</span>
-                </div>
-              </div>
-              <div className="space-y-2">
                 <div className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Format</div>
                 <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)} disabled={running}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -288,7 +263,7 @@ export function CompressDialog({
 
               <div className="rounded border border-border bg-background/50 p-3 text-xs text-muted-foreground">
                 Output: <span className="text-foreground">633 × 382 px</span> at quality {Math.round(ENCODE_QUALITY * 100)}%
-                {format === "png" ? " (PNG uses lossless mode)" : " — KB is a PageSpeed cap; files over the limit are still saved with a warning"}.
+                {format === "png" ? " (PNG lossless)" : " — no file-size limit; actual KB is shown per slot after compress"}.
                 Re-compress uses the originals master (crop/focal applied). Eligible: <span className="text-foreground">{eligible.length}</span> of {images.length} selected.
               </div>
             </>
