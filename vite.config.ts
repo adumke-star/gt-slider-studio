@@ -18,5 +18,6 @@ export default defineConfig({
     optimizeDeps: {
       exclude: ["@jsquash/jpeg"],
     },
+    assetsInclude: ["**/*.wasm"],
   },
 });

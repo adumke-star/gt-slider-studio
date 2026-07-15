@@ -97,6 +97,8 @@ export function CompressDialog({
     let ok = 0;
     let skipped = 0;
     let failed = 0;
+    let mozjpegCount = 0;
+    let canvasFallbackCount = 0;
 
     for (const img of eligible) {
       const label = imageLabel(img);
@@ -127,7 +129,7 @@ export function CompressDialog({
               : undefined,
           sharpen: format !== "png" && sharpen ? ENCODE_SHARPEN_AMOUNT : undefined,
         });
-        const { blob: out, mime, sizeKB, overTarget, downscaled } = result;
+        const { blob: out, mime, sizeKB, overTarget, downscaled, jpegEncoder } = result;
 
         if (overTarget) {
           toast.error(
@@ -176,9 +178,16 @@ export function CompressDialog({
         }
 
         ok++;
+        if (format === "jpeg" && jpegEncoder === "mozjpeg") {
+          mozjpegCount++;
+        } else if (format === "jpeg" && jpegEncoder === "canvas") {
+          canvasFallbackCount++;
+          toast.warning(`${label}: Canvas fallback (MozJPEG unavailable).`, { duration: 6000 });
+        }
       } catch (e) {
         console.error("compress failed for", img.id, e);
-        toast.error(`Compression failed for ${label}`);
+        const detail = e instanceof Error ? e.message : String(e);
+        toast.error(`Compression failed for ${label}: ${detail}`);
         failed++;
       } finally {
         done++;
@@ -186,7 +195,17 @@ export function CompressDialog({
       }
     }
 
-    if (ok > 0) toast.success(`${ok} image${ok === 1 ? "" : "s"} compressed`);
+    if (ok > 0) {
+      let summary = `${ok} image${ok === 1 ? "" : "s"} compressed`;
+      if (format === "jpeg") {
+        if (mozjpegCount === ok) summary += " (MozJPEG)";
+        else if (canvasFallbackCount === ok) summary += " (Canvas fallback)";
+        else {
+          summary += ` (${mozjpegCount} MozJPEG, ${canvasFallbackCount} Canvas fallback)`;
+        }
+      }
+      toast.success(summary);
+    }
     if (skipped > 0) {
       toast.warning(
         `${skipped} image${skipped === 1 ? "" : "s"} over ${targetKB} KB — not saved. Raise the limit or try WebP.`,
