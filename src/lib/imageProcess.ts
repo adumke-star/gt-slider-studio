@@ -12,6 +12,7 @@ import {
   SLIDER_OUTPUT_HEIGHT,
   SLIDER_OUTPUT_WIDTH,
 } from "@/lib/cropUtils";
+import { encodeCanvasMozJpeg } from "@/lib/mozjpegEncode";
 
 export type ExportFormat = "jpeg" | "png" | "webp" | "avif";
 
@@ -104,6 +105,17 @@ function canvasToBlob(
       quality,
     ),
   );
+}
+
+async function encodeCanvas(
+  canvas: HTMLCanvasElement,
+  format: ExportFormat,
+  quality = 0.85,
+): Promise<Blob> {
+  if (format === "jpeg") {
+    return encodeCanvasMozJpeg(canvas, quality);
+  }
+  return canvasToBlob(canvas, MIME[format], quality);
 }
 
 const MIME: Record<ExportFormat, string> = {
@@ -216,12 +228,12 @@ export async function transformImage(
     }
     const minQ = opts.minQuality ?? 0.75;
     let q = Math.min(1, opts.qualityFirst);
-    let blob = await canvasToBlob(canvas, mime, q);
+    let blob = await encodeCanvas(canvas, opts.format, q);
 
     if (target > 0) {
       while (blob.size / BYTES_PER_KB > target && q > minQ + 0.001) {
         q = Math.max(minQ, Math.round((q - 0.05) * 100) / 100);
-        blob = await canvasToBlob(canvas, mime, q);
+        blob = await encodeCanvas(canvas, opts.format, q);
       }
     }
 
@@ -238,7 +250,7 @@ export async function transformImage(
   let scale = 1;
   let canvas = renderBaseCanvas(img, baseW, baseH, cropArea, focal);
   let q = 0.85;
-  let blob = await canvasToBlob(canvas, mime, q);
+  let blob = await encodeCanvas(canvas, opts.format, q);
   let downscaled = false;
 
   async function fitQualityUnderTarget() {
@@ -246,18 +258,18 @@ export async function transformImage(
     let lo = 0.2;
     let hi = 0.95;
     q = 0.85;
-    blob = await canvasToBlob(canvas, mime, q);
+    blob = await encodeCanvas(canvas, opts.format, q);
     for (let i = 0; i < 10; i++) {
       const kb = blob.size / BYTES_PER_KB;
       if (kb <= target && target - kb < target * 0.05) break;
       if (kb > target) hi = q;
       else lo = q;
       q = (lo + hi) / 2;
-      blob = await canvasToBlob(canvas, mime, q);
+      blob = await encodeCanvas(canvas, opts.format, q);
     }
     if (blob.size / BYTES_PER_KB > target) {
       q = lo;
-      blob = await canvasToBlob(canvas, mime, q);
+      blob = await encodeCanvas(canvas, opts.format, q);
     }
   }
 
@@ -281,7 +293,7 @@ export async function transformImage(
     if (target > 0) {
       await fitQualityUnderTarget();
     } else {
-      blob = await canvasToBlob(canvas, mime, q);
+      blob = await encodeCanvas(canvas, opts.format, q);
     }
   }
 
