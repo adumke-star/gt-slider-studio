@@ -24,15 +24,19 @@ const SLIDER_SIZE_LABEL = "633x382";
 const LIGHTBOX_SIZE_LABEL = "960x579";
 /** Default unsharp-mask strength for lightbox export (mild). */
 const LIGHTBOX_SHARPEN_AMOUNT = 0.22;
+/** Lightbox: encode at this quality; KB slider is only a hard ceiling. */
+const LIGHTBOX_QUALITY = 0.92;
+const LIGHTBOX_MIN_QUALITY = 0.75;
 
-/**
- * Lightbox format follows the existing 633 image; avif/unknown fall back to
- * WebP because browser AVIF encoding silently degrades to PNG.
- */
+/** Format for lightbox re-encode — prefer compressed format, else original file extension. */
 function lightboxFormat(img: SliderImage): ExportFormat {
   const f = img.format;
   if (f === "jpeg" || f === "png" || f === "webp") return f;
-  return "webp";
+  const ext = img.original_path?.split(".").pop()?.toLowerCase();
+  if (ext === "jpg" || ext === "jpeg") return "jpeg";
+  if (ext === "png") return "png";
+  if (ext === "webp") return "webp";
+  return "jpeg";
 }
 
 function slugify(s: string) {
@@ -208,6 +212,8 @@ export function ExportDialog({
         const out = await transformImage(srcBlob, {
           format: fmt,
           targetKB: lightboxKB,
+          qualityFirst: LIGHTBOX_QUALITY,
+          minQuality: LIGHTBOX_MIN_QUALITY,
           width: LIGHTBOX_WIDTH,
           height: LIGHTBOX_HEIGHT,
           cropArea,
@@ -236,7 +242,7 @@ export function ExportDialog({
 
     if (lightboxOverTarget > 0) {
       toast.warning(
-        `${lightboxOverTarget} lightbox image${lightboxOverTarget === 1 ? "" : "s"} could not reach ${lightboxKB} KB — skipped. Try a higher limit.`,
+        `${lightboxOverTarget} lightbox image${lightboxOverTarget === 1 ? "" : "s"} over ${lightboxKB} KB even at min quality — skipped. Raise the KB limit.`,
         { duration: 7000 },
       );
     }
@@ -357,13 +363,14 @@ export function ExportDialog({
           {include960 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-bold uppercase tracking-wider text-muted-foreground">Lightbox target size</span>
+                <span className="font-bold uppercase tracking-wider text-muted-foreground">Max file size (PageSpeed cap)</span>
                 <span className="font-display text-lg text-primary">{lightboxKB} KB</span>
               </div>
               <Slider value={[lightboxKB]} min={50} max={1000} step={10}
                 onValueChange={([v]) => setLightboxKB(v)} disabled={running} />
               <p className="text-[10px] text-muted-foreground">
-                960 × 579 px · same crop as the slider image · format follows the slider image (AVIF falls back to WebP).
+                960 × 579 px at quality {Math.round(LIGHTBOX_QUALITY * 100)}% — KB is a ceiling only, resolution never reduced.
+                Format from original or slider image (AVIF → WebP).
               </p>
               <div className="flex items-center justify-between rounded border border-border bg-background/50 p-3">
                 <label htmlFor="lightbox-sharpen" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">

@@ -24,6 +24,13 @@ export interface TransformOptions {
   focalPoint?: FocalPoint | null;
   /** Unsharp-mask strength (0 = off, ~0.2 = mild). Applied at final resolution before encode. */
   sharpen?: number;
+  /**
+   * Encode at this quality first; targetKB is only a hard ceiling (no resolution downscale).
+   * Used for lightbox export. Compress keeps the legacy KB-fit mode when omitted.
+   */
+  qualityFirst?: number;
+  /** Lowest quality step when trimming to fit targetKB in quality-first mode. */
+  minQuality?: number;
 }
 
 export interface TransformResult {
@@ -196,7 +203,33 @@ export async function transformImage(
     };
   }
 
-  // Lossy formats: search quality first, then downscale if still too big.
+  // Quality-first: fixed resolution, encode at qualityFirst, KB is only a ceiling.
+  if (opts.qualityFirst != null && opts.qualityFirst > 0) {
+    const canvas = renderBaseCanvas(img, baseW, baseH, cropArea, focal);
+    if (opts.sharpen && opts.sharpen > 0) {
+      applyUnsharpMask(canvas, opts.sharpen);
+    }
+    const minQ = opts.minQuality ?? 0.75;
+    let q = Math.min(1, opts.qualityFirst);
+    let blob = await canvasToBlob(canvas, mime, q);
+
+    if (target > 0) {
+      while (blob.size / BYTES_PER_KB > target && q > minQ + 0.001) {
+        q = Math.max(minQ, Math.round((q - 0.05) * 100) / 100);
+        blob = await canvasToBlob(canvas, mime, q);
+      }
+    }
+
+    return {
+      blob, mime,
+      sizeKB: Math.round(blob.size / BYTES_PER_KB),
+      width: canvas.width, height: canvas.height,
+      overTarget: target > 0 && blob.size / BYTES_PER_KB > target,
+      downscaled: false,
+    };
+  }
+
+  // Lossy formats (legacy): search quality to fit KB, then downscale if still too big.
   let scale = 1;
   let canvas = renderBaseCanvas(img, baseW, baseH, cropArea, focal);
   let q = 0.85;
